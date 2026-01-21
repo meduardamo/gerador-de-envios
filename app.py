@@ -1,3 +1,4 @@
+# app.py
 from datetime import datetime
 from urllib.parse import quote
 import os
@@ -6,7 +7,14 @@ import re
 import streamlit as st
 from google import genai
 
-
+# =========================
+# CONFIG (NÃO COMMITE CHAVE)
+# =========================
+# No Streamlit Cloud: Settings -> Secrets:
+# GEMINI_API_KEY = "..."
+#
+# Local: crie .streamlit/secrets.toml (exemplo abaixo)
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-2.5-flash"
 
 # Paleta Eixo
@@ -21,6 +29,7 @@ EIXO = {
     "vermelho": "#B84349",
 }
 
+# Coloque este arquivo na mesma pasta do app.py
 LOGO_PATH = "Marca_eixo_vetor_Logo horizontal magenta.png"
 
 AREAS = [
@@ -122,13 +131,6 @@ div[data-testid="stCodeBlock"] > pre {{
 )
 
 
-def _get_gemini_key() -> str:
-    # Prioridade: Streamlit secrets > env var
-    key = st.secrets.get("GEMINI_API_KEY", "") if hasattr(st, "secrets") else ""
-    key = (key or os.getenv("GEMINI_API_KEY", "")).strip()
-    return key
-
-
 def data_br(dt: datetime) -> str:
     return dt.strftime("%d/%m/%Y")
 
@@ -166,13 +168,12 @@ def limpar_prefixo_alerta_envio(resumo: str) -> str:
 
 @st.cache_resource
 def get_gemini_client():
-    api_key = _get_gemini_key()
-    if not api_key:
+    if not GEMINI_API_KEY.strip():
         raise RuntimeError(
-            "GEMINI_API_KEY não configurada. Defina em st.secrets (Streamlit Cloud) "
-            "ou como variável de ambiente GEMINI_API_KEY."
+            "Faltou a GEMINI_API_KEY. Configure nos Secrets do Streamlit Cloud "
+            "(App settings -> Secrets) ou crie .streamlit/secrets.toml local."
         )
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=GEMINI_API_KEY)
 
 
 def gerar_resumo_gemini(texto: str, is_alerta: bool, area: str) -> str:
@@ -248,7 +249,6 @@ def compilar_envio(
     header = montar_header(is_alerta=is_alerta, area=area, uf=uf)
     dt = data_br(datetime.now())
 
-    # WhatsApp bold: *texto*
     header_fmt = f"*{header}*"
     titulo_fmt = f"*{titulo.strip()}*"
 
@@ -275,12 +275,12 @@ def whatsapp_share_link(message: str) -> str:
 @st.dialog("Enviar no WhatsApp")
 def dialog_whatsapp(message: str):
     st.caption("Vai abrir o WhatsApp com o texto já preenchido. O envio final acontece por lá.")
-    st.link_button("Abrir WhatsApp", whatsapp_share_link(message), width="stretch")
+    st.link_button("Abrir WhatsApp", whatsapp_share_link(message), use_container_width=True)
 
 
 with st.sidebar:
     try:
-        st.image(LOGO_PATH, width="stretch")
+        st.image(LOGO_PATH, use_container_width=True)
     except Exception:
         st.caption("Logo não encontrada. Coloque o arquivo na mesma pasta do app.py:")
         st.code(LOGO_PATH, language="text")
@@ -290,7 +290,6 @@ with st.sidebar:
         "Cole o texto da notícia, escolha tipo e área, e o app gera um envio/alerta padronizado com IA.\n"
         "O resultado já sai no formato para copiar e colar no WhatsApp."
     )
-
 
 if "resultado_final" not in st.session_state:
     st.session_state["resultado_final"] = ""
@@ -393,7 +392,7 @@ with col_dir:
         c1, c2 = st.columns([1, 1])
 
         with c1:
-            if st.button("Enviar no WhatsApp", width="stretch"):
+            if st.button("Enviar no WhatsApp", use_container_width=True):
                 dialog_whatsapp(st.session_state["resultado_final"])
 
         with c2:
@@ -402,5 +401,5 @@ with col_dir:
                 data=st.session_state["resultado_final"].encode("utf-8"),
                 file_name="envio_padronizado.txt",
                 mime="text/plain",
-                width="stretch"
+                use_container_width=True
             )
