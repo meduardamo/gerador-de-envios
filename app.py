@@ -1,6 +1,6 @@
 # app.py
 from datetime import datetime
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 import os
 import re
 
@@ -145,9 +145,6 @@ def montar_header(is_alerta: bool, area: str, uf: str | None) -> str:
 def limpar_prefixo_alerta_envio(resumo: str) -> str:
     s = (resumo or "").strip()
 
-    # Remove prefixos tipo:
-    # "ALERTA: ...", "ALERTA JUDICIÁRIO: ...", "ALERTA Subnacional: ...",
-    # "ENVIO: ...", "ENVIO ECONOMIA: ..."
     s = re.sub(
         r"^(ALERTA|ENVIO)\s*(?:[-–—]|:)?\s*[^:\n]{0,60}:\s*",
         "",
@@ -155,7 +152,6 @@ def limpar_prefixo_alerta_envio(resumo: str) -> str:
         flags=re.IGNORECASE
     )
 
-    # Remove casos simples "ALERTA:" / "ENVIO:"
     s = re.sub(
         r"^(ALERTA|ENVIO)\s*(?:[-–—]|:)\s*",
         "",
@@ -164,6 +160,23 @@ def limpar_prefixo_alerta_envio(resumo: str) -> str:
     )
 
     return s.strip()
+
+
+def normalizar_link(raw: str) -> str | None:
+    s = (raw or "").strip()
+    if not s:
+        return None
+
+    if not re.match(r"^https?://", s, flags=re.IGNORECASE):
+        s = "https://" + s
+
+    p = urlparse(s)
+    if p.scheme not in ("http", "https"):
+        return None
+    if not p.netloc:
+        return None
+
+    return s
 
 
 @st.cache_resource
@@ -229,6 +242,7 @@ def compilar_envio(
     titulo: str,
     resumo: str,
     analise_eixo: str | None,
+    link: str | None,
 ) -> str:
     header = montar_header(is_alerta=is_alerta, area=area, uf=uf)
     dt = data_br(datetime.now())
@@ -243,6 +257,11 @@ def compilar_envio(
     partes.append(titulo_fmt)
     partes.append("")
     partes.append(resumo.strip())
+
+    link_norm = normalizar_link(link or "")
+    if link_norm:
+        partes.append("")
+        partes.append(f"Link: {link_norm}")
 
     if analise_eixo and analise_eixo.strip():
         partes.append("")
@@ -328,6 +347,12 @@ with col_esq:
             placeholder="Ex.: Haddad descarta candidatura em 2026..."
         )
 
+        link = st.text_input(
+            "Link (opcional)",
+            value="",
+            placeholder="Ex.: https://... (ou cole só o domínio que eu completo)"
+        )
+
         analise_eixo = st.text_area(
             "Análise Eixo (opcional)",
             height=120,
@@ -345,6 +370,10 @@ with col_esq:
         if area.strip() == "Subnacional" and not uf:
             erros.append("Selecione a UF (obrigatório para Subnacional).")
 
+        link_norm = normalizar_link(link)
+        if link.strip() and not link_norm:
+            erros.append("O link parece inválido. Cole uma URL completa (http/https) ou um domínio válido.")
+
         if erros:
             for e in erros:
                 st.error(e)
@@ -358,7 +387,8 @@ with col_esq:
                         uf=uf,
                         titulo=titulo,
                         resumo=resumo,
-                        analise_eixo=analise_eixo
+                        analise_eixo=analise_eixo,
+                        link=link_norm
                     )
                     st.success("Envio gerado.")
                 except Exception as e:
