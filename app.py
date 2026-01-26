@@ -258,15 +258,15 @@ def compilar_envio(
     partes.append("")
     partes.append(resumo.strip())
 
-    link_norm = normalizar_link(link or "")
-    if link_norm:
-        partes.append("")
-        partes.append(f"Link: {link_norm}")
-
     if analise_eixo and analise_eixo.strip():
         partes.append("")
         partes.append("ANÁLISE EIXO")
         partes.append(analise_eixo.strip())
+
+    link_norm = normalizar_link(link or "")
+    if link_norm:
+        partes.append("")
+        partes.append(f"Link: {link_norm}")
 
     return "\n".join(partes)
 
@@ -350,7 +350,7 @@ with col_esq:
         link = st.text_input(
             "Link (opcional)",
             value="",
-            placeholder="Ex.: https://..."
+            placeholder="Ex.: https://... (ou cole só o domínio que eu completo)"
         )
 
         analise_eixo = st.text_area(
