@@ -290,8 +290,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.caption(
-        "Cole o texto da notícia, escolha tipo e área, e o app gera um envio/alerta padronizado com IA.\n"
-        "O resultado já sai no formato para copiar e colar no WhatsApp."
+        "Cole o texto da notícia, escolha tipo e área, e o app gera um envio/alerta padronizado com IA. O resultado já sai no formato para copiar e colar no WhatsApp."
     )
 
 if "resultado_final" not in st.session_state:
@@ -347,16 +346,16 @@ with col_esq:
             placeholder="Ex.: Haddad descarta candidatura em 2026..."
         )
 
-        link = st.text_input(
-            "Link (opcional)",
-            value="",
-            placeholder="Ex.: https://... (ou cole só o domínio que eu completo)"
-        )
-
         analise_eixo = st.text_area(
             "Análise Eixo (opcional)",
             height=120,
             placeholder="Se quiser, escreva aqui uma análise curta e objetiva."
+        )
+
+        link = st.text_input(
+            "Link (opcional)",
+            value="",
+            placeholder="Ex.: https://... (ou cole só o domínio que eu completo)"
         )
 
         submitted = st.form_submit_button("Gerar envio/alerta")
