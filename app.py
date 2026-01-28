@@ -528,6 +528,6 @@ with col_dir:
                         if sucesso:
                             st.success("Salvo no Google Sheets!")
                         else:
-                            st.error("❌ Erro ao salvar")
+                            st.error("Erro ao salvar")
                 else:
-                    st.error("Google Sheets não configurado. Veja a sidebar."
+                    st.error("Google Sheets não configurado. Veja a sidebar.")
