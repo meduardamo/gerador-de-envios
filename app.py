@@ -506,7 +506,7 @@ with col_dir:
     st.subheader("Resultado")
 
     if not st.session_state["resultado_final"].strip():
-        st.info("Preencha o formulário e clique em "Gerar envio/alerta".")
+        st.info("Preencha o formulário e clique em \"Gerar envio/alerta\".")
     else:
         st.markdown("**Copiar:**")
         st.code(st.session_state["resultado_final"], language="text")
