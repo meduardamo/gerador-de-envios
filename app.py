@@ -435,7 +435,7 @@ with col_esq:
         link = st.text_input(
             "Link (opcional)",
             value="",
-            placeholder="Ex.: https://... (ou cole só o domínio que eu completo)"
+            placeholder="Ex.: https://..."
         )
 
         submitted = st.form_submit_button("Gerar envio/alerta")
