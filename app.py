@@ -375,7 +375,7 @@ with st.sidebar:
     st.markdown("---")
     sheets_client = get_sheets_client()
     if sheets_client:
-        st.success("✅ Google Sheets conectado")
+        st.success("Google Sheets conectado")
     else:
         st.warning("⚠️ Google Sheets não configurado")
         with st.expander("Como configurar?"):
