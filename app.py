@@ -527,7 +527,7 @@ with col_dir:
             )
         
         with c3:
-            if st.button("💾 Salvar no Sheets", use_container_width=True):
+            if st.button("Salvar no Sheets", use_container_width=True):
                 if get_sheets_client():
                     with st.spinner("Salvando..."):
                         dados = st.session_state["dados_envio"]
