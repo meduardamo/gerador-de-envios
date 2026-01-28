@@ -370,22 +370,6 @@ with st.sidebar:
     st.caption(
         "Cole o texto da notícia, escolha tipo e área, e o app gera um envio/alerta padronizado com IA. O resultado já sai no formato para copiar e colar no WhatsApp."
     )
-    
-    # Status do Google Sheets
-    st.markdown("---")
-    sheets_client = get_sheets_client()
-    if sheets_client:
-        st.success("Google Sheets conectado")
-    else:
-        st.warning("⚠️ Google Sheets não configurado")
-        with st.expander("Como configurar?"):
-            st.markdown("""
-            1. Crie uma Service Account no Google Cloud
-            2. Baixe o JSON das credenciais
-            3. No Streamlit Cloud: Settings → Secrets
-            4. Adicione: `GOOGLE_SHEETS_CREDS = {seu_json_aqui}`
-            5. Compartilhe a planilha com o email da service account
-            """)
 
 if "resultado_final" not in st.session_state:
     st.session_state["resultado_final"] = ""
@@ -527,7 +511,7 @@ with col_dir:
             )
         
         with c3:
-            if st.button("Salvar no Sheets", use_container_width=True):
+            if st.button("💾 Salvar no Sheets", use_container_width=True):
                 if get_sheets_client():
                     with st.spinner("Salvando..."):
                         dados = st.session_state["dados_envio"]
@@ -542,8 +526,8 @@ with col_dir:
                             texto_completo=dados["texto"]
                         )
                         if sucesso:
-                            st.success("✅ Salvo no Google Sheets!")
+                            st.success("Salvo no Google Sheets!")
                         else:
                             st.error("❌ Erro ao salvar")
                 else:
-                    st.error("Google Sheets não configurado. Veja a sidebar.")
+                    st.error("Google Sheets não configurado. Veja a sidebar."
