@@ -11,18 +11,20 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # =========================
-# CONFIG (NÃO COMMITE CHAVE)
+# CONFIG
 # =========================
 # No Streamlit Cloud: Settings -> Secrets:
 # GEMINI_API_KEY = "..."
 # GOOGLE_SHEETS_CREDS = {...} (JSON da service account)
+# SHEET_ID = "..."  (ID da planilha)
 #
-# Local: crie .streamlit/secrets.toml (exemplo abaixo)
+# Local: crie .streamlit/secrets.toml
+
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-2.5-flash"
 
-# ID da planilha (extraído da URL)
-SHEET_ID = "14Gkj4uBYuY8sRNhjUMG8z58dkac02ZcMvmp56ER5A3o"
+# ID da planilha (via Secrets/env)
+SHEET_ID = st.secrets.get("SHEET_ID") or os.getenv("SHEET_ID", "")
 
 # Paleta Eixo
 EIXO = {
@@ -74,8 +76,8 @@ AREAS = [
 ]
 
 UFS = [
-    "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG",
-    "PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+    "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
 ]
 
 st.set_page_config(page_title="Gerador de Envios", layout="wide")
@@ -204,21 +206,22 @@ def get_gemini_client():
 def get_sheets_client():
     """Conecta ao Google Sheets usando credenciais da service account"""
     try:
-        # Tenta pegar as credenciais do secrets
+        if not SHEET_ID.strip():
+            return None
+
         if "GOOGLE_SHEETS_CREDS" in st.secrets:
             creds_dict = dict(st.secrets["GOOGLE_SHEETS_CREDS"])
         else:
-            # Fallback para variável de ambiente (JSON string)
             creds_json = os.getenv("GOOGLE_SHEETS_CREDS", "")
             if not creds_json:
                 return None
             creds_dict = json.loads(creds_json)
-        
+
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        
+
         credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(credentials)
         return client
@@ -237,18 +240,17 @@ def salvar_no_sheets(
     link: str | None,
     texto_completo: str
 ):
-    """Salva o envio na planilha do Google Sheets"""
+    """Salva o envio na planilha do Google Sheets (INSERT na linha 2)."""
     client = get_sheets_client()
     if not client:
         return False
-    
+
     try:
         sheet = client.open_by_key(SHEET_ID).sheet1
-        
-        # Prepara a linha para inserir
+
         agora = datetime.now()
         linha = [
-            data_hora_br(agora),  # Data/Hora
+            data_hora_br(agora),   # Data/Hora
             tipo,                  # Tipo (Envio/Alerta)
             area,                  # Área
             uf or "",              # UF
@@ -258,9 +260,9 @@ def salvar_no_sheets(
             link or "",            # Link
             texto_completo         # Texto Completo
         ]
-        
-        # Adiciona a linha na planilha
-        sheet.append_row(linha)
+
+        # Inserir logo abaixo do cabeçalho (linha 2)
+        sheet.insert_row(linha, index=2)
         return True
     except Exception as e:
         st.error(f"Erro ao salvar no Sheets: {e}")
@@ -368,8 +370,12 @@ with st.sidebar:
 
     st.markdown("---")
     st.caption(
-        "Cole o texto da notícia, escolha tipo e área, e o app gera um envio/alerta padronizado com IA. O resultado já sai no formato para copiar e colar no WhatsApp."
+        "Cole o texto da notícia, escolha tipo e área, e o app gera um envio/alerta padronizado com IA. "
+        "O resultado já sai no formato para copiar e colar no WhatsApp."
     )
+
+    if not SHEET_ID.strip():
+        st.warning("⚠️ SHEET_ID não configurado nos Secrets/env.")
 
 if "resultado_final" not in st.session_state:
     st.session_state["resultado_final"] = ""
@@ -469,7 +475,7 @@ with col_esq:
                         analise_eixo=analise_eixo,
                         link=link_norm
                     )
-                    
+
                     st.session_state["resultado_final"] = resultado
                     st.session_state["dados_envio"] = {
                         "tipo": "Alerta" if is_alerta else "Envio",
@@ -481,7 +487,7 @@ with col_esq:
                         "link": link_norm,
                         "texto": texto
                     }
-                    
+
                     st.success("Envio gerado.")
                 except Exception as e:
                     st.error(f"Erro ao gerar com Gemini: {e}")
@@ -509,7 +515,7 @@ with col_dir:
                 mime="text/plain",
                 use_container_width=True
             )
-        
+
         with c3:
             if st.button("Salvar no Sheets", use_container_width=True):
                 if get_sheets_client():
