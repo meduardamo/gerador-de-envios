@@ -1430,9 +1430,18 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
             )
 
         if turno_cenario == "t1":
+            # Mostra direto o NÚMERO que vai pro scenario_label da matriz (já
+            # passado por normalizar_scenario_label_t1), não o rótulo
+            # descritivo cru extraído ("Estimulada - 5 candidatos" etc.) — a
+            # conversão texto->número era invisível antes, e um rótulo sem
+            # número reconhecível podia cair num fallback que ela não via.
+            # Editando aqui o número direto, o que ela vê é literalmente o
+            # que é salvo; se estiver errado, corrige na hora.
             scenario_label = st.text_input(
-                "Rótulo do cenário (T1)",
-                value=cenario.get("scenario_label", str(idx_no_grupo)),
+                "Número do cenário (T1) — é isso que vai pro scenario_label da matriz",
+                value=normalizar_scenario_label_t1(
+                    cenario.get("scenario_label", str(idx_no_grupo)), idx_no_grupo
+                ),
                 key=f"polling_scenario_label_{idx}",
             )
         else:
