@@ -1199,14 +1199,13 @@ def montar_dataframes_polling_manual(
 
 
 def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[str]]:
-    """Fecha o loop com a fila 'relatorios' do eixo-eleicoes: quando um relatório
-    não tem ficha de instituto cadastrada, relatorios_pipeline.py grava
-    '⚠️ REGISTRE NO POLLING MANUAL' em 'Topline extraída?' e NUNCA mais toca
-    nessa linha — fica sinalizada como pendente pra sempre, mesmo depois de
-    lançada aqui manualmente. Isso marca 'sim' + data nas linhas correspondentes
-    (por Registro TSE + Cargo). Silencioso por design: se a planilha não
-    estiver configurada ou a linha não for encontrada, não interrompe o
-    salvamento da pesquisa — só devolve avisos pra exibir.
+    """Fecha o loop com a fila 'relatorios' do eixo-eleicoes: extração automática de
+    topline foi aposentada em 16/07/2026 (só segmentos/rejeição/aprovação continuam
+    automáticos) - 'Intenção de voto cadastrada?' (nome antigo: 'Topline extraída?')
+    fica '⚠️ REGISTRE NO POLLING MANUAL' até alguém lançar por aqui. Isso marca 'sim'
+    + data nas linhas correspondentes (por Registro TSE + Cargo). Silencioso por
+    design: se a planilha não estiver configurada ou a linha não for encontrada, não
+    interrompe o salvamento da pesquisa — só devolve avisos pra exibir.
 
     Retorna (quantidade de linhas atualizadas, lista de avisos).
     """
@@ -1237,9 +1236,9 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
     try:
         i_registro = header.index("Registro TSE")
         i_cargo = header.index("Cargo")
-        i_flag = header.index("Topline extraída?")
-        i_data = header.index("Data da extração de topline")
-        i_erro = header.index("Erro na extração de topline")
+        i_flag = (header.index("Intenção de voto cadastrada?") if "Intenção de voto cadastrada?" in header
+                  else header.index("Topline extraída?"))
+        i_data = header.index("Data do registro manual")
     except ValueError as exc:
         avisos.append(f"fila de relatórios sem a coluna esperada ({exc})")
         return 0, avisos
@@ -1256,7 +1255,6 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
         updates.extend([
             gspread.Cell(row_i, i_flag + 1, "sim"),
             gspread.Cell(row_i, i_data + 1, agora),
-            gspread.Cell(row_i, i_erro + 1, ""),
         ])
 
     if updates:
