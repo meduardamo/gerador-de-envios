@@ -625,13 +625,23 @@ def normalizar_payload_polling(payload: dict) -> dict:
         if turno_cenario not in POLLING_MANUAL_TURNOS:
             turno_cenario = turno
 
+        # Mesma lógica pro cargo: relatório estadual costuma trazer presidente
+        # + governador + senador no mesmo material — cai pro cargo do payload
+        # quando o cenário não especificar o dele.
+        cargo_cenario = normalizar_texto_simples(cenario.get("cargo")).lower()
+        if cargo_cenario not in POLLING_MANUAL_CARGOS:
+            cargo_cenario = cargo
+
         # SENADOR NUNCA TEM SEGUNDO TURNO (regra também no prompt, mas o modelo
         # às vezes desobedece - visto ao vivo com "2º voto" de senador virando
         # t2). O prompt já pede pra nem criar cenário nesse caso, mas se o
         # modelo criar mesmo assim, força t1 aqui em vez de deixar um "Segundo
         # turno" fantasma entrar na revisão/planilha: 1º/2º voto de senador de
         # 2 vagas é sempre t1, nunca é o confronto de 2º turno de verdade.
-        if cargo == "senador" and turno_cenario == "t2":
+        # Usa o cargo DESTE cenário, não o do payload - um material com vários
+        # cargos juntos pode ter, no mesmo lote, um cenário de senador e outro
+        # de governador/presidente que É t2 de verdade.
+        if cargo_cenario == "senador" and turno_cenario == "t2":
             turno_cenario = "t1"
 
         # Para T2, a identidade persistida vem dos dois candidatos. Rótulos
@@ -641,6 +651,7 @@ def normalizar_payload_polling(payload: dict) -> dict:
 
         cenarios_norm.append({
             "scenario_label": label or str(idx),
+            "cargo": cargo_cenario,
             "turno": turno_cenario,
             "itens": itens_norm,
         })
@@ -674,6 +685,7 @@ def carregar_payload_polling_no_state(payload: dict):
             "polling_scenario_label_",
             "polling_scenario_desc_",
             "polling_scenario_turno_",
+            "polling_scenario_cargo_",
             "polling_meta_",
         )):
             del st.session_state[chave]
@@ -886,6 +898,15 @@ Extraia os dados estruturados para inserção em planilha.
   turno correto — não descarte um pra "focar" só no outro, mesmo que
   TURNO-ALVO tenha sido informado (ver regra de FOCO DA EXTRAÇÃO acima). Não
   use inferência eleitoral pra completar confrontos que o material não trouxer.
+- CADA CENÁRIO TAMBÉM TEM SEU PRÓPRIO CAMPO "cargo": relatório estadual
+  frequentemente traz presidente + governador + senador no MESMO material
+  (às vezes até no mesmo PDF, um bloco de páginas por cargo). Não existe um
+  cargo único pra resposta inteira: se o material trouxer estimulada de mais
+  de um cargo, extraia os cenários de TODOS eles na mesma resposta, cada um
+  com o "cargo" correto — não escolha só um cargo "principal" pra focar,
+  mesmo que CARGO-ALVO não tenha sido informado (auto-detectar = pegar
+  todos). Só restrinja a um cargo quando CARGO-ALVO tiver sido informado
+  explicitamente (ver FOCO DA EXTRAÇÃO acima).
 - Para t2, cada confronto direto deve ser um cenário separado.
 - SENADOR NUNCA TEM SEGUNDO TURNO: eleição de senador no Brasil não tem 2º
   turno (decide por maioria simples no 1º turno). Mesmo que o relatório traga
@@ -937,6 +958,7 @@ FORMATO:
   "cenarios": [
     {{
       "scenario_label": "",
+      "cargo": "",
       "turno": "",
       "itens": [
         {{
@@ -952,7 +974,10 @@ FORMATO:
 "turno" no nível raiz = turno predominante do material (fallback pra cenário
 que não preencher o próprio); "turno" dentro de cada cenário é obrigatório
 sempre que houver mais de um turno no material (ver regra acima) — nesse caso
-preencha os dois, raiz E cada cenário.
+preencha os dois, raiz E cada cenário. Mesma lógica pro "cargo": o do nível
+raiz é o predominante/fallback, e "cargo" dentro de cada cenário é
+obrigatório sempre que o material trouxer mais de um cargo (ver regra
+acima) — preencha os dois, raiz E cada cenário, nesse caso.
 
 TEXTO FONTE:
 {texto_fonte}
@@ -1017,6 +1042,10 @@ def montar_dataframes_polling_manual(
         # confronto de 2º turno embutido num relatório majoritariamente T1) —
         # cai pro turno do payload quando o cenário não especificar o dele.
         turno_cenario = normalizar_texto_simples(cenario.get("turno")).lower() or turno
+        # Mesma lógica pro cargo: material com presidente+governador+senador
+        # juntos (comum nos relatórios estaduais) pode vir com um cargo por
+        # cenário — cai pro cargo do payload quando o cenário não especificar.
+        cargo_cenario = normalizar_texto_simples(cenario.get("cargo")).lower() or cargo
         disputa = ""
         if turno_cenario == "t2":
             # T2 só é uma disputa binária. Não escolha os dois primeiros em
@@ -1054,7 +1083,7 @@ def montar_dataframes_polling_manual(
             scenario_label = normalizar_scenario_label_t1(cenario.get("scenario_label"), idx)
 
         poll_id = gerar_poll_id(
-            uf, instituto, registro_tse, data_campo, cargo, turno_cenario, block_hash,
+            uf, instituto, registro_tse, data_campo, cargo_cenario, turno_cenario, block_hash,
             disputa=disputa,
             exigir_registro=exige_registro,
         )
@@ -1071,7 +1100,7 @@ def montar_dataframes_polling_manual(
             "poll_id": poll_id,
             "ano": ano_calc,
             "uf": uf,
-            "cargo": cargo,
+            "cargo": cargo_cenario,
             "turno": turno_cenario,
             "disputa": disputa,
             "instituto": instituto,
@@ -1106,8 +1135,13 @@ def montar_dataframes_polling_manual(
                 "poll_id": poll_id,
                 "ano": ano_calc,
                 "uf": uf,
-                "cargo": cargo,
-                "turno": turno,
+                "cargo": cargo_cenario,
+                # Bug pré-existente: usava o 'turno' uniforme do payload em vez
+                # do turno resolvido deste cenário (turno_cenario), então um
+                # material com T1 e T2 juntos gravava a linha de 'pesquisas'
+                # com o turno certo mas a(s) linha(s) de 'resultados' do mesmo
+                # scenario_id com o turno do payload — podendo divergir.
+                "turno": turno_cenario,
                 "disputa": disputa,
                 "data_campo": data_campo,
                 "instituto": instituto,
@@ -1294,17 +1328,46 @@ def buscar_duplicatas_polling_manual(gc, spreadsheet_id: str, df_p: pd.DataFrame
     return pd.DataFrame(matches).drop_duplicates().reset_index(drop=True)
 
 
-def render_editor_cenarios_polling(cenarios: list[dict], turno: str) -> list[dict]:
+def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str) -> list[dict]:
     cenarios_editados = []
+    grupo_anterior = None
 
     for idx, cenario in enumerate(cenarios, start=1):
         turno_salvo = normalizar_texto_simples(cenario.get("turno")).lower()
         if turno_salvo not in POLLING_MANUAL_TURNOS:
             turno_salvo = turno
+        cargo_salvo = normalizar_texto_simples(cenario.get("cargo")).lower()
+        if cargo_salvo not in POLLING_MANUAL_CARGOS:
+            cargo_salvo = cargo
 
-        col_titulo, col_turno, col_remover = st.columns([0.7, 0.2, 0.1])
+        # Header de agrupamento (Cargo — Turno), pra separar visualmente
+        # relatório que traz presidente+governador+senador (ou T1+T2) juntos.
+        # Lê o valor JÁ escolhido nos selectboxes desta rodada (mesma chave
+        # usada abaixo) em vez do valor salvo, pra reagrupar na hora quando
+        # ela troca o cargo/turno de um cenário, não só depois de salvar.
+        cargo_atual_grupo = st.session_state.get(f"polling_scenario_cargo_{idx}", cargo_salvo)
+        if cargo_atual_grupo not in POLLING_MANUAL_CARGOS:
+            cargo_atual_grupo = cargo_salvo
+        turno_atual_grupo = st.session_state.get(f"polling_scenario_turno_{idx}", turno_salvo)
+        if turno_atual_grupo not in POLLING_MANUAL_TURNOS:
+            turno_atual_grupo = turno_salvo
+        grupo_atual = (cargo_atual_grupo, turno_atual_grupo)
+        if grupo_atual != grupo_anterior:
+            rotulo_turno = "1º turno" if turno_atual_grupo == "t1" else "2º turno"
+            st.markdown(f"### {cargo_atual_grupo.capitalize()} — {rotulo_turno}")
+            grupo_anterior = grupo_atual
+
+        col_titulo, col_cargo, col_turno, col_remover = st.columns([0.55, 0.2, 0.15, 0.1])
         with col_titulo:
             st.markdown(f"##### Cenário {idx}")
+        with col_cargo:
+            cargo_cenario = st.selectbox(
+                "Cargo deste cenário",
+                POLLING_MANUAL_CARGOS,
+                index=POLLING_MANUAL_CARGOS.index(cargo_salvo),
+                key=f"polling_scenario_cargo_{idx}",
+                label_visibility="collapsed",
+            )
         with col_turno:
             turno_cenario = st.selectbox(
                 "Turno deste cenário",
@@ -1324,11 +1387,12 @@ def render_editor_cenarios_polling(cenarios: list[dict], turno: str) -> list[dic
                     payload_atual["cenarios"].pop(idx - 1)
                 st.session_state["polling_manual_payload"] = payload_atual
                 st.rerun()
-        if turno_cenario != turno:
+        if cargo_cenario != cargo or turno_cenario != turno:
             st.caption(
-                f"⚠️ Este cenário está marcado como {turno_cenario}, diferente do turno "
-                f"principal da pesquisa ({turno}) — material com T1 e T2 juntos. Vai pra "
-                f"planilha de {turno_cenario.upper()} ao salvar."
+                f"⚠️ Este cenário está marcado como {cargo_cenario}/{turno_cenario}, diferente "
+                f"do principal da pesquisa ({cargo}/{turno}) — material com mais de um "
+                f"cargo ou turno junto. Vai pra planilha de {turno_cenario.upper()} com "
+                f"cargo={cargo_cenario} ao salvar."
             )
 
         if turno_cenario == "t1":
@@ -1379,6 +1443,7 @@ def render_editor_cenarios_polling(cenarios: list[dict], turno: str) -> list[dic
 
         cenarios_editados.append({
             "scenario_label": normalizar_texto_simples(scenario_label) or str(idx),
+            "cargo": cargo_cenario,
             "turno": turno_cenario,
             "itens": itens,
         })
@@ -1792,6 +1857,7 @@ if payload:
         payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)
         payload_atual["cenarios"].append({
             "scenario_label": str(len(payload_atual["cenarios"]) + 1),
+            "cargo": cargo,
             "turno": turno,
             "itens": [],
         })
@@ -1799,7 +1865,7 @@ if payload:
         st.rerun()
 
     cenarios_fonte = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)["cenarios"]
-    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, turno)
+    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno)
 
     st.markdown("#### Salvar")
     duplicatas_alerta = st.session_state.get("polling_manual_duplicatas")
