@@ -41,6 +41,8 @@ from polling_manual_core import (
     normalizar_scenario_label_t1,
     obter_metodologia,
     registro_tse_valido,
+    REGISTRO_TSE_TOKEN_RE,
+    resolver_registro_por_cargo,
     salvar_tudo,
 )
 
@@ -1072,6 +1074,12 @@ def montar_dataframes_polling_manual(
         # mensagens de erro abaixo, pra bater com o "Cenário N" mostrado
         # na tela (render_editor_cenarios_polling usa a mesma lógica).
         idx_no_grupo = indices_no_grupo[idx - 1]
+        # Registro TSE próprio do cenário (material com presidente + governador/
+        # senador junto costuma trazer DOIS registros, um por cargo — ex.
+        # "DF-04765/2026, BR-06776/2026") — cai pro registro geral do payload
+        # quando o cenário não veio da tela de revisão com um valor próprio
+        # (render_editor_cenarios_polling já resolve por cargo/UF antes disso).
+        registro_cenario = normalizar_texto_simples(cenario.get("registro_tse")).upper() or registro_tse
         disputa = ""
         if turno_cenario == "t2":
             # T2 só é uma disputa binária. Não escolha os dois primeiros em
@@ -1111,7 +1119,7 @@ def montar_dataframes_polling_manual(
             scenario_label = normalizar_scenario_label_t1(cenario.get("scenario_label"), idx_no_grupo)
 
         poll_id = gerar_poll_id(
-            uf, instituto, registro_tse, data_campo, cargo_cenario, turno_cenario, block_hash,
+            uf, instituto, registro_cenario, data_campo, cargo_cenario, turno_cenario, block_hash,
             disputa=disputa,
             exigir_registro=exige_registro,
         )
@@ -1134,7 +1142,7 @@ def montar_dataframes_polling_manual(
             "disputa": disputa,
             "instituto": instituto,
             "classificacao_instituto": classificacao,
-            "registro_tse": registro_tse,
+            "registro_tse": registro_cenario,
             "data_campo": data_campo,
             "modo": modo_payload,
             "amostra": amostra,
@@ -1175,7 +1183,7 @@ def montar_dataframes_polling_manual(
                 "data_campo": data_campo,
                 "instituto": instituto,
                 "classificacao_instituto": classificacao,
-                "registro_tse": registro_tse,
+                "registro_tse": registro_cenario,
                 "scenario_label": scenario_label,
                 "candidato": candidato,
                 "partido": partido,
@@ -1357,10 +1365,16 @@ def buscar_duplicatas_polling_manual(gc, spreadsheet_id: str, df_p: pd.DataFrame
     return pd.DataFrame(matches).drop_duplicates().reset_index(drop=True)
 
 
-def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str) -> list[dict]:
+def render_editor_cenarios_polling(
+    cenarios: list[dict], cargo: str, turno: str, registro_tse: str = ""
+) -> list[dict]:
     cenarios_editados = []
     grupo_anterior = None
     contadores_grupo: dict[tuple[str, str], int] = {}
+    # Só mostra o campo de registro por cenário quando o texto geral trouxer
+    # mais de um registro reconhecível — caso comum é um registro só, que
+    # todo cenário já herda sem precisar de campo extra na tela.
+    multi_registro = len(REGISTRO_TSE_TOKEN_RE.findall(registro_tse or "")) > 1
 
     for idx, cenario in enumerate(cenarios, start=1):
         turno_salvo = normalizar_texto_simples(cenario.get("turno")).lower()
@@ -1435,6 +1449,21 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
                 unsafe_allow_html=True,
             )
 
+        registro_cenario = registro_tse
+        if multi_registro:
+            # Material com presidente + governador/senador junto costuma
+            # trazer DOIS registros TSE, um por cargo (ex.: "DF-04765/2026,
+            # BR-06776/2026") - usar o texto combinado inteiro pra todo
+            # cenário grava poll_id/scenario_id errado pros cargos que não
+            # são o do registro escolhido. resolver_registro_por_cargo já
+            # separa por cargo/UF (presidente = registro BR); aqui só mostra
+            # o resultado editável, mesmo princípio do número do cenário.
+            registro_cenario = st.text_input(
+                "Registro TSE deste cenário",
+                value=resolver_registro_por_cargo(registro_tse, cargo_cenario),
+                key=f"polling_scenario_registro_{idx}",
+            )
+
         if turno_cenario == "t1":
             # Mostra direto o NÚMERO que vai pro scenario_label da matriz (já
             # passado por normalizar_scenario_label_t1), não o rótulo
@@ -1462,6 +1491,13 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
         for coluna in ["candidato", "partido", "percentual", "tipo"]:
             if coluna not in df_itens.columns:
                 df_itens[coluna] = None if coluna == "percentual" else ""
+
+        # Padroniza nome/partido ANTES de mostrar na tabela editável - senão
+        # ela revisa "FLÁVIO BOLSONARO" em CAIXA ALTA e o que é salvo (via
+        # normalizar_nome_candidato/normalizar_partido lá na frente) sai
+        # diferente do que ela viu e aprovou aqui.
+        df_itens["candidato"] = df_itens["candidato"].apply(normalizar_nome_candidato)
+        df_itens["partido"] = df_itens["partido"].apply(normalizar_partido)
 
         editado = st.data_editor(
             df_itens[["candidato", "partido", "percentual", "tipo"]],
@@ -1494,6 +1530,7 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
             "scenario_label": normalizar_texto_simples(scenario_label) or str(idx_no_grupo),
             "cargo": cargo_cenario,
             "turno": turno_cenario,
+            "registro_tse": normalizar_texto_simples(registro_cenario),
             "itens": itens,
         })
 
@@ -1914,7 +1951,7 @@ if payload:
         st.rerun()
 
     cenarios_fonte = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)["cenarios"]
-    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno)
+    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno, registro_tse)
 
     st.markdown("#### Salvar")
     duplicatas_alerta = st.session_state.get("polling_manual_duplicatas")
