@@ -32,9 +32,11 @@ from polling_manual_core import (
     garantir_aba,
     gerar_poll_id,
     gerar_scenario_id,
+    indices_por_grupo_cenario,
     normalizar_data_campo_segura,
     normalizar_disputa_t2,
     normalizar_instituto,
+    normalizar_nome_candidato,
     normalizar_partido,
     normalizar_scenario_label_t1,
     obter_metodologia,
@@ -1036,7 +1038,20 @@ def montar_dataframes_polling_manual(
     resultados_rows = []
     scenario_ids_vistos = set()
 
-    for idx, cenario in enumerate(payload.get("cenarios") or [], start=1):
+    cenarios_payload = payload.get("cenarios") or []
+    # Cargo/turno resolvidos de cada cenário (mesma regra de fallback usada
+    # no loop abaixo), calculados antes pra poder indexar por grupo — ver
+    # indices_por_grupo_cenario.
+    grupos_cenarios = [
+        (
+            normalizar_texto_simples(c.get("cargo")).lower() or cargo,
+            normalizar_texto_simples(c.get("turno")).lower() or turno,
+        )
+        for c in cenarios_payload
+    ]
+    indices_no_grupo = indices_por_grupo_cenario(grupos_cenarios)
+
+    for idx, cenario in enumerate(cenarios_payload, start=1):
         itens = cenario.get("itens") or []
         # Cenário pode trazer turno próprio (material com T1 e T2 juntos, ex.:
         # confronto de 2º turno embutido num relatório majoritariamente T1) —
@@ -1046,6 +1061,13 @@ def montar_dataframes_polling_manual(
         # juntos (comum nos relatórios estaduais) pode vir com um cargo por
         # cenário — cai pro cargo do payload quando o cenário não especificar.
         cargo_cenario = normalizar_texto_simples(cenario.get("cargo")).lower() or cargo
+        # Posição do cenário DENTRO do seu grupo (mesmo cargo+turno), não a
+        # posição global na lista inteira — é essa que vira o fallback de
+        # scenario_label (normalizar_scenario_label_t1) quando o rótulo
+        # digitado não tem número reconhecível, e a que aparece nas
+        # mensagens de erro abaixo, pra bater com o "Cenário N" mostrado
+        # na tela (render_editor_cenarios_polling usa a mesma lógica).
+        idx_no_grupo = indices_no_grupo[idx - 1]
         disputa = ""
         if turno_cenario == "t2":
             # T2 só é uma disputa binária. Não escolha os dois primeiros em
@@ -1066,8 +1088,9 @@ def montar_dataframes_polling_manual(
 
             if len(candidatos_validos) != 2:
                 raise ValueError(
-                    f"Cenário {idx}: T2 exige exatamente dois candidatos válidos; "
-                    f"encontrei {len(candidatos_validos)}. Revise o tipo de cada opção."
+                    f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): T2 exige exatamente "
+                    f"dois candidatos válidos; encontrei {len(candidatos_validos)}. Revise o tipo de "
+                    f"cada opção."
                 )
 
             disputa = normalizar_disputa_t2(
@@ -1076,11 +1099,12 @@ def montar_dataframes_polling_manual(
             )
             if not disputa:
                 raise ValueError(
-                    f"Cenário {idx}: informe exatamente dois candidatos válidos para formar a disputa de T2."
+                    f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): informe exatamente "
+                    f"dois candidatos válidos para formar a disputa de T2."
                 )
             scenario_label = "NA"
         else:
-            scenario_label = normalizar_scenario_label_t1(cenario.get("scenario_label"), idx)
+            scenario_label = normalizar_scenario_label_t1(cenario.get("scenario_label"), idx_no_grupo)
 
         poll_id = gerar_poll_id(
             uf, instituto, registro_tse, data_campo, cargo_cenario, turno_cenario, block_hash,
@@ -1090,7 +1114,8 @@ def montar_dataframes_polling_manual(
         scenario_id = gerar_scenario_id(poll_id, scenario_label)
         if scenario_id in scenario_ids_vistos:
             raise ValueError(
-                f"Cenário {idx}: duplicado após a padronização ({scenario_id}). Revise o rótulo ou os candidatos."
+                f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): duplicado após a "
+                f"padronização ({scenario_id}). Revise o rótulo ou os candidatos."
             )
         scenario_ids_vistos.add(scenario_id)
         fonte_url_final = normalizar_texto_simples(fonte_url) or f"manual://streamlit/{poll_id}"
@@ -1120,7 +1145,7 @@ def montar_dataframes_polling_manual(
         })
 
         for item in itens:
-            candidato = normalizar_texto_simples(item.get("candidato"))
+            candidato = normalizar_nome_candidato(normalizar_texto_simples(item.get("candidato")))
             partido = normalizar_partido(item.get("partido"))
             percentual = normalizar_percentual_simples(item.get("percentual"))
             tipo = classificar_tipo_resultado_manual(candidato, item.get("tipo", ""))
@@ -1331,6 +1356,7 @@ def buscar_duplicatas_polling_manual(gc, spreadsheet_id: str, df_p: pd.DataFrame
 def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str) -> list[dict]:
     cenarios_editados = []
     grupo_anterior = None
+    contadores_grupo: dict[tuple[str, str], int] = {}
 
     for idx, cenario in enumerate(cenarios, start=1):
         turno_salvo = normalizar_texto_simples(cenario.get("turno")).lower()
@@ -1357,9 +1383,17 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
             st.markdown(f"### {cargo_atual_grupo.capitalize()} — {rotulo_turno}")
             grupo_anterior = grupo_atual
 
+        # Índice DENTRO do grupo (mesmo cargo+turno), não a posição global na
+        # lista — senão "Cenário N" mistura a numeração de presidente/T1 com
+        # governador/T1 etc. e dá a entender (errado) que é tudo uma
+        # sequência só da mesma pesquisa. É esse número, não o idx global,
+        # que também vira o rótulo/scenario_label default ao salvar.
+        contadores_grupo[grupo_atual] = contadores_grupo.get(grupo_atual, 0) + 1
+        idx_no_grupo = contadores_grupo[grupo_atual]
+
         col_titulo, col_cargo, col_turno, col_remover = st.columns([0.55, 0.2, 0.15, 0.1])
         with col_titulo:
-            st.markdown(f"##### Cenário {idx}")
+            st.markdown(f"##### Cenário {idx_no_grupo}")
         with col_cargo:
             cargo_cenario = st.selectbox(
                 "Cargo deste cenário",
@@ -1398,13 +1432,13 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
         if turno_cenario == "t1":
             scenario_label = st.text_input(
                 "Rótulo do cenário (T1)",
-                value=cenario.get("scenario_label", str(idx)),
+                value=cenario.get("scenario_label", str(idx_no_grupo)),
                 key=f"polling_scenario_label_{idx}",
             )
         else:
             # No T2, a chave gravada é a disputa normalizada pelos dois
             # candidatos, e não um rótulo digitado.
-            scenario_label = f"Segundo turno — cenário {idx}"
+            scenario_label = f"Segundo turno — cenário {idx_no_grupo}"
 
         df_itens = pd.DataFrame(cenario.get("itens") or [])
         if df_itens.empty:
@@ -1435,14 +1469,14 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
             if not candidato and percentual is None:
                 continue
             itens.append({
-                "candidato": candidato,
+                "candidato": normalizar_nome_candidato(candidato),
                 "partido": normalizar_partido(row.get("partido")),
                 "percentual": percentual,
                 "tipo": classificar_tipo_resultado_manual(candidato, row.get("tipo")),
             })
 
         cenarios_editados.append({
-            "scenario_label": normalizar_texto_simples(scenario_label) or str(idx),
+            "scenario_label": normalizar_texto_simples(scenario_label) or str(idx_no_grupo),
             "cargo": cargo_cenario,
             "turno": turno_cenario,
             "itens": itens,
