@@ -625,6 +625,15 @@ def normalizar_payload_polling(payload: dict) -> dict:
         if turno_cenario not in POLLING_MANUAL_TURNOS:
             turno_cenario = turno
 
+        # SENADOR NUNCA TEM SEGUNDO TURNO (regra também no prompt, mas o modelo
+        # às vezes desobedece - visto ao vivo com "2º voto" de senador virando
+        # t2). O prompt já pede pra nem criar cenário nesse caso, mas se o
+        # modelo criar mesmo assim, força t1 aqui em vez de deixar um "Segundo
+        # turno" fantasma entrar na revisão/planilha: 1º/2º voto de senador de
+        # 2 vagas é sempre t1, nunca é o confronto de 2º turno de verdade.
+        if cargo == "senador" and turno_cenario == "t2":
+            turno_cenario = "t1"
+
         # Para T2, a identidade persistida vem dos dois candidatos. Rótulos
         # determinísticos evitam conteúdo alucinado ou herdado na revisão.
         if turno_cenario == "t2":
@@ -1293,7 +1302,7 @@ def render_editor_cenarios_polling(cenarios: list[dict], turno: str) -> list[dic
         if turno_salvo not in POLLING_MANUAL_TURNOS:
             turno_salvo = turno
 
-        col_titulo, col_turno = st.columns([0.8, 0.2])
+        col_titulo, col_turno, col_remover = st.columns([0.7, 0.2, 0.1])
         with col_titulo:
             st.markdown(f"##### Cenário {idx}")
         with col_turno:
@@ -1304,6 +1313,17 @@ def render_editor_cenarios_polling(cenarios: list[dict], turno: str) -> list[dic
                 key=f"polling_scenario_turno_{idx}",
                 label_visibility="collapsed",
             )
+        with col_remover:
+            # Mesmo padrão de "Adicionar cenário em branco": mexe direto no
+            # payload guardado em session_state (a lista 'cenarios' recebida
+            # aqui é só a leitura desta execução) e força rerun pra tirar o
+            # cenário da tela.
+            if st.button("🗑️", key=f"polling_scenario_remover_{idx}", help="Remover este cenário"):
+                payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or {})
+                if 0 <= idx - 1 < len(payload_atual["cenarios"]):
+                    payload_atual["cenarios"].pop(idx - 1)
+                st.session_state["polling_manual_payload"] = payload_atual
+                st.rerun()
         if turno_cenario != turno:
             st.caption(
                 f"⚠️ Este cenário está marcado como {turno_cenario}, diferente do turno "
@@ -1820,6 +1840,30 @@ if payload:
                 help="Use só se conferiu que não é a mesma pesquisa.",
             )
 
+    # marcar_topline_extraida_manual (chamado logo abaixo) fecha a linha da fila
+    # 'relatorios' (Registro TSE + Cargo) assim que QUALQUER cenário é salvo, sem
+    # saber se ainda faltam outros cenários desse mesmo cargo pra lançar depois
+    # (o eixo-eleicoes nunca revisita uma linha já marcada "sim" - ver
+    # marcar_topline_extraida_manual). Institutos variam demais no número de
+    # cenários por relatório pra dar pra adivinhar isso automaticamente, então
+    # a decisão fica explícita aqui: desmarque só quando tiver certeza de que vai
+    # voltar depois com mais cenários deste MESMO Registro TSE + Cargo.
+    concluir_linha_fila = st.checkbox(
+        "Marcar esta pesquisa (Registro TSE + Cargo) como concluída na fila do eixo-eleicoes",
+        value=True,
+        key="polling_concluir_linha_fila",
+        help=(
+            "Desmarque se ainda faltam cenários deste mesmo Registro TSE + Cargo pra "
+            "lançar depois - a linha correspondente na aba 'relatorios' fica pendente "
+            "em vez de ser marcada como concluída."
+        ),
+    )
+    if not concluir_linha_fila:
+        st.caption(
+            "A linha da fila (Registro TSE + Cargo) NÃO será marcada como concluída "
+            "ao salvar - continuará pendente pra você voltar e lançar o restante."
+        )
+
     salvar_clicado = st.button("Salvar pesquisa na planilha", use_container_width=True, key="polling_salvar")
     if salvar_clicado or forcar_salvar:
         erros = []
@@ -1921,12 +1965,13 @@ if payload:
                             df_r_log = montar_log_resultados_manual(df_r_g, username=username, nome_usuario=name)
                             linhas_log = append_log_resultados_manual(gc, spreadsheet_destino, df_r_log)
                             salvar_tudo(gc, spreadsheet_destino, df_p_g, df_r_g)
-                            linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_g)
+                            if concluir_linha_fila:
+                                linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_g)
+                                total_fila += linhas_fila
+                                avisos_fila_total.extend(avisos_fila)
                             total_pesquisas += len(df_p_g)
                             total_resultados += len(df_r_g)
                             total_log += linhas_log
-                            total_fila += linhas_fila
-                            avisos_fila_total.extend(avisos_fila)
                             destinos_salvos.append(f"{nome_destino} ({len(df_p_g)} cenário(s))")
 
                         st.session_state["polling_manual_payload"] = payload_final
@@ -1948,10 +1993,6 @@ if payload:
                             st.caption(f"Também marquei {total_fila} linha(s) como concluída na fila de relatórios.")
                         for aviso in avisos_fila_total:
                             st.caption(f"⚠️ Fila de relatórios: {aviso}")
-                    if linhas_fila:
-                        st.caption(f"Também marquei {linhas_fila} linha(s) como concluída na fila de relatórios.")
-                    for aviso in avisos_fila:
-                        st.caption(f"⚠️ Fila de relatórios: {aviso}")
 
 resultado = st.session_state.get("polling_manual_resultado")
 if resultado:
