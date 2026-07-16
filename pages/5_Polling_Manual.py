@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from difflib import get_close_matches
 import hashlib
 import inspect
@@ -189,6 +189,11 @@ SPREADSHEET_ID_RELATORIOS = (
     or os.getenv("SPREADSHEET_ID_RELATORIOS", "")
 ).strip()
 LOGO_PATH = str(ROOT_DIR / "Marca_eixo_vetor_Logo horizontal magenta.png")
+
+# Streamlit Cloud roda o servidor em UTC - datetime.now() sem timezone grava hora
+# errada (3h a mais) em qualquer timestamp mostrado pra ela. Mesmo fuso usado no
+# eixo-eleicoes (BRT = timezone(timedelta(hours=-3))).
+BRT = timezone(timedelta(hours=-3))
 
 UFS = [
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -1012,7 +1017,7 @@ def montar_dataframes_polling_manual(
     amostra = normalizar_inteiro_simples(payload.get("amostra"))
     margem_erro = normalizar_percentual_simples(payload.get("margem_erro"))
     confianca = normalizar_inteiro_simples(payload.get("confianca"))
-    horario_raspagem = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    horario_raspagem = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
 
     # ano: deriva de data_campo (YYYY-MM-DD); fallback para ano atual
     ano_calc = datetime.now().year
@@ -1243,7 +1248,7 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
         avisos.append(f"fila de relatórios sem a coluna esperada ({exc})")
         return 0, avisos
 
-    agora = datetime.now().strftime("%Y-%m-%d %H:%M")
+    agora = datetime.now(BRT).strftime("%Y-%m-%d %H:%M")
     updates = []
     encontrados = set()
     for row_i, row in enumerate(valores[1:], start=2):
@@ -1270,8 +1275,8 @@ def montar_log_resultados_manual(df_r: pd.DataFrame, username: str, nome_usuario
     if df_r is None or df_r.empty:
         return pd.DataFrame()
 
-    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    batch_id = f"manual-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    agora = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
+    batch_id = f"manual-{datetime.now(BRT).strftime('%Y%m%d%H%M%S')}"
 
     df_log = df_r.copy()
     df_log["manual_batch_id"] = batch_id
