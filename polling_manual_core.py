@@ -818,6 +818,37 @@ def indices_por_grupo_cenario(grupos: list[tuple[str, str]]) -> list[int]:
     return indices
 
 
+REGISTRO_TSE_TOKEN_RE = re.compile(
+    r"\b(?:BR|AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)"
+    r"[\s-]*\d{4,6}/20\d{2}\b",
+    flags=re.I,
+)
+
+
+def resolver_registro_por_cargo(registro_texto, cargo) -> str:
+    """Resolve qual registro TSE usar quando o texto extraído trouxer mais de
+    um — comum em material que registra presidente e governador/senador sob
+    protocolos separados (ex. 'DF-04765/2026, BR-06776/2026': um PDF só, dois
+    cargos, dois registros). Cargo nacional (presidente) usa o registro com
+    prefixo BR; cargo estadual (governador/senador) usa o outro. Se o texto
+    trouxer só um registro (ou nenhum reconhecível), devolve como veio — nada
+    a resolver."""
+    texto = _norm_ws(registro_texto)
+    tokens = [m.group(0) for m in REGISTRO_TSE_TOKEN_RE.finditer(texto)]
+    if len(tokens) <= 1:
+        return texto
+    cargo_norm = _norm_ws(cargo).lower()
+    nacionais = [t for t in tokens if t.upper().startswith("BR")]
+    estaduais = [t for t in tokens if not t.upper().startswith("BR")]
+    if cargo_norm == "presidente" and len(nacionais) == 1:
+        return nacionais[0]
+    if cargo_norm in ("governador", "senador") and len(estaduais) == 1:
+        return estaduais[0]
+    # Ambíguo (0 ou 2+ candidatos pro cargo) — devolve tudo, visível pra ela
+    # corrigir na mão em vez de escolher errado em silêncio.
+    return texto
+
+
 def gerar_poll_id(uf, instituto, id_pesquisa, data_campo, cargo, turno, raw_block_hash, disputa="",
                   exigir_registro=False):
     """Identificador da pesquisa independente da origem de entrada.
