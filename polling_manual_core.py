@@ -454,6 +454,54 @@ def normalizar_partido(valor) -> str:
     return PARTIDOS_CANONICOS.get(_chave_partido(partido), partido.upper())
 
 
+PARTICULAS_NOME_MINUSCULAS = {"de", "da", "do", "das", "dos", "e"}
+
+# Nomes de urna com sigla/abreviação que Title Case comum estragaria (ex.:
+# "ACM Neto" viraria "Acm Neto"). Acrescentar aqui conforme aparecer
+# candidato novo com esse padrão — não dá pra distinguir sigla de sobra de
+# CAIXA ALTA só pelo texto.
+NOMES_COM_SIGLA_CANONICOS = {
+    "acm neto": "ACM Neto",
+}
+
+
+def _chave_candidato(valor) -> str:
+    texto = unicodedata.normalize("NFKD", _norm_ws(valor))
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch)).lower()
+    return re.sub(r"\s+", " ", texto).strip()
+
+
+def normalizar_nome_candidato(valor) -> str:
+    """Padroniza a capitalização do nome pro formato usado nas matrizes T1/T2
+    (Nome Próprio, ex. 'Flávio Bolsonaro') - extração de gráfico de barra
+    costuma vir em CAIXA ALTA, outras fontes vêm em minúsculo, e sem isso as
+    duas formas convivem na mesma matriz. Só re-capitaliza quando o nome
+    inteiro já veio uniformemente maiúsculo ou minúsculo; nome que já chega
+    com capitalização mista não é mexido, pra não estragar um caso em que já
+    está certo (ex. sigla própria no meio do nome de urna)."""
+    texto = _norm_ws(valor)
+    if not texto:
+        return texto
+    canonico = NOMES_COM_SIGLA_CANONICOS.get(_chave_candidato(texto))
+    if canonico:
+        return canonico
+    letras = [c for c in texto if c.isalpha()]
+    if not letras or not (all(c.isupper() for c in letras) or all(c.islower() for c in letras)):
+        return texto
+    palavras = texto.split(" ")
+    resultado = []
+    for i, palavra in enumerate(palavras):
+        if i > 0 and palavra.lower() in PARTICULAS_NOME_MINUSCULAS:
+            resultado.append(palavra.lower())
+            continue
+        partes = re.split(r"([-'])", palavra)
+        resultado.append("".join(
+            (p[:1].upper() + p[1:].lower()) if p and p not in ("-", "'") else p
+            for p in partes
+        ))
+    return " ".join(resultado)
+
+
 def _strip_html(s: str) -> str:
     return re.sub(r"<[^>]+>", "", str(s or "")).strip()
 
@@ -705,13 +753,38 @@ def normalizar_disputa_t2(valor, itens=None) -> str:
 
 
 def normalizar_scenario_label_t1(valor, indice: int) -> str:
-    """Converte rótulos como 'Cenário 01' e 'Estimulada' em chaves numéricas."""
-    """Converte rótulos de T1 em chaves numéricas para scenario_label."""
+    """Converte rótulos de T1 (ex.: 'Cenário 01', 'Estimulada', 'Estimulada -
+    2º voto', 'Estimulada - 5 candidatos') em chaves numéricas para
+    scenario_label — a matriz só aceita número puro nessa coluna.
+
+    ``indice`` deve ser a posição do cenário DENTRO do seu grupo (mesmo
+    cargo+turno), não uma contagem global misturando cargos/turnos
+    diferentes — senão o fallback grava um número sem sentido (ex. "13"
+    quando devia ser "1").
+    """
     texto = _norm_ws(valor)
     if not texto:
         return str(indice)
     chave = _norm_ascii(texto)
-    numero = re.search(r"(?:cenario|estimulad[ao])\s*[-:]?\s*0*(\d+)\b", chave)
+
+    # "1º voto"/"2º voto" (comum em senador, que elege 2 por estado) e as
+    # formas por extenso — checado ANTES do regex genérico de dígito, porque
+    # o "º" quebra o \b logo depois do número em "estimulada - 1º voto" e o
+    # regex de baixo não bate.
+    voto = re.search(r"\b0*(\d+)o?\s+voto\b", chave)
+    if voto:
+        return str(int(voto.group(1)))
+    if re.search(r"\bprimeiro\s+voto\b", chave):
+        return "1"
+    if re.search(r"\bsegundo\s+voto\b", chave):
+        return "2"
+
+    # Dígito logo após "cenário"/"estimulada", mas NUNCA quando é a contagem
+    # de candidatos do cenário — "estimulada - 5 candidatos" não é o
+    # cenário 5, é um cenário com 5 opções, a ordem real vem do indice.
+    numero = re.search(
+        r"(?:cenario|estimulad[ao])\s*[-:]?\s*0*(\d+)\b(?!\s*candidat)", chave
+    )
     if numero:
         return str(int(numero.group(1)))
     romano = re.search(
@@ -729,6 +802,20 @@ def normalizar_scenario_label_t1(valor, indice: int) -> str:
     if re.fullmatch(r"0*\d+", texto):
         return str(int(texto))
     return str(indice)
+
+
+def indices_por_grupo_cenario(grupos: list[tuple[str, str]]) -> list[int]:
+    """Índice sequencial de cada cenário dentro do seu grupo (cargo, turno),
+    na ordem em que aparecem — evita um índice global que mistura cargos e
+    turnos diferentes numa contagem só (confunde a UI, que passa a dar a
+    entender que é tudo a mesma pesquisa, e vira fallback de scenario_label
+    sem sentido quando o rótulo digitado não tem número reconhecível)."""
+    contadores: dict[tuple[str, str], int] = {}
+    indices = []
+    for grupo in grupos:
+        contadores[grupo] = contadores.get(grupo, 0) + 1
+        indices.append(contadores[grupo])
+    return indices
 
 
 def gerar_poll_id(uf, instituto, id_pesquisa, data_campo, cargo, turno, raw_block_hash, disputa="",
