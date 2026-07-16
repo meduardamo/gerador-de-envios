@@ -94,6 +94,10 @@ footer { display: none !important; }
 .ge-hero { background: #962E4D; display: flex; align-items: center; padding: 36px 48px; margin: 0 -2rem 32px -2rem; }
 .ge-hero-title { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.01em; }
 .ge-rule { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #962E4D; border-top: 1.5px solid #962E4D; padding-top: 8px; margin: 20px 0 14px; }
+.ge-alerta-cenario {
+    background: #192D4E; color: #fff; border-left: 4px solid #962E4D;
+    padding: 10px 14px; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.5;
+}
 </style>""", unsafe_allow_html=True)
 
 
@@ -1422,11 +1426,13 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
                 st.session_state["polling_manual_payload"] = payload_atual
                 st.rerun()
         if cargo_cenario != cargo or turno_cenario != turno:
-            st.caption(
-                f"⚠️ Este cenário está marcado como {cargo_cenario}/{turno_cenario}, diferente "
-                f"do principal da pesquisa ({cargo}/{turno}) — material com mais de um "
-                f"cargo ou turno junto. Vai pra planilha de {turno_cenario.upper()} com "
-                f"cargo={cargo_cenario} ao salvar."
+            st.markdown(
+                f'<div class="ge-alerta-cenario">⚠️ Este cenário está marcado como '
+                f'{cargo_cenario}/{turno_cenario}, diferente do principal da pesquisa '
+                f'({cargo}/{turno}) — material com mais de um cargo ou turno junto. '
+                f'Vai pra planilha de {turno_cenario.upper()} com cargo={cargo_cenario} '
+                f'ao salvar.</div>',
+                unsafe_allow_html=True,
             )
 
         if turno_cenario == "t1":
@@ -1438,7 +1444,7 @@ def render_editor_cenarios_polling(cenarios: list[dict], cargo: str, turno: str)
             # Editando aqui o número direto, o que ela vê é literalmente o
             # que é salvo; se estiver errado, corrige na hora.
             scenario_label = st.text_input(
-                "Número do cenário (T1) — é isso que vai pro scenario_label da matriz",
+                "Número do cenário (T1)",
                 value=normalizar_scenario_label_t1(
                     cenario.get("scenario_label", str(idx_no_grupo)), idx_no_grupo
                 ),
