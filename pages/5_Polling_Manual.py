@@ -2275,7 +2275,7 @@ if payload:
                         st.success(
                             f"Pesquisa salva com sucesso em {' e '.join(destinos_salvos)}. "
                             f"{total_pesquisas} cenário(s) e {total_resultados} resultado(s). "
-                            "O BI (Looker) é reconstruído pelo workflow de 4 em 4h."
+                            "A média móvel é reconstruída de 4 em 4 horas."
                         )
                         if total_fila:
                             st.caption(f"Também marquei {total_fila} linha(s) como concluída na fila de relatórios.")
