@@ -799,8 +799,75 @@ def normalizar_payload_polling(payload: dict) -> dict:
     }
 
 
+# Prefixos de widgets por cenário (um por índice) + o data_editor de candidatos.
+POLLING_PREFIXOS_ESTADO = (
+    "polling_editor_",
+    "polling_scenario_label_",
+    "polling_scenario_desc_",
+    "polling_scenario_turno_",
+    "polling_scenario_cargo_",
+    "polling_scenario_uf_",
+    "polling_scenario_registro_",
+    "polling_meta_",
+)
+
+# Chaves avulsas presas a UMA pesquisa específica (payload, alertas, resíduos de
+# tela). Tudo aqui é da pesquisa da vez e não pode sobreviver a uma nova.
+POLLING_CHAVES_ESTADO = (
+    "polling_manual_payload",
+    "polling_manual_resultado",
+    "polling_manual_duplicatas",
+    "polling_partidos_da_base",
+    "polling_manual_flash",
+    "polling_pdf_flash",
+    "polling_pdf_preview_png",
+    "polling_pdf_resumo",
+    "polling_manual_ultimo_texto",
+    "polling_manual_ultima_url",
+    "polling_manual_url_pendente",
+    "polling_manual_texto_pendente",
+)
+
+# Fonte + controles de leitura (texto colado, URL, uploader, foco, páginas).
+# Só saem no "Limpar tudo"; numa nova extração a fonte é justamente o que fica.
+POLLING_CHAVES_FONTE = (
+    "polling_manual_texto_fonte",
+    "polling_manual_url_original",
+)
+POLLING_CHAVES_CONTROLE = (
+    "polling_foco_cargo",
+    "polling_foco_uf",
+    "polling_foco_turno",
+    "polling_foco_instituto",
+    "polling_foco_instrucoes",
+    "polling_pdf_uploader",
+    "polling_modo_pdf",
+    "polling_pag_ini",
+    "polling_pag_fim",
+)
+
+
+def resetar_estado_pesquisa_polling(limpar_fonte: bool = False):
+    """Apaga TODO o estado preso à pesquisa da vez — cenários, candidatos,
+    header (instituto/registro/data/etc.), alertas de duplicidade e resíduos de
+    tela. Sem isso, dado da pesquisa anterior (ex.: registro TSE de presidente)
+    vaza pra próxima extração e só a trava de duplicata segura. Com
+    ``limpar_fonte=True`` zera também o texto/URL/foco (botão 'Limpar tudo')."""
+    alvos = list(POLLING_CHAVES_ESTADO)
+    if limpar_fonte:
+        alvos += list(POLLING_CHAVES_FONTE) + list(POLLING_CHAVES_CONTROLE)
+    for chave in list(st.session_state.keys()):
+        if chave.startswith(POLLING_PREFIXOS_ESTADO) or chave in alvos:
+            del st.session_state[chave]
+
+
 def carregar_payload_polling_no_state(payload: dict):
     payload = normalizar_payload_polling(payload)
+
+    # Zera tudo da pesquisa anterior ANTES de carregar a nova, pra não sobrar
+    # header/cenário/registro de uma extração passada (ver
+    # resetar_estado_pesquisa_polling). A fonte fica: é o material da vez.
+    resetar_estado_pesquisa_polling(limpar_fonte=False)
 
     # Partido que o PDF/modelo não trouxe: puxa da nossa base (matrizes T1/T2)
     # já na extração, pra galera ver preenchido e conferir. Guarda a lista pra
@@ -809,19 +876,6 @@ def carregar_payload_polling_no_state(payload: dict):
     st.session_state["polling_partidos_da_base"] = autopreencher_partidos_faltantes(
         payload["cenarios"], mapa_cand_partido
     )
-
-    for chave in list(st.session_state.keys()):
-        if chave.startswith((
-            "polling_editor_",
-            "polling_scenario_label_",
-            "polling_scenario_desc_",
-            "polling_scenario_turno_",
-            "polling_scenario_cargo_",
-            "polling_scenario_uf_",
-            "polling_scenario_registro_",
-            "polling_meta_",
-        )):
-            del st.session_state[chave]
 
     st.session_state["polling_manual_payload"] = payload
     st.session_state["polling_meta_cargo"] = payload["cargo"] if payload["cargo"] in POLLING_MANUAL_CARGOS else "governador"
@@ -1672,6 +1726,13 @@ for k, v in [
     if k not in st.session_state:
         st.session_state[k] = v
 
+# "Limpar tudo": zera a pesquisa inteira (fonte, foco, header, cenários). Roda
+# aqui no topo porque apaga chaves de widget, e o Streamlit não deixa alterar o
+# estado de um widget depois de criado na execução atual.
+if st.session_state.pop("polling_limpar_tudo_pendente", False):
+    resetar_estado_pesquisa_polling(limpar_fonte=True)
+    st.session_state["polling_manual_flash"] = "Tudo limpo. Cole ou carregue uma nova pesquisa."
+
 # A troca de pesquisa precisa começar com controles limpos. Esta seção roda
 # antes de qualquer widget, pois o Streamlit não permite alterar o estado de
 # um widget depois de ele ter sido criado na execução atual.
@@ -1734,6 +1795,9 @@ with st.sidebar:
     st.markdown("---")
     if st.button("↻ Recarregar dados", use_container_width=True):
         st.cache_data.clear()
+        st.rerun()
+    if st.button("🧹 Limpar tudo", use_container_width=True, help="Zera a pesquisa da tela (fonte, foco, header e cenários) pra começar do zero"):
+        st.session_state["polling_limpar_tudo_pendente"] = True
         st.rerun()
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
