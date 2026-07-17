@@ -472,6 +472,90 @@ def carregar_catalogo_institutos_matrizes(versao_catalogo: str) -> tuple[dict, s
     }, "dicionário local temporário"
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_mapa_candidato_partido(versao_catalogo: str) -> dict:
+    """Mapa candidato→partido a partir da aba 'resultados' das matrizes T1/T2
+    (mesma fonte do canonico.json do eixo-eleicoes, só que lido ao vivo aqui).
+
+    Estrutura: {'presidente': {nome_casefold: PARTIDO},
+                'governador': {(UF, nome_casefold): PARTIDO},
+                'senador':    {(UF, nome_casefold): PARTIDO}}.
+    Presidente é nacional, ignora UF. Se o mesmo nome aparecer com partidos
+    diferentes (troca de sigla ao longo do tempo), fica com o mais frequente.
+    """
+    from collections import Counter
+
+    client = get_polling_sheets_client()
+    contagem: dict[str, dict] = {"presidente": {}, "governador": {}, "senador": {}}
+    if client:
+        for spreadsheet_id in [MATRIZ_T1_SPREADSHEET_ID.strip(), MATRIZ_T2_SPREADSHEET_ID.strip()]:
+            if not spreadsheet_id:
+                continue
+            try:
+                aba = client.open_by_key(spreadsheet_id).worksheet("resultados")
+                df = carregar_df_da_aba(aba)
+            except Exception:
+                continue
+            if df.empty or "candidato" not in df.columns or "partido" not in df.columns:
+                continue
+            for _, linha in df.iterrows():
+                cargo = normalizar_texto_simples(linha.get("cargo")).lower()
+                if cargo not in contagem:
+                    continue
+                nome = normalizar_texto_simples(linha.get("candidato"))
+                partido = normalizar_texto_simples(linha.get("partido")).upper()
+                if not nome or not partido or partido == "SEM PARTIDO":
+                    continue
+                if cargo == "presidente":
+                    chave = nome.casefold()
+                else:
+                    chave = (normalizar_texto_simples(linha.get("uf")).upper(), nome.casefold())
+                contagem[cargo].setdefault(chave, Counter())[partido] += 1
+
+    return {
+        cargo: {chave: cnt.most_common(1)[0][0] for chave, cnt in mapa.items()}
+        for cargo, mapa in contagem.items()
+    }
+
+
+def partido_do_candidato(mapa: dict, cargo: str, uf: str, nome: str) -> str:
+    """Devolve o partido conhecido pro candidato (ou '' se não achar)."""
+    nome_key = normalizar_texto_simples(nome).casefold()
+    if not nome_key:
+        return ""
+    cargo = normalizar_texto_simples(cargo).lower()
+    sub = mapa.get(cargo, {})
+    if cargo == "presidente":
+        return sub.get(nome_key, "")
+    return sub.get((normalizar_texto_simples(uf).upper(), nome_key), "")
+
+
+def autopreencher_partidos_faltantes(cenarios: list[dict], mapa: dict) -> list[str]:
+    """Preenche o partido vazio de cada candidato a partir das matrizes T1/T2.
+    Mexe nos itens in-place; devolve a lista de 'Nome (PARTIDO)' preenchidos
+    (pra avisar que veio da base, não da pesquisa). Só toca em partido vazio de
+    linha com candidato de verdade (tipo=candidato) — não sobrescreve o que já
+    veio preenchido nem inventa partido pra 'branco/nulo/não válido'."""
+    if not mapa:
+        return []
+    preenchidos: list[str] = []
+    for cenario in cenarios:
+        cargo = cenario.get("cargo", "")
+        uf = cenario.get("uf", "")
+        for item in cenario.get("itens") or []:
+            if normalizar_texto_simples(item.get("partido")):
+                continue
+            nome = normalizar_texto_simples(item.get("candidato"))
+            tipo_item = classificar_tipo_resultado_manual(nome, item.get("tipo", ""))
+            if not nome or tipo_item != "candidato":
+                continue
+            partido = partido_do_candidato(mapa, cargo, uf, nome)
+            if partido:
+                item["partido"] = partido
+                preenchidos.append(f"{nome} ({partido})")
+    return preenchidos
+
+
 def aplicar_grafia_canonica_do_instituto():
     """Troca, no callback do widget, uma grafia conhecida pela forma de T1/T2."""
     catalogo = st.session_state.get("polling_catalogo_institutos", {})
@@ -697,6 +781,14 @@ def normalizar_payload_polling(payload: dict) -> dict:
 def carregar_payload_polling_no_state(payload: dict):
     payload = normalizar_payload_polling(payload)
 
+    # Partido que o PDF/modelo não trouxe: puxa da nossa base (matrizes T1/T2)
+    # já na extração, pra galera ver preenchido e conferir. Guarda a lista pra
+    # avisar que veio da base, não da pesquisa.
+    mapa_cand_partido = carregar_mapa_candidato_partido(VERSAO_CATALOGO_INSTITUTOS)
+    st.session_state["polling_partidos_da_base"] = autopreencher_partidos_faltantes(
+        payload["cenarios"], mapa_cand_partido
+    )
+
     for chave in list(st.session_state.keys()):
         if chave.startswith((
             "polling_editor_",
@@ -704,6 +796,8 @@ def carregar_payload_polling_no_state(payload: dict):
             "polling_scenario_desc_",
             "polling_scenario_turno_",
             "polling_scenario_cargo_",
+            "polling_scenario_uf_",
+            "polling_scenario_registro_",
             "polling_meta_",
         )):
             del st.session_state[chave]
@@ -1931,6 +2025,13 @@ if payload:
 
     for pendencia in payload.get("pendencias") or []:
         st.warning(pendencia)
+
+    partidos_da_base = st.session_state.get("polling_partidos_da_base") or []
+    if partidos_da_base:
+        st.warning(
+            "Atenção: estes partidos não vieram da pesquisa, foram puxados da nossa "
+            "base (matrizes T1/T2). Confira: " + ", ".join(partidos_da_base) + "."
+        )
 
     st.markdown("#### Cenários e candidatos")
     if st.button("Adicionar cenário em branco"):
