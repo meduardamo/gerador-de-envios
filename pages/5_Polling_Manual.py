@@ -93,7 +93,7 @@ footer { display: none !important; }
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #962E4D !important; border-bottom-color: #962E4D !important; }
 .ge-hero { background: #962E4D; display: flex; align-items: center; padding: 36px 48px; margin: 0 -2rem 32px -2rem; }
 .ge-hero-title { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.01em; }
-.ge-rule { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #962E4D; border-top: 1.5px solid #962E4D; padding-top: 8px; margin: 20px 0 14px; }
+.ge-rule { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #962E4D; border-top: 2px solid #962E4D; padding-top: 10px; margin: 24px 0 16px; }
 .ge-alerta-cenario {
     background: #192D4E; color: #fff; border-left: 4px solid #962E4D;
     padding: 10px 14px; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.5;
@@ -102,13 +102,13 @@ footer { display: none !important; }
    senador e 1º/2º turno quando vêm no mesmo material. */
 .ge-grupo {
     background: #192D4E; color: #fff; border-left: 6px solid #962E4D;
-    padding: 11px 18px; margin: 26px 0 4px;
-    font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 13px 20px; margin: 28px 0 6px;
+    font-size: 18px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
 }
 /* Rótulo de cada cenário dentro do grupo. */
 .ge-cenario-lbl {
-    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-    color: #962E4D; margin: 14px 0 2px; padding-bottom: 5px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+    color: #962E4D; margin: 16px 0 4px; padding-bottom: 6px;
     border-bottom: 1px solid #DADAD4;
 }
 </style>""", unsafe_allow_html=True)
@@ -1516,25 +1516,15 @@ def render_editor_cenarios_polling(
         contadores_grupo[grupo_atual] = contadores_grupo.get(grupo_atual, 0) + 1
         idx_no_grupo = contadores_grupo[grupo_atual]
 
-        col_titulo, col_remover = st.columns([0.9, 0.1])
-        with col_titulo:
-            st.markdown(f'<div class="ge-cenario-lbl">Cenário {idx_no_grupo}</div>', unsafe_allow_html=True)
-        with col_remover:
-            # Mesmo padrão de "Adicionar cenário em branco": mexe direto no
-            # payload guardado em session_state (a lista 'cenarios' recebida
-            # aqui é só a leitura desta execução) e força rerun pra tirar o
-            # cenário da tela.
-            if st.button("🗑️", key=f"polling_scenario_remover_{idx}", help="Remover este cenário"):
-                payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or {})
-                if 0 <= idx - 1 < len(payload_atual["cenarios"]):
-                    payload_atual["cenarios"].pop(idx - 1)
-                st.session_state["polling_manual_payload"] = payload_atual
-                st.rerun()
+        st.markdown(f'<div class="ge-cenario-lbl">Cenário {idx_no_grupo}</div>', unsafe_allow_html=True)
 
         # Cargo, turno, UF e registro vivem por cenário (a extração pré-preenche,
         # a galera ajusta). Caso típico: material estadual com presidente +
         # governador + senador junto, ou presidente pesquisado só num estado.
-        col_cargo, col_turno, col_uf, col_registro = st.columns([0.28, 0.18, 0.18, 0.36])
+        # O botão de remover fica no fim da linha, alinhado com os campos.
+        col_cargo, col_turno, col_uf, col_registro, col_remover = st.columns(
+            [0.26, 0.15, 0.15, 0.34, 0.1], vertical_alignment="bottom"
+        )
         with col_cargo:
             cargo_cenario = st.selectbox(
                 "Cargo",
@@ -1565,6 +1555,16 @@ def render_editor_cenarios_polling(
                 value=resolver_registro_por_cargo(registro_tse, cargo_cenario),
                 key=f"polling_scenario_registro_{idx}",
             )
+        with col_remover:
+            # Mexe direto no payload guardado em session_state (a lista
+            # 'cenarios' recebida aqui é só a leitura desta execução) e força
+            # rerun pra tirar o cenário da tela.
+            if st.button("🗑️", key=f"polling_scenario_remover_{idx}", help="Remover este cenário"):
+                payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or {})
+                if 0 <= idx - 1 < len(payload_atual["cenarios"]):
+                    payload_atual["cenarios"].pop(idx - 1)
+                st.session_state["polling_manual_payload"] = payload_atual
+                st.rerun()
 
         if turno_cenario == "t1":
             # Mostra direto o NÚMERO que vai pro scenario_label da matriz (já
