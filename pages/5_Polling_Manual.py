@@ -1397,9 +1397,10 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
     topline foi aposentada em 16/07/2026 (só segmentos/rejeição/aprovação continuam
     automáticos) - 'Voto cadastrado?' (nomes antigos: 'Intenção de voto cadastrada?',
     'Topline extraída?') fica '⚠️ REGISTRE NO POLLING MANUAL' até alguém lançar por
-    aqui. Isso marca 'sim' + data nas linhas correspondentes (por Registro TSE +
-    Cargo). Silencioso por design: se a planilha não estiver configurada ou a linha
-    não for encontrada, não interrompe o salvamento da pesquisa — só devolve avisos
+    aqui. Isso marca 'sim' + data (coluna 'Data do registro', nome antigo 'Data do
+    registro manual') nas linhas correspondentes (por Registro TSE + Cargo).
+    Silencioso por design: se a planilha não estiver configurada ou a linha não
+    for encontrada, não interrompe o salvamento da pesquisa — só devolve avisos
     pra exibir.
 
     Retorna (quantidade de linhas atualizadas, lista de avisos).
@@ -1436,7 +1437,11 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
             ("Voto cadastrado?", "Intenção de voto cadastrada?", "Topline extraída?")
             if nome in header
         )
-        i_data = header.index("Data do registro manual")
+        i_data = next(
+            header.index(nome) for nome in
+            ("Data do registro", "Data do registro manual", "Data da extração de topline")
+            if nome in header
+        )
     except (ValueError, StopIteration) as exc:
         avisos.append(f"fila de relatórios sem a coluna esperada ({exc})")
         return 0, avisos
