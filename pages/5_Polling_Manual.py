@@ -1395,11 +1395,12 @@ def montar_dataframes_polling_manual(
 def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[str]]:
     """Fecha o loop com a fila 'relatorios' do eixo-eleicoes: extração automática de
     topline foi aposentada em 16/07/2026 (só segmentos/rejeição/aprovação continuam
-    automáticos) - 'Intenção de voto cadastrada?' (nome antigo: 'Topline extraída?')
-    fica '⚠️ REGISTRE NO POLLING MANUAL' até alguém lançar por aqui. Isso marca 'sim'
-    + data nas linhas correspondentes (por Registro TSE + Cargo). Silencioso por
-    design: se a planilha não estiver configurada ou a linha não for encontrada, não
-    interrompe o salvamento da pesquisa — só devolve avisos pra exibir.
+    automáticos) - 'Voto cadastrado?' (nomes antigos: 'Intenção de voto cadastrada?',
+    'Topline extraída?') fica '⚠️ REGISTRE NO POLLING MANUAL' até alguém lançar por
+    aqui. Isso marca 'sim' + data nas linhas correspondentes (por Registro TSE +
+    Cargo). Silencioso por design: se a planilha não estiver configurada ou a linha
+    não for encontrada, não interrompe o salvamento da pesquisa — só devolve avisos
+    pra exibir.
 
     Retorna (quantidade de linhas atualizadas, lista de avisos).
     """
@@ -1430,10 +1431,13 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
     try:
         i_registro = header.index("Registro TSE")
         i_cargo = header.index("Cargo")
-        i_flag = (header.index("Intenção de voto cadastrada?") if "Intenção de voto cadastrada?" in header
-                  else header.index("Topline extraída?"))
+        i_flag = next(
+            header.index(nome) for nome in
+            ("Voto cadastrado?", "Intenção de voto cadastrada?", "Topline extraída?")
+            if nome in header
+        )
         i_data = header.index("Data do registro manual")
-    except ValueError as exc:
+    except (ValueError, StopIteration) as exc:
         avisos.append(f"fila de relatórios sem a coluna esperada ({exc})")
         return 0, avisos
 
