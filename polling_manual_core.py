@@ -318,6 +318,10 @@ def normalizar_instituto(nome) -> str:
         return "GERP"
     if re.search(r"\b100\s*%?\s*cidades\b", nome_norm, flags=re.IGNORECASE):
         return "Futura"
+    # Nome legal comprido "Instituto de Pesquisa, Inteligência e Opinião
+    # França" (aparece em registros/relatórios) é o Instituto França.
+    if re.search(r"instituto de pesquisa.*opini[aã]o.*fran[çc]a", nome_norm, flags=re.IGNORECASE):
+        return "Instituto França"
     return ALIASES_INSTITUTO.get(nome_norm, nome_norm)
 
 
@@ -2649,7 +2653,9 @@ def salvar_tudo(gc, spreadsheet_id: str, df_p: pd.DataFrame, df_r: pd.DataFrame)
 
     aba_pesquisas = garantir_aba(sh, "pesquisas", rows=50000, cols=35)
     aba_resultados = garantir_aba(sh, "resultados", rows=20000, cols=35)
-    aba_resultados_bi = garantir_aba(sh, "resultados_bi", rows=20000, cols=40)
+    # Garante que a aba do BI existe (o Looker lê dela), mas quem a reconstrói
+    # agora é o workflow "05 - Rebuild BI" do eixo-eleicoes, não este salvamento.
+    garantir_aba(sh, "resultados_bi", rows=20000, cols=40)
 
     migrar_origem_e_remover_conferida(aba_pesquisas, aba_resultados)
 
@@ -2711,12 +2717,11 @@ def salvar_tudo(gc, spreadsheet_id: str, df_p: pd.DataFrame, df_r: pd.DataFrame)
 
     preencher_posicao_pesquisa_na_aba(aba_resultados)
 
-    df_resultados_all = carregar_df_da_aba(aba_resultados)
-    df_resultados_bi = construir_resultados_bi(df_resultados_all)
-    sobrescrever_aba(aba_resultados_bi, df_resultados_bi)
-    print(f"[+] resultados_bi: {len(df_resultados_bi)} linhas consolidadas para Looker")
-
     corrigir_coluna_numerica_na_aba(aba_resultados, "percentual")
     corrigir_coluna_numerica_na_aba(aba_resultados, "percentual_media_cenarios")
-    corrigir_coluna_numerica_na_aba(aba_resultados_bi, "percentual_base")
-    corrigir_coluna_numerica_na_aba(aba_resultados_bi, "media_movel_13d")
+
+    # O resultados_bi (consolidado do Looker, com média móvel) NÃO é mais
+    # reconstruído aqui — era a parte pesada do salvamento, relia todos os
+    # resultados a cada gravação. Agora quem refaz é o workflow "05 - Rebuild
+    # BI" do eixo-eleicoes, de 4 em 4 horas. Efeito: o Looker fica atualizado
+    # até a próxima rodada do workflow, não instantaneamente após um cadastro.

@@ -26,7 +26,6 @@ if str(ROOT_DIR) not in sys.path:
 
 from polling_manual_core import (
     CLASSIFICACAO_INSTITUTOS,
-    append_log_resultados_manual,
     carregar_df_da_aba,
     classificar_instituto,
     garantir_aba,
@@ -41,7 +40,6 @@ from polling_manual_core import (
     normalizar_scenario_label_t1,
     obter_metodologia,
     registro_tse_valido,
-    REGISTRO_TSE_TOKEN_RE,
     resolver_registro_por_cargo,
     salvar_tudo,
 )
@@ -662,10 +660,17 @@ def normalizar_payload_polling(payload: dict) -> dict:
         if turno_cenario == "t2":
             label = f"Segundo turno — cenário {idx}"
 
+        # UF do cenário: presidente às vezes é pesquisado só num estado; cai
+        # pra UF geral do payload quando o cenário não trouxer a sua.
+        uf_cenario = normalizar_texto_simples(cenario.get("uf")).upper()
+        if uf_cenario not in (["BR"] + UFS):
+            uf_cenario = uf
+
         cenarios_norm.append({
             "scenario_label": label or str(idx),
             "cargo": cargo_cenario,
             "turno": turno_cenario,
+            "uf": uf_cenario,
             "itens": itens_norm,
         })
 
@@ -685,7 +690,7 @@ def normalizar_payload_polling(payload: dict) -> dict:
         "fonte_url_original": normalizar_texto_simples(payload.get("fonte_url_original")),
         "observacoes": normalizar_texto_simples(payload.get("observacoes")),
         "pendencias": payload.get("pendencias") or [],
-        "cenarios": cenarios_norm or [{"scenario_label": "1", "turno": turno, "itens": []}],
+        "cenarios": cenarios_norm or [{"scenario_label": "1", "cargo": cargo, "turno": turno, "uf": uf, "itens": []}],
     }
 
 
@@ -1085,6 +1090,11 @@ def montar_dataframes_polling_manual(
         # quando o cenário não veio da tela de revisão com um valor próprio
         # (render_editor_cenarios_polling já resolve por cargo/UF antes disso).
         registro_cenario = normalizar_texto_simples(cenario.get("registro_tse")).upper() or registro_tse
+        # UF própria do cenário: pesquisa nacional (presidente) às vezes é feita
+        # só num estado pra testar o candidato lá — o cenário guarda a UF onde
+        # foi a campo. Cai pra UF geral do payload quando o cenário não trouxer
+        # a sua. Entra no poll_id (identidade da pesquisa) e nas duas planilhas.
+        uf_cenario = normalizar_texto_simples(cenario.get("uf")).upper() or uf
         disputa = ""
         if turno_cenario == "t2":
             # T2 só é uma disputa binária. Não escolha os dois primeiros em
@@ -1124,7 +1134,7 @@ def montar_dataframes_polling_manual(
             scenario_label = normalizar_scenario_label_t1(cenario.get("scenario_label"), idx_no_grupo)
 
         poll_id = gerar_poll_id(
-            uf, instituto, registro_cenario, data_campo, cargo_cenario, turno_cenario, block_hash,
+            uf_cenario, instituto, registro_cenario, data_campo, cargo_cenario, turno_cenario, block_hash,
             disputa=disputa,
             exigir_registro=exige_registro,
         )
@@ -1141,7 +1151,7 @@ def montar_dataframes_polling_manual(
             "scenario_id": scenario_id,
             "poll_id": poll_id,
             "ano": ano_calc,
-            "uf": uf,
+            "uf": uf_cenario,
             "cargo": cargo_cenario,
             "turno": turno_cenario,
             "disputa": disputa,
@@ -1176,7 +1186,7 @@ def montar_dataframes_polling_manual(
                 "scenario_id": scenario_id,
                 "poll_id": poll_id,
                 "ano": ano_calc,
-                "uf": uf,
+                "uf": uf_cenario,
                 "cargo": cargo_cenario,
                 # Bug pré-existente: usava o 'turno' uniforme do payload em vez
                 # do turno resolvido deste cenário (turno_cenario), então um
@@ -1271,22 +1281,6 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
     return len(encontrados), avisos
 
 
-def montar_log_resultados_manual(df_r: pd.DataFrame, username: str, nome_usuario: str) -> pd.DataFrame:
-    if df_r is None or df_r.empty:
-        return pd.DataFrame()
-
-    agora = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
-    batch_id = f"manual-{datetime.now(BRT).strftime('%Y%m%d%H%M%S')}"
-
-    df_log = df_r.copy()
-    df_log["manual_batch_id"] = batch_id
-    df_log["manual_usuario"] = normalizar_texto_simples(username)
-    df_log["manual_nome"] = normalizar_texto_simples(nome_usuario)
-    df_log["manual_salvo_em"] = agora
-    df_log["manual_origem"] = "streamlit"
-    return df_log
-
-
 def buscar_duplicatas_polling_manual(gc, spreadsheet_id: str, df_p: pd.DataFrame) -> pd.DataFrame:
     if df_p is None or df_p.empty:
         return pd.DataFrame()
@@ -1369,15 +1363,12 @@ def buscar_duplicatas_polling_manual(gc, spreadsheet_id: str, df_p: pd.DataFrame
 
 
 def render_editor_cenarios_polling(
-    cenarios: list[dict], cargo: str, turno: str, registro_tse: str = ""
+    cenarios: list[dict], cargo: str, turno: str, uf: str = "BR", registro_tse: str = ""
 ) -> list[dict]:
     cenarios_editados = []
     grupo_anterior = None
     contadores_grupo: dict[tuple[str, str], int] = {}
-    # Só mostra o campo de registro por cenário quando o texto geral trouxer
-    # mais de um registro reconhecível — caso comum é um registro só, que
-    # todo cenário já herda sem precisar de campo extra na tela.
-    multi_registro = len(REGISTRO_TSE_TOKEN_RE.findall(registro_tse or "")) > 1
+    opcoes_uf = ["BR"] + UFS
 
     for idx, cenario in enumerate(cenarios, start=1):
         turno_salvo = normalizar_texto_simples(cenario.get("turno")).lower()
@@ -1386,6 +1377,9 @@ def render_editor_cenarios_polling(
         cargo_salvo = normalizar_texto_simples(cenario.get("cargo")).lower()
         if cargo_salvo not in POLLING_MANUAL_CARGOS:
             cargo_salvo = cargo
+        uf_salvo = normalizar_texto_simples(cenario.get("uf")).upper()
+        if uf_salvo not in opcoes_uf:
+            uf_salvo = uf if uf in opcoes_uf else "BR"
 
         # Header de agrupamento (Cargo — Turno), pra separar visualmente
         # relatório que traz presidente+governador+senador (ou T1+T2) juntos.
@@ -1412,25 +1406,9 @@ def render_editor_cenarios_polling(
         contadores_grupo[grupo_atual] = contadores_grupo.get(grupo_atual, 0) + 1
         idx_no_grupo = contadores_grupo[grupo_atual]
 
-        col_titulo, col_cargo, col_turno, col_remover = st.columns([0.55, 0.2, 0.15, 0.1])
+        col_titulo, col_remover = st.columns([0.9, 0.1])
         with col_titulo:
             st.markdown(f"##### Cenário {idx_no_grupo}")
-        with col_cargo:
-            cargo_cenario = st.selectbox(
-                "Cargo deste cenário",
-                POLLING_MANUAL_CARGOS,
-                index=POLLING_MANUAL_CARGOS.index(cargo_salvo),
-                key=f"polling_scenario_cargo_{idx}",
-                label_visibility="collapsed",
-            )
-        with col_turno:
-            turno_cenario = st.selectbox(
-                "Turno deste cenário",
-                POLLING_MANUAL_TURNOS,
-                index=POLLING_MANUAL_TURNOS.index(turno_salvo),
-                key=f"polling_scenario_turno_{idx}",
-                label_visibility="collapsed",
-            )
         with col_remover:
             # Mesmo padrão de "Adicionar cenário em branco": mexe direto no
             # payload guardado em session_state (a lista 'cenarios' recebida
@@ -1442,27 +1420,38 @@ def render_editor_cenarios_polling(
                     payload_atual["cenarios"].pop(idx - 1)
                 st.session_state["polling_manual_payload"] = payload_atual
                 st.rerun()
-        if cargo_cenario != cargo or turno_cenario != turno:
-            st.markdown(
-                f'<div class="ge-alerta-cenario">⚠️ Este cenário está marcado como '
-                f'{cargo_cenario}/{turno_cenario}, diferente do principal da pesquisa '
-                f'({cargo}/{turno}) — material com mais de um cargo ou turno junto. '
-                f'Vai pra planilha de {turno_cenario.upper()} com cargo={cargo_cenario} '
-                f'ao salvar.</div>',
-                unsafe_allow_html=True,
-            )
 
-        registro_cenario = registro_tse
-        if multi_registro:
-            # Material com presidente + governador/senador junto costuma
-            # trazer DOIS registros TSE, um por cargo (ex.: "DF-04765/2026,
-            # BR-06776/2026") - usar o texto combinado inteiro pra todo
-            # cenário grava poll_id/scenario_id errado pros cargos que não
-            # são o do registro escolhido. resolver_registro_por_cargo já
-            # separa por cargo/UF (presidente = registro BR); aqui só mostra
-            # o resultado editável, mesmo princípio do número do cenário.
+        # Cargo, turno, UF e registro vivem por cenário (a extração pré-preenche,
+        # a galera ajusta). Caso típico: material estadual com presidente +
+        # governador + senador junto, ou presidente pesquisado só num estado.
+        col_cargo, col_turno, col_uf, col_registro = st.columns([0.28, 0.18, 0.18, 0.36])
+        with col_cargo:
+            cargo_cenario = st.selectbox(
+                "Cargo",
+                POLLING_MANUAL_CARGOS,
+                index=POLLING_MANUAL_CARGOS.index(cargo_salvo),
+                key=f"polling_scenario_cargo_{idx}",
+            )
+        with col_turno:
+            turno_cenario = st.selectbox(
+                "Turno",
+                POLLING_MANUAL_TURNOS,
+                index=POLLING_MANUAL_TURNOS.index(turno_salvo),
+                key=f"polling_scenario_turno_{idx}",
+            )
+        with col_uf:
+            uf_cenario = st.selectbox(
+                "UF",
+                opcoes_uf,
+                index=opcoes_uf.index(uf_salvo),
+                key=f"polling_scenario_uf_{idx}",
+            )
+        with col_registro:
+            # resolver_registro_por_cargo separa o registro certo quando o
+            # texto geral traz mais de um (presidente = registro BR, governador
+            # = registro da UF). Pré-preenche; se estiver errado, corrige aqui.
             registro_cenario = st.text_input(
-                "Registro TSE deste cenário",
+                "Registro TSE",
                 value=resolver_registro_por_cargo(registro_tse, cargo_cenario),
                 key=f"polling_scenario_registro_{idx}",
             )
@@ -1533,6 +1522,7 @@ def render_editor_cenarios_polling(
             "scenario_label": normalizar_texto_simples(scenario_label) or str(idx_no_grupo),
             "cargo": cargo_cenario,
             "turno": turno_cenario,
+            "uf": uf_cenario,
             "registro_tse": normalizar_texto_simples(registro_cenario),
             "itens": itens,
         })
@@ -1807,14 +1797,26 @@ if payload:
     payload = normalizar_payload_polling(payload)
 
     st.markdown("#### Dados extraídos")
+    st.caption("Vale pra pesquisa toda. Cargo, turno, UF e registro TSE ficam em cada cenário abaixo.")
+
+    # Cargo/turno/UF/registro não são mais editados aqui — vivem por cenário.
+    # Guardamos os valores da extração como padrão de cenário em branco e como
+    # fallback do que o cenário não especificar.
+    cargo = normalizar_texto_simples(st.session_state.get("polling_meta_cargo") or payload.get("cargo")).lower()
+    if cargo not in POLLING_MANUAL_CARGOS:
+        cargo = "governador"
+    turno = normalizar_texto_simples(st.session_state.get("polling_meta_turno") or payload.get("turno")).lower()
+    if turno not in POLLING_MANUAL_TURNOS:
+        turno = "t1"
+    uf = normalizar_texto_simples(st.session_state.get("polling_meta_uf") or payload.get("uf")).upper()
+    if uf not in (["BR"] + UFS):
+        uf = "BR"
+    registro_tse = normalizar_texto_simples(
+        st.session_state.get("polling_meta_registro") or payload.get("registro_tse")
+    )
+
     meta1, meta2, meta3 = st.columns(3)
     with meta1:
-        cargo = st.selectbox(
-            "Cargo",
-            POLLING_MANUAL_CARGOS,
-            key="polling_meta_cargo",
-        )
-
         # T1 e T2 são a fonte canônica dos institutos. O seletor aceita um
         # texto novo, mas confere por uma chave insensível a caixa e acentos.
         catalogo_institutos, origem_catalogo_institutos = carregar_catalogo_institutos_matrizes(
@@ -1881,12 +1883,7 @@ if payload:
 
         amostra = st.number_input("Amostra", min_value=0, step=1, key="polling_meta_amostra")
     with meta2:
-        turno = st.selectbox(
-            "Turno",
-            POLLING_MANUAL_TURNOS,
-            key="polling_meta_turno",
-        )
-        registro_tse = st.text_input("Registro TSE", key="polling_meta_registro")
+        data_campo = st.text_input("Data do campo (YYYY-MM-DD)", key="polling_meta_data")
         margem_erro = st.number_input(
             "Margem de erro (%)",
             min_value=0.0,
@@ -1895,12 +1892,6 @@ if payload:
             key="polling_meta_margem",
         )
     with meta3:
-        uf = st.selectbox(
-            "UF",
-            ["BR"] + UFS,
-            key="polling_meta_uf",
-        )
-        data_campo = st.text_input("Data do campo (YYYY-MM-DD)", key="polling_meta_data")
         confianca = st.text_input(
             "Confiança (%)",
             key="polling_meta_confianca",
@@ -1948,13 +1939,14 @@ if payload:
             "scenario_label": str(len(payload_atual["cenarios"]) + 1),
             "cargo": cargo,
             "turno": turno,
+            "uf": uf,
             "itens": [],
         })
         st.session_state["polling_manual_payload"] = payload_atual
         st.rerun()
 
     cenarios_fonte = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)["cenarios"]
-    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno, registro_tse)
+    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno, uf, registro_tse)
 
     st.markdown("#### Salvar")
     duplicatas_alerta = st.session_state.get("polling_manual_duplicatas")
@@ -2041,6 +2033,21 @@ if payload:
             for erro in erros:
                 st.error(erro)
         else:
+            # Aviso leve, não bloqueia: candidato de verdade sem partido
+            # costuma ser esquecimento no cadastro. Salva do mesmo jeito.
+            sem_partido = []
+            for cenario in cenarios_editados:
+                for item in cenario.get("itens") or []:
+                    cand = normalizar_texto_simples(item.get("candidato"))
+                    tipo_item = classificar_tipo_resultado_manual(cand, item.get("tipo", ""))
+                    if cand and tipo_item == "candidato" and not normalizar_texto_simples(item.get("partido")):
+                        sem_partido.append(cand)
+            if sem_partido:
+                st.warning(
+                    "Sem partido: " + ", ".join(dict.fromkeys(sem_partido))
+                    + ". Salvei assim mesmo — preencha se for esquecimento."
+                )
+
             gc = get_polling_sheets_client()
             fonte_url_original_atual = normalizar_texto_simples(payload.get("fonte_url_original"))
             if not gc:
@@ -2112,13 +2119,11 @@ if payload:
                         )
                         st.rerun()
 
-                    with st.spinner("Salvando na planilha e atualizando o BI..."):
-                        total_pesquisas = total_resultados = total_log = total_fila = 0
+                    with st.spinner("Salvando na planilha..."):
+                        total_pesquisas = total_resultados = total_fila = 0
                         avisos_fila_total: list[str] = []
                         destinos_salvos: list[str] = []
                         for turno_grupo, spreadsheet_destino, nome_destino, df_p_g, df_r_g in grupos:
-                            df_r_log = montar_log_resultados_manual(df_r_g, username=username, nome_usuario=name)
-                            linhas_log = append_log_resultados_manual(gc, spreadsheet_destino, df_r_log)
                             salvar_tudo(gc, spreadsheet_destino, df_p_g, df_r_g)
                             if concluir_linha_fila:
                                 linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_g)
@@ -2126,7 +2131,6 @@ if payload:
                                 avisos_fila_total.extend(avisos_fila)
                             total_pesquisas += len(df_p_g)
                             total_resultados += len(df_r_g)
-                            total_log += linhas_log
                             destinos_salvos.append(f"{nome_destino} ({len(df_p_g)} cenário(s))")
 
                         st.session_state["polling_manual_payload"] = payload_final
@@ -2134,15 +2138,14 @@ if payload:
                         st.session_state["polling_manual_resultado"] = {
                             "pesquisas": total_pesquisas,
                             "resultados": total_resultados,
-                            "resultados_manual": total_log,
                             "destino": " + ".join(destinos_salvos),
                             "linhas_fila": total_fila,
                             "avisos_fila": avisos_fila_total,
                         }
                         st.success(
                             f"Pesquisa salva com sucesso em {' e '.join(destinos_salvos)}. "
-                            f"{total_pesquisas} cenário(s), {total_resultados} resultado(s) "
-                            f"e {total_log} linha(s) no histórico `resultados_manual`."
+                            f"{total_pesquisas} cenário(s) e {total_resultados} resultado(s). "
+                            "O BI (Looker) é reconstruído pelo workflow de 4 em 4h."
                         )
                         if total_fila:
                             st.caption(f"Também marquei {total_fila} linha(s) como concluída na fila de relatórios.")
@@ -2152,7 +2155,6 @@ if payload:
 resultado = st.session_state.get("polling_manual_resultado")
 if resultado:
     st.info(
-        f"Último salvamento ({resultado.get('destino', 'matriz')}): {resultado['pesquisas']} linha(s) em `pesquisas` e "
-        f"{resultado['resultados']} linha(s) em `resultados` e "
-        f"{resultado.get('resultados_manual', 0)} linha(s) em `resultados_manual`."
+        f"Último salvamento ({resultado.get('destino', 'matriz')}): {resultado['pesquisas']} linha(s) em `pesquisas` "
+        f"e {resultado['resultados']} linha(s) em `resultados`."
     )
