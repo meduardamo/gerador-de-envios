@@ -1710,8 +1710,8 @@ with st.sidebar:
         'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
-        'Cadastre pesquisas antigas ou recentes que ainda não entraram no '
-        '<strong>PollingData</strong>.'
+        'Cadastre pesquisas eleitorais direto nas matrizes <strong>T1</strong> e '
+        '<strong>T2</strong> a partir de notícias ou relatórios do instituto.'
         '</p></div>',
         unsafe_allow_html=True,
     )
