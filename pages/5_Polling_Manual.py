@@ -981,9 +981,10 @@ Extraia os dados estruturados para inserção em planilha.
   "Resolução-TSE n.º 23.600/2019" — o 2019 é o ano da resolução, não da
   pesquisa, e deve ser IGNORADO como data. Uma pesquisa registrada sob
   protocolo terminado em /2026 tem data_campo em 2026.
-- confianca é o percentual do nível/grau/intervalo de confiança. Aceite
+- confianca é o percentual do nível/grau/índice/intervalo de confiança. Aceite
   qualquer dessas expressões: "nível de confiança", "grau de confiança",
-  "intervalo de confiança de 95%". Costuma vir na MESMA frase da margem de erro
+  "índice de confiança", "intervalo de confiança de 95%". Costuma vir junto da
+  margem de erro (na mesma frase ou na mesma lista de metodologia)
   (ex.: "margem estimada de erro de 2,6 pontos percentuais para um grau de
   confiança de 95,0%") — se achou a margem, procure a confiança ao lado.
   Descarte casa decimal e símbolo (95,0% = 95). Nunca presuma 100 ou 95 quando
