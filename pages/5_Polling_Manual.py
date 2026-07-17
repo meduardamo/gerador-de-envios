@@ -301,6 +301,14 @@ def normalizar_percentual_simples(valor) -> float | None:
         return None
 
 
+def normalizar_percentual_resultado(valor) -> float | None:
+    """Percentual de candidato/opção arredondado para 1 casa (pro mais perto),
+    igual ao resto das matrizes. Instituto que reporta 2 casas (ex.: 41,49)
+    vira 41.5, não 41.4 — o editor com step 0.1 truncava a segunda casa."""
+    n = normalizar_percentual_simples(valor)
+    return round(n, 1) if n is not None else None
+
+
 def normalizar_inteiro_simples(valor) -> int | None:
     s = normalizar_texto_simples(valor)
     if not s:
@@ -714,7 +722,7 @@ def normalizar_payload_polling(payload: dict) -> dict:
                 item.get("candidato") or item.get("nome") or item.get("opcao") or item.get("candidato_partido")
             )
             partido = normalizar_partido(item.get("partido"))
-            percentual = normalizar_percentual_simples(item.get("percentual"))
+            percentual = normalizar_percentual_resultado(item.get("percentual"))
             tipo = classificar_tipo_resultado_manual(candidato, item.get("tipo", ""))
 
             if not candidato and percentual is None:
@@ -1291,7 +1299,7 @@ def montar_dataframes_polling_manual(
         for item in itens:
             candidato = normalizar_nome_candidato(normalizar_texto_simples(item.get("candidato")))
             partido = normalizar_partido(item.get("partido"))
-            percentual = normalizar_percentual_simples(item.get("percentual"))
+            percentual = normalizar_percentual_resultado(item.get("percentual"))
             tipo = classificar_tipo_resultado_manual(candidato, item.get("tipo", ""))
 
             if not candidato or percentual is None:
@@ -1623,7 +1631,7 @@ def render_editor_cenarios_polling(
             column_config={
                 "candidato": st.column_config.TextColumn("Candidato / opção"),
                 "partido": st.column_config.TextColumn("Partido"),
-                "percentual": st.column_config.NumberColumn("Percentual", min_value=0.0, max_value=100.0, step=0.1),
+                "percentual": st.column_config.NumberColumn("Percentual", min_value=0.0, max_value=100.0, step=0.1, format="%.1f"),
                 "tipo": st.column_config.SelectboxColumn("Tipo", options=POLLING_MANUAL_TIPOS_RESULTADO),
             },
         )
@@ -1631,7 +1639,7 @@ def render_editor_cenarios_polling(
         itens = []
         for _, row in editado.iterrows():
             candidato = normalizar_texto_simples(row.get("candidato"))
-            percentual = normalizar_percentual_simples(row.get("percentual"))
+            percentual = normalizar_percentual_resultado(row.get("percentual"))
             if not candidato and percentual is None:
                 continue
             itens.append({
