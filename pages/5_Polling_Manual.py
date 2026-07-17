@@ -1731,6 +1731,11 @@ for k, v in [
 # estado de um widget depois de criado na execução atual.
 if st.session_state.pop("polling_limpar_tudo_pendente", False):
     resetar_estado_pesquisa_polling(limpar_fonte=True)
+    # Textarea/text_input não zeram só com del — o Streamlit restaura o valor do
+    # cache interno do widget quando a chave some. Setar "" antes do widget montar
+    # (aqui no topo) força o campo vazio de fato.
+    st.session_state["polling_manual_texto_fonte"] = ""
+    st.session_state["polling_manual_url_original"] = ""
     st.session_state["polling_manual_flash"] = "Tudo limpo. Cole ou carregue uma nova pesquisa."
 
 # A troca de pesquisa precisa começar com controles limpos. Esta seção roda
