@@ -98,6 +98,19 @@ footer { display: none !important; }
     background: #192D4E; color: #fff; border-left: 4px solid #962E4D;
     padding: 10px 14px; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.5;
 }
+/* Faixa de grupo cargo — turno: separa visualmente presidente/governador/
+   senador e 1º/2º turno quando vêm no mesmo material. */
+.ge-grupo {
+    background: #192D4E; color: #fff; border-left: 6px solid #962E4D;
+    padding: 11px 18px; margin: 26px 0 4px;
+    font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+/* Rótulo de cada cenário dentro do grupo. */
+.ge-cenario-lbl {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #962E4D; margin: 14px 0 2px; padding-bottom: 5px;
+    border-bottom: 1px solid #DADAD4;
+}
 </style>""", unsafe_allow_html=True)
 
 
@@ -1489,7 +1502,10 @@ def render_editor_cenarios_polling(
         grupo_atual = (cargo_atual_grupo, turno_atual_grupo)
         if grupo_atual != grupo_anterior:
             rotulo_turno = "1º turno" if turno_atual_grupo == "t1" else "2º turno"
-            st.markdown(f"### {cargo_atual_grupo.capitalize()} — {rotulo_turno}")
+            st.markdown(
+                f'<div class="ge-grupo">{cargo_atual_grupo.capitalize()} — {rotulo_turno}</div>',
+                unsafe_allow_html=True,
+            )
             grupo_anterior = grupo_atual
 
         # Índice DENTRO do grupo (mesmo cargo+turno), não a posição global na
@@ -1502,7 +1518,7 @@ def render_editor_cenarios_polling(
 
         col_titulo, col_remover = st.columns([0.9, 0.1])
         with col_titulo:
-            st.markdown(f"##### Cenário {idx_no_grupo}")
+            st.markdown(f'<div class="ge-cenario-lbl">Cenário {idx_no_grupo}</div>', unsafe_allow_html=True)
         with col_remover:
             # Mesmo padrão de "Adicionar cenário em branco": mexe direto no
             # payload guardado em session_state (a lista 'cenarios' recebida
@@ -1890,7 +1906,7 @@ payload = st.session_state.get("polling_manual_payload")
 if payload:
     payload = normalizar_payload_polling(payload)
 
-    st.markdown("#### Dados extraídos")
+    st.markdown('<div class="ge-rule">Dados extraídos</div>', unsafe_allow_html=True)
     st.caption("Vale pra pesquisa toda. Cargo, turno, UF e registro TSE ficam em cada cenário abaixo.")
 
     # Cargo/turno/UF/registro não são mais editados aqui — vivem por cenário.
@@ -2033,7 +2049,7 @@ if payload:
             "base (matrizes T1/T2). Confira: " + ", ".join(partidos_da_base) + "."
         )
 
-    st.markdown("#### Cenários e candidatos")
+    st.markdown('<div class="ge-rule">Cenários e candidatos</div>', unsafe_allow_html=True)
     if st.button("Adicionar cenário em branco"):
         payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)
         payload_atual["cenarios"].append({
@@ -2049,7 +2065,7 @@ if payload:
     cenarios_fonte = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)["cenarios"]
     cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno, uf, registro_tse)
 
-    st.markdown("#### Salvar")
+    st.markdown('<div class="ge-rule">Salvar</div>', unsafe_allow_html=True)
     duplicatas_alerta = st.session_state.get("polling_manual_duplicatas")
     forcar_salvar = False
     if isinstance(duplicatas_alerta, pd.DataFrame) and not duplicatas_alerta.empty:
