@@ -976,9 +976,18 @@ Extraia os dados estruturados para inserção em planilha.
   nunca o primeiro. Se a fonte não informar a data final de coleta, use a data
   de divulgação como fallback e registre em observacoes: "data de divulgação
   usada como data_campo; período de coleta não informado".
-- confianca deve ser somente o percentual explicitamente informado como nível de
-  confiança (ex.: "nível de confiança de 95%" = 95). Nunca presuma 100 ou 95
-  quando a fonte não informar esse dado; nesse caso use null.
+- O ANO de data_campo vem SEMPRE do período de coleta (ou da data de
+  divulgação, no fallback), NUNCA do número de uma norma citada. Ex.:
+  "Resolução-TSE n.º 23.600/2019" — o 2019 é o ano da resolução, não da
+  pesquisa, e deve ser IGNORADO como data. Uma pesquisa registrada sob
+  protocolo terminado em /2026 tem data_campo em 2026.
+- confianca é o percentual do nível/grau/intervalo de confiança. Aceite
+  qualquer dessas expressões: "nível de confiança", "grau de confiança",
+  "intervalo de confiança de 95%". Costuma vir na MESMA frase da margem de erro
+  (ex.: "margem estimada de erro de 2,6 pontos percentuais para um grau de
+  confiança de 95,0%") — se achou a margem, procure a confiança ao lado.
+  Descarte casa decimal e símbolo (95,0% = 95). Nunca presuma 100 ou 95 quando
+  a fonte não informar esse dado; nesse caso use null.
 - cargo deve ser governador, senador ou presidente.
 - turno deve ser t1 ou t2.
 - uf deve estar em caixa alta. Para presidente use BR.
@@ -1574,11 +1583,14 @@ def render_editor_cenarios_polling(
             # número reconhecível podia cair num fallback que ela não via.
             # Editando aqui o número direto, o que ela vê é literalmente o
             # que é salvo; se estiver errado, corrige na hora.
+            # Número = posição DENTRO do grupo (cargo+turno), não o número que o
+            # Gemini extraiu: a extração numera os cenários de forma global no
+            # documento (governador=1, senador=2...), então um cargo com um só
+            # cenário virava "cenário 2". A posição no grupo é sempre a leitura
+            # certa; ela ainda pode editar o número aqui se precisar.
             scenario_label = st.text_input(
                 "Número do cenário (T1)",
-                value=normalizar_scenario_label_t1(
-                    cenario.get("scenario_label", str(idx_no_grupo)), idx_no_grupo
-                ),
+                value=str(idx_no_grupo),
                 key=f"polling_scenario_label_{idx}",
             )
         else:
