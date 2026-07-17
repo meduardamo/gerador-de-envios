@@ -1837,7 +1837,12 @@ with col1:
     )
 
 with col2:
-    url_original = st.text_input("URL original (opcional)", key="polling_manual_url_original")
+    url_original = st.text_input(
+        "Link da notícia ou relatório (obrigatório)",
+        key="polling_manual_url_original",
+        help="Vai pras colunas fonte_url e fonte_url_original. Uma extração = um "
+             "material, então o link é o mesmo pra todos os cenários.",
+    )
 
     with st.expander("Extrair texto de PDF", expanded=False):
         pdf_file = st.file_uploader("Upload do PDF da pesquisa", type=["pdf"], key="polling_pdf_uploader")
@@ -2235,6 +2240,18 @@ if payload:
             erros.append("Registro TSE é obrigatório para pesquisas de 2026.")
         if sum(len(cenario.get("itens") or []) for cenario in cenarios_editados) == 0:
             erros.append("Inclua pelo menos um resultado em algum cenário.")
+        # Link da fonte é obrigatório: alimenta fonte_url e fonte_url_original.
+        # Global de propósito — uma extração vem de UM material só, então todos
+        # os cenários compartilham o mesmo link (se a notícia trouxe os
+        # candidatos, é porque eles estão nela).
+        link_fonte = normalizar_texto_simples(url_original)
+        if not link_fonte:
+            erros.append(
+                "Cole o link da notícia ou relatório — é obrigatório "
+                "(vai pras colunas fonte_url e fonte_url_original)."
+            )
+        elif not link_fonte.lower().startswith("http"):
+            erros.append("O link da notícia ou relatório precisa ser uma URL (começar com http).")
 
         if erros:
             for erro in erros:
@@ -2256,7 +2273,10 @@ if payload:
                 )
 
             gc = get_polling_sheets_client()
-            fonte_url_original_atual = normalizar_texto_simples(payload.get("fonte_url_original"))
+            # Usa o link do campo (já validado como obrigatório acima), não o
+            # que ficou no payload da extração — se ela ajustou o link depois de
+            # extrair, é esse que vale.
+            fonte_url_original_atual = link_fonte
             if not gc:
                 st.error("Credenciais do Google Sheets não encontradas.")
             else:
@@ -2278,7 +2298,7 @@ if payload:
                 }
                 df_p, df_r = montar_dataframes_polling_manual(
                     payload=payload_final,
-                    fonte_url="",
+                    fonte_url=link_fonte,
                     fonte_url_original=fonte_url_original_atual,
                     classificacao_canonica=classificacao_canonica,
                 )
