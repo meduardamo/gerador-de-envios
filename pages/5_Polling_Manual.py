@@ -915,11 +915,19 @@ def corrigir_metadados_explicitos_da_fonte(payload: dict, texto_fonte: str) -> d
     payload = dict(payload or {})
     texto = normalizar_texto_simples(texto_fonte)
 
+    # Aceita "nível/grau/índice/intervalo de confiança", "confiança de 95%" e a
+    # ordem invertida "95% de confiança". Institutos usam grafias variadas.
     confianca = re.search(
-        r"(?:nível|nivel)\s+de\s+confiança\s*(?:de|:)?\s*(\d{1,3}(?:[,.]\d+)?)\s*%",
+        r"(?:n[íi]vel|grau|[íi]ndice|intervalo)?\s*(?:de\s+)?confian[çc]a\s*(?:de|:)?\s*(\d{1,3}(?:[,.]\d+)?)\s*%",
         texto,
         flags=re.IGNORECASE,
     )
+    if not confianca:
+        confianca = re.search(
+            r"(\d{1,3}(?:[,.]\d+)?)\s*%\s*(?:de\s+)?(?:n[íi]vel|grau|[íi]ndice|intervalo)?\s*(?:de\s+)?confian[çc]a",
+            texto,
+            flags=re.IGNORECASE,
+        )
     if confianca:
         try:
             valor = float(confianca.group(1).replace(",", "."))
