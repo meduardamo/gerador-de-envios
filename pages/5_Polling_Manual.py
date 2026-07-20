@@ -2102,11 +2102,10 @@ if payload:
                 cutoff=0.62,
             )
             sugestoes = [catalogo_institutos[chave]["instituto"] for chave in sugestoes_chave]
-            st.caption(
-                "Confira a grafia: este nome não está no catálogo canônico de T1 e T2."
-            )
+            aviso_grafia = "⚠️ Confira a grafia: este nome não está no catálogo canônico de T1 e T2."
             if sugestoes:
-                st.caption("Possíveis correspondências nas matrizes: " + ", ".join(sugestoes) + ".")
+                aviso_grafia += " Possíveis correspondências nas matrizes: " + ", ".join(sugestoes) + "."
+            st.warning(aviso_grafia)
         elif origem_catalogo_institutos != "T1 e T2":
             st.caption("Catálogo de T1/T2 indisponível no momento; usando o dicionário local temporariamente.")
 
