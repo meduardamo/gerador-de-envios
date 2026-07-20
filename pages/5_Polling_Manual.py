@@ -1051,6 +1051,12 @@ Extraia os dados estruturados para inserção em planilha.
   "Resolução-TSE n.º 23.600/2019" — o 2019 é o ano da resolução, não da
   pesquisa, e deve ser IGNORADO como data. Uma pesquisa registrada sob
   protocolo terminado em /2026 tem data_campo em 2026.
+- registro_tse é o número de registro da pesquisa na Justiça Eleitoral
+  (formato UF-XXXXX/AAAA, ex.: "AL-01460/2026"). Extraia SOMENTE se ele
+  aparecer explicitamente escrito na fonte. NUNCA invente, deduza, "complete"
+  ou chute um número de registro que não esteja no material. Se a fonte não
+  informar o registro, use "" (string vazia) — não preencha com um valor
+  plausível.
 - confianca é o percentual do nível/grau/índice/intervalo de confiança. Aceite
   qualquer dessas expressões: "nível de confiança", "grau de confiança",
   "índice de confiança", "intervalo de confiança de 95%". Costuma vir junto da
