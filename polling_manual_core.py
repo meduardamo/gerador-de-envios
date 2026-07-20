@@ -2212,7 +2212,10 @@ def dedup_e_salvar(aba, df: pd.DataFrame, key_col: str):
         return 0, len(existing)
 
     df_add = df_add.reindex(columns=header_final, fill_value="")
-    aba.insert_rows(df_add.fillna("").astype(str).values.tolist(), row=2)
+    # astype(object).where(...) troca NA por "" mesmo em colunas de dtype
+    # nullable (Int64/Float64), onde fillna("") quebra com TypeError.
+    df_add_export = df_add.astype(object).where(pd.notna(df_add), "")
+    aba.insert_rows(df_add_export.astype(str).values.tolist(), row=2)
 
     print(f"  [insert] {len(df_add)} nova(s) | {len(existing)} já existiam")
     return len(df_add), len(existing)
