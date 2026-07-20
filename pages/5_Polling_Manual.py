@@ -1233,9 +1233,11 @@ def montar_dataframes_polling_manual(
         payload.get("fonte_url_original")
     )
     classificacao = normalizar_texto_simples(classificacao_canonica) or classificar_instituto(instituto)
+    # O registro TSE é resolvido por cenário (cada cenário pode ter o seu, ex.:
+    # material com presidente + governador junto). A obrigatoriedade é checada
+    # dentro do loop, sobre o registro efetivo do cenário — não sobre um registro
+    # global do payload, que fica vazio quando a tela só preenche o do cenário.
     exige_registro = ano_calc == 2026
-    if exige_registro and not registro_tse_valido(registro_tse):
-        raise ValueError("Registro TSE é obrigatório para pesquisas de 2026.")
 
     pesquisas_rows = []
     resultados_rows = []
@@ -1277,6 +1279,11 @@ def montar_dataframes_polling_manual(
         # quando o cenário não veio da tela de revisão com um valor próprio
         # (render_editor_cenarios_polling já resolve por cargo/UF antes disso).
         registro_cenario = normalizar_texto_simples(cenario.get("registro_tse")).upper() or registro_tse
+        if exige_registro and not registro_tse_valido(registro_cenario):
+            raise ValueError(
+                f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): "
+                "Registro TSE é obrigatório para pesquisas de 2026."
+            )
         # UF própria do cenário: pesquisa nacional (presidente) às vezes é feita
         # só num estado pra testar o candidato lá — o cenário guarda a UF onde
         # foi a campo. Cai pra UF geral do payload quando o cenário não trouxer
