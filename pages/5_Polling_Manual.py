@@ -2259,8 +2259,20 @@ if payload:
         ):
             erros.append("Confiança deve ser um percentual inteiro entre 1 e 100 ou ficar em branco.")
         data_campo_normalizada = normalizar_data_campo_segura(normalizar_texto_simples(data_campo))
-        if data_campo_normalizada.startswith("2026") and not registro_tse_valido(registro_tse):
-            erros.append("Registro TSE é obrigatório para pesquisas de 2026.")
+        if data_campo_normalizada.startswith("2026"):
+            # O registro é por cenário (cai pro global só como fallback). Barra
+            # apenas se algum cenário com resultado ficar sem registro válido —
+            # não exige um registro global, que fica vazio quando a tela preenche
+            # só o do cenário.
+            cenarios_sem_registro = [
+                c for c in cenarios_editados
+                if (c.get("itens") or [])
+                and not registro_tse_valido(
+                    normalizar_texto_simples(c.get("registro_tse")) or registro_tse
+                )
+            ]
+            if cenarios_sem_registro:
+                erros.append("Registro TSE é obrigatório para pesquisas de 2026.")
         if sum(len(cenario.get("itens") or []) for cenario in cenarios_editados) == 0:
             erros.append("Inclua pelo menos um resultado em algum cenário.")
         # Link da fonte é obrigatório: alimenta fonte_url e fonte_url_original.
