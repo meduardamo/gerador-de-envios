@@ -706,7 +706,59 @@ DISPUTA_CANDIDATO_ALIASES = {
 
 
 def registro_tse_valido(valor) -> bool:
+    """Presença: o campo foi preenchido com alguma coisa que não é 'sem registro'.
+
+    Deliberadamente frouxa. Participa da identidade da pesquisa (gerar_poll_id) e
+    das rotas legadas de raspagem, que carregam registro em formatos antigos —
+    apertar aqui mudaria o poll_id de dado histórico já gravado nas matrizes.
+    Pra barrar registro malformado na entrada, use registro_tse_formato_ok.
+    """
     return _norm_ws(valor).lower() not in ("", "sem registro", "sem_registro", "semregistro", "nan", "none")
+
+
+# UFs + BR, usados tanto pra achar registro solto num texto quanto pra validar
+# o formato canônico de um campo inteiro.
+_UF_REGISTRO = (
+    "BR|AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO"
+)
+
+# Aceita o que a pessoa costuma digitar/colar ('df 4765/2026', 'DF04765/2026')
+# pra poder canonizar. A validação de verdade é feita depois, sobre o canônico.
+_REGISTRO_TSE_SOLTO_RE = re.compile(
+    rf"^({_UF_REGISTRO})[\s\-–—/.]*(\d{{4,6}})[\s\-–—/.]*(/|\s|-)?\s*(20\d{{2}})$",
+    flags=re.I,
+)
+# Exatamente 5 dígitos: conferido contra a fila de relatórios de 2026, onde os
+# 144 registros distintos são todos UF + 5 dígitos + /2026. Aceitar 4 deixaria
+# passar o erro mais comum de digitação, que é comer o zero à esquerda
+# ('DF-4765/2026'). Reprovar é melhor que completar o zero no chute: se o
+# registro de verdade for 14765, o preenchimento automático gravaria outro.
+REGISTRO_TSE_CANONICO_RE = re.compile(rf"^({_UF_REGISTRO})-\d{{5}}/20\d{{2}}$")
+
+
+def normalizar_registro_tse(valor) -> str:
+    """Devolve o registro no formato canônico da matriz: 'DF-04765/2026'.
+
+    Corrige o que varia na digitação: caixa, espaço sobrando, hífen ausente ou
+    travessão no lugar do hífen. O que não for reconhecível como registro volta
+    só com espaços aparados e em maiúsculas, pra registro_tse_formato_ok poder
+    reprovar em vez de o valor ser silenciosamente "consertado" em algo errado.
+    """
+    texto = _norm_ws(valor).upper()
+    match = _REGISTRO_TSE_SOLTO_RE.match(texto)
+    if not match:
+        return texto
+    return f"{match.group(1).upper()}-{match.group(2)}/{match.group(4)}"
+
+
+def registro_tse_formato_ok(valor) -> bool:
+    """Formato: 'UF-NNNNN/AAAA' (ex.: DF-04765/2026, BR-06776/2026).
+
+    Não confere se o registro EXISTE no TSE — só se tem a cara de um registro.
+    Serve pra barrar dígito a mais/a menos, ano impossível e texto colado por
+    engano antes de virar poll_id e ir pra matriz.
+    """
+    return bool(REGISTRO_TSE_CANONICO_RE.match(normalizar_registro_tse(valor)))
 
 
 def _norm_ascii(valor) -> str:
@@ -2233,8 +2285,8 @@ def _norm_key_text(s) -> str:
 
 
 def _registro_tse_valido(valor) -> bool:
-    s = _norm_ws(valor).lower()
-    return s not in ("", "sem registro", "sem_registro", "semregistro", "nan", "none")
+    # Era uma segunda cópia da mesma regra; agora delega, pra não divergirem.
+    return registro_tse_valido(valor)
 
 
 def _tipo_origem(origem_valor) -> str:

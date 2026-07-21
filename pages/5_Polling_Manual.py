@@ -37,8 +37,10 @@ from polling_manual_core import (
     normalizar_instituto,
     normalizar_nome_candidato,
     normalizar_partido,
+    normalizar_registro_tse,
     normalizar_scenario_label_t1,
     obter_metodologia,
+    registro_tse_formato_ok,
     registro_tse_valido,
     resolver_registro_por_cargo,
     salvar_tudo,
@@ -253,11 +255,6 @@ def normalizar_chave_dedup_manual(valor) -> str:
 def chave_instituto_catalogo(valor) -> str:
     """Chave sem acento/caixa para buscar o nome canônico nas matrizes."""
     return normalizar_chave_dedup_manual(valor).replace("-", "")
-
-
-def registro_tse_valido(valor: str) -> bool:
-    texto = normalizar_texto_simples(valor).lower()
-    return texto not in ("", "sem registro", "sem_registro", "semregistro", "nan", "none")
 
 
 def gerar_chave_polling_registro(uf, cargo, turno, registro_tse) -> str:
@@ -1284,11 +1281,20 @@ def montar_dataframes_polling_manual(
         # "DF-04765/2026, BR-06776/2026") — cai pro registro geral do payload
         # quando o cenário não veio da tela de revisão com um valor próprio
         # (render_editor_cenarios_polling já resolve por cargo/UF antes disso).
-        registro_cenario = normalizar_texto_simples(cenario.get("registro_tse")).upper() or registro_tse
+        # Canoniza o que foi digitado ('df 4765/2026' -> 'DF-04765/2026') antes de
+        # virar poll_id: o registro é parte da identidade da pesquisa, então caixa
+        # e pontuação diferentes criariam duas pesquisas onde só existe uma.
+        registro_cenario = normalizar_registro_tse(cenario.get("registro_tse")) or normalizar_registro_tse(registro_tse)
         if exige_registro and not registro_tse_valido(registro_cenario):
             raise ValueError(
                 f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): "
                 "Registro TSE é obrigatório para pesquisas de 2026."
+            )
+        if exige_registro and not registro_tse_formato_ok(registro_cenario):
+            raise ValueError(
+                f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): "
+                f"Registro TSE \"{registro_cenario}\" fora do formato UF-NNNNN/AAAA "
+                f"(ex.: DF-04765/2026). Confira contra o PDF."
             )
         # UF própria do cenário: pesquisa nacional (presidente) às vezes é feita
         # só num estado pra testar o candidato lá — o cenário guarda a UF onde
@@ -2279,6 +2285,23 @@ if payload:
             ]
             if cenarios_sem_registro:
                 erros.append("Registro TSE é obrigatório para pesquisas de 2026.")
+            # Formato conferido antes de gravar: o app não sabe se o registro
+            # EXISTE no TSE, mas sabe reprovar dígito a mais/a menos e ano
+            # impossível. Registro torto entra no poll_id, escapa do detector de
+            # duplicata e não casa com a linha da fila de relatórios.
+            registros_tortos = []
+            for cenario in cenarios_editados:
+                if not (cenario.get("itens") or []):
+                    continue
+                bruto = normalizar_texto_simples(cenario.get("registro_tse")) or registro_tse
+                if bruto and not registro_tse_formato_ok(bruto):
+                    registros_tortos.append(normalizar_registro_tse(bruto))
+            if registros_tortos:
+                erros.append(
+                    "Registro TSE fora do formato UF-NNNNN/AAAA (ex.: DF-04765/2026): "
+                    + ", ".join(dict.fromkeys(registros_tortos))
+                    + ". Confira contra o PDF."
+                )
         if sum(len(cenario.get("itens") or []) for cenario in cenarios_editados) == 0:
             erros.append("Inclua pelo menos um resultado em algum cenário.")
         # Link da fonte é obrigatório: alimenta fonte_url e fonte_url_original.
