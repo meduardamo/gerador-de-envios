@@ -34,6 +34,11 @@ COLUNAS_RESULTADOS = ["scenario_id", "poll_id", "ano", "uf", "cargo", "turno", "
                       "candidato_partido", "tipo", "percentual", "disputa", "fonte_url",
                       "horario_raspagem", "origem"]
 
+# Marca a procedência: veio de texto colado do PollingData, não do PDF/Gemini
+# (Polling Manual). Dedup dentro do colar é por scenario_id no salvar_tudo; o
+# cruzamento com entrada manual do mesmo registro é sinalizado na página.
+ORIGEM_COLAR = "polling_colar"
+
 REG = re.compile(r"^[A-Z]{2}-\d{4,6}/\d{4}$")
 NAO_VALIDO = {"outros", "não válido", "nao valido", "nulo", "branco", "ns/nr",
               "não sabe", "nao sabe", "indeciso", "nenhum"}
@@ -123,7 +128,7 @@ def parsear(texto):
                 pcts = _nums(linhas[j])
                 j += 1
                 pesquisas.append({
-                    "registro": reg, "instituto": inst,
+                    "registro_tse": reg, "instituto": inst,
                     "data_campo": datas.group(2) if datas else "", "modo": modo,
                     "amostra": amostra, "margem": margem, "confianca": confianca,
                     "scenario_label": rotulo or "Cenário 01",
@@ -139,37 +144,67 @@ def parsear(texto):
 
 
 def montar(pesquisas, ano, uf, cargo, turno, fonte_url):
+    """Constrói linhas no MESMO schema do Polling Manual, usando os helpers do
+    core (poll_id, classificação, metodologia, normalização de nome/partido/%).
+
+    Assim a página pode chamar salvar_tudo() e o dado sai idêntico ao do Polling
+    Manual: mesmo scenario_id (a chave de dedup), mesma classificação de
+    instituto, mesma metodologia. Sem isso, uma pesquisa colada e a mesma pesquisa
+    cadastrada à mão virariam duas entradas, e o dedup por scenario_id não pegaria.
+    """
+    from polling_manual_core import (
+        classificar_instituto, gerar_poll_id, gerar_scenario_id,
+        normalizar_instituto, normalizar_nome_candidato, normalizar_partido, obter_metodologia,
+    )
     agora = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
-    linhas_p, linhas_r, avisos = [], [], []
+    linhas_p, linhas_r, avisos, vistos = [], [], [], set()
     for p in pesquisas:
         cols, pcts = p["colunas"], p["percentuais"]
         if len(cols) != len(pcts):
-            avisos.append(f"{p['registro']} / {p['scenario_label']}: "
+            avisos.append(f"{p['registro_tse']} / {p['scenario_label']}: "
                           f"{len(cols)} coluna(s) mas {len(pcts)} percentual(is) — confira")
-        inst = p["instituto"].split("<>")[0].strip()
-        poll_id = f"colar|{uf}|{cargo}|{turno}|{p['registro']}|{p['scenario_label']}"
+        instituto = normalizar_instituto(p["instituto"].split("<>")[0].strip())
+        registro = p["registro_tse"]
+        data_campo = p["data_campo"]
+        # Mesma identidade do Polling Manual: registro entra no poll_id; sem
+        # block_hash na chave pública (só compat).
+        poll_id = gerar_poll_id(uf, instituto, registro, data_campo, cargo, turno, "",
+                                disputa="", exigir_registro=False)
+        scenario_id = gerar_scenario_id(poll_id, p["scenario_label"])
+        if scenario_id in vistos:
+            avisos.append(f"{registro} / {p['scenario_label']}: cenário duplicado no texto colado")
+            continue
+        vistos.add(scenario_id)
+
         linhas_p.append({
-            "scenario_id": poll_id, "poll_id": poll_id, "ano": ano, "uf": uf,
-            "cargo": cargo, "turno": turno, "instituto": inst,
-            "registro_tse": p["registro"], "data_campo": p["data_campo"], "modo": p["modo"],
+            "scenario_id": scenario_id, "poll_id": poll_id, "ano": ano, "uf": uf,
+            "cargo": cargo, "turno": turno, "disputa": "",
+            "instituto": instituto, "classificacao_instituto": classificar_instituto(instituto),
+            "registro_tse": registro, "data_campo": data_campo, "modo": p["modo"],
             "amostra": p["amostra"], "margem_erro": p["margem"], "confianca": p["confianca"],
-            "scenario_label": p["scenario_label"], "disputa": "",
-            "fonte_url": fonte_url, "fonte_url_original": fonte_url,
-            "horario_raspagem": agora, "origem": "pollingdata_colar",
+            "scenario_label": p["scenario_label"], "fonte_url": fonte_url,
+            "fonte_url_original": fonte_url, "horario_raspagem": agora,
+            "metodologia": obter_metodologia(instituto), "origem": ORIGEM_COLAR,
         })
         for col, pct in zip(cols, pcts):
-            candidato_partido = col.strip()
-            mp = re.search(r"\(([^)]+)\)\s*$", candidato_partido)
-            partido = mp.group(1).strip().upper() if mp else ""
-            nome = re.sub(r"\s*\([^)]*\)\s*$", "", candidato_partido).strip()
+            bruto = col.strip()
+            mp = re.search(r"\(([^)]+)\)\s*$", bruto)
+            partido = normalizar_partido(mp.group(1)) if mp else ""
+            nome = normalizar_nome_candidato(re.sub(r"\s*\([^)]*\)\s*$", "", bruto).strip())
+            tipo = _tipo(nome)
+            candidato_partido = nome if tipo == "nao_valido" else (f"{nome} ({partido})" if partido else nome)
+            try:
+                percentual = round(float(str(pct).replace(",", ".")), 1)
+            except (ValueError, TypeError):
+                percentual = None
             linhas_r.append({
-                "scenario_id": poll_id, "poll_id": poll_id, "ano": ano, "uf": uf,
-                "cargo": cargo, "turno": turno, "data_campo": p["data_campo"],
-                "instituto": inst, "registro_tse": p["registro"],
-                "scenario_label": p["scenario_label"], "candidato": nome, "partido": partido,
-                "candidato_partido": candidato_partido, "tipo": _tipo(nome),
-                "percentual": pct, "disputa": "", "fonte_url": fonte_url,
-                "horario_raspagem": agora, "origem": "pollingdata_colar",
+                "scenario_id": scenario_id, "poll_id": poll_id, "ano": ano, "uf": uf,
+                "cargo": cargo, "turno": turno, "disputa": "", "data_campo": data_campo,
+                "instituto": instituto, "classificacao_instituto": classificar_instituto(instituto),
+                "registro_tse": registro, "scenario_label": p["scenario_label"],
+                "candidato": nome, "partido": partido, "candidato_partido": candidato_partido,
+                "tipo": tipo, "percentual": percentual, "fonte_url": fonte_url,
+                "horario_raspagem": agora, "origem": ORIGEM_COLAR,
             })
     return linhas_p, linhas_r, avisos
 

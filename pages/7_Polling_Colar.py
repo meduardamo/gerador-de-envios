@@ -81,8 +81,6 @@ def _secret(*nomes, default=""):
 
 MATRIZ_T1 = _secret("MATRIZ_T1_SHEET_ID", "SPREADSHEET_ID_POLLINGDATA")
 MATRIZ_T2 = _secret("MATRIZ_T2_SHEET_ID", "SPREADSHEET_ID_POLLINGDATA_T2")
-ABA_PESQ = _secret("POLLING_COLAR_ABA_PESQ", default="pesquisas_api")
-ABA_RES = _secret("POLLING_COLAR_ABA_RES", default="resultados_api")
 
 
 def _sheets_client():
@@ -98,24 +96,21 @@ def _sheets_client():
     return gspread.authorize(creds)
 
 
-def _gravar(gc, sheet_id, linhas_p, linhas_r):
-    sh = gc.open_by_key(sheet_id)
-
-    def _append(nome, colunas, linhas):
-        try:
-            ws = sh.worksheet(nome)
-            if not ws.get_all_values():
-                ws.update(range_name="A1", values=[colunas], value_input_option="RAW")
-        except gspread.exceptions.WorksheetNotFound:
-            ws = sh.add_worksheet(title=nome, rows=len(linhas) + 20, cols=len(colunas))
-            ws.update(range_name="A1", values=[colunas], value_input_option="RAW")
-            ws.freeze(rows=1)
-        corpo = [[("" if l.get(c) is None else str(l.get(c))) for c in colunas] for l in linhas]
-        ws.append_rows(corpo, value_input_option="USER_ENTERED",
-                       table_range=f"A{len(ws.get_all_values())}")
-
-    _append(ABA_PESQ, COLUNAS_PESQUISAS, linhas_p)
-    _append(ABA_RES, COLUNAS_RESULTADOS, linhas_r)
+def _registros_existentes(gc, sheet_id):
+    """(registro_tse, cargo) já na aba 'pesquisas' da matriz, pra avisar de repetição."""
+    try:
+        ws = gc.open_by_key(sheet_id).worksheet("pesquisas")
+        valores = ws.get_all_values()
+    except Exception:
+        return set()
+    if not valores:
+        return set()
+    h = {c.strip().lower(): i for i, c in enumerate(valores[0])}
+    ir, ic = h.get("registro_tse"), h.get("cargo")
+    if ir is None or ic is None:
+        return set()
+    return {(r[ir].strip().upper(), r[ic].strip().lower())
+            for r in valores[1:] if len(r) > max(ir, ic) and r[ir].strip()}
 
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -195,13 +190,32 @@ if res:
     sheet_id = MATRIZ_T2 if res["turno"] == "t2" else MATRIZ_T1
     if not sheet_id:
         st.error(f"ID da matriz {res['turno'].upper()} não configurado nos Secrets.")
-    elif st.button(f"Gravar na Matriz {res['turno'].upper()}", use_container_width=True):
+    else:
         gc = _sheets_client()
-        if not gc:
-            st.error("Credenciais do Google Sheets não encontradas.")
-        else:
-            with st.spinner("Gravando..."):
-                _gravar(gc, sheet_id, res["linhas_p"], res["linhas_r"])
-            st.success(f"Gravado: {len(res['linhas_p'])} pesquisa(s) e "
-                       f"{len(res['linhas_r'])} resultado(s) em {ABA_PESQ}/{ABA_RES}.")
-            st.session_state.pop("colar_resultado", None)
+        # Aviso de repetição: registro TSE + cargo que já está na matriz (do
+        # Polling Manual ou de um colar anterior). Não bloqueia — o dedup real,
+        # por scenario_id, acontece no salvar_tudo; aqui é só um sinal pra revisar.
+        if gc:
+            existentes = _registros_existentes(gc, sheet_id)
+            repetidos = sorted({(p["registro_tse"], p["cargo"]) for p in res["linhas_p"]
+                                if (p["registro_tse"].upper(), p["cargo"].lower()) in existentes})
+            if repetidos:
+                st.markdown(
+                    '<div class="ge-aviso">⚠️ Já existe(m) na matriz (registro + cargo): '
+                    + ", ".join(f"{r} ({c})" for r, c in repetidos)
+                    + ". Cenário idêntico não duplica; cenário novo do mesmo "
+                    "registro é adicionado.</div>", unsafe_allow_html=True)
+
+        if st.button(f"Gravar na Matriz {res['turno'].upper()}", use_container_width=True):
+            if not gc:
+                st.error("Credenciais do Google Sheets não encontradas.")
+            else:
+                import pandas as _pd
+                from polling_manual_core import salvar_tudo
+                with st.spinner("Gravando nas abas pesquisas / resultados..."):
+                    salvar_tudo(gc, sheet_id,
+                                _pd.DataFrame(res["linhas_p"]), _pd.DataFrame(res["linhas_r"]))
+                st.success(f"Gravado: {len(res['linhas_p'])} pesquisa(s) e "
+                           f"{len(res['linhas_r'])} resultado(s) na Matriz {res['turno'].upper()}. "
+                           "A média móvel é reconstruída de 4 em 4 horas.")
+                st.session_state.pop("colar_resultado", None)
