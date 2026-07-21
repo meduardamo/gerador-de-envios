@@ -1,0 +1,196 @@
+"""
+Transforma o texto COPIADO da secao "Dados das Pesquisas" do PollingData
+(flex.pollingdata.com.br) em linhas no schema das matrizes T1/T2.
+
+Nao raspa nada e nao usa token: le o texto que a pessoa ja tem na tela e colou.
+UF, cargo e turno vem da URL da pagina, informada junto.
+
+Uso:
+  python -m outros.polling_colar --url <url> --texto arquivo.txt          # revisar
+  python -m outros.polling_colar --url <url> --texto arquivo.txt --gravar  # gravar
+
+  <url> = https://flex.pollingdata.com.br/pdvoto/2026/governador/pi/t1
+          (aceita tambem a de www.pollingdata.com.br/2026/...)
+
+Secrets/env pra gravar:
+  GOOGLE_CREDENTIALS_JSON
+  SPREADSHEET_ID_POLLINGDATA      (T1)
+  SPREADSHEET_ID_POLLINGDATA_T2   (T2)
+"""
+
+import json
+import os
+import re
+from datetime import datetime, timedelta, timezone
+
+BRT = timezone(timedelta(hours=-3))
+
+COLUNAS_PESQUISAS = ["scenario_id", "poll_id", "ano", "uf", "cargo", "turno", "instituto",
+                     "registro_tse", "data_campo", "modo", "amostra", "margem_erro",
+                     "confianca", "scenario_label", "disputa", "fonte_url",
+                     "fonte_url_original", "horario_raspagem", "origem"]
+COLUNAS_RESULTADOS = ["scenario_id", "poll_id", "ano", "uf", "cargo", "turno", "data_campo",
+                      "instituto", "registro_tse", "scenario_label", "candidato", "partido",
+                      "candidato_partido", "tipo", "percentual", "disputa", "fonte_url",
+                      "horario_raspagem", "origem"]
+
+REG = re.compile(r"^[A-Z]{2}-\d{4,6}/\d{4}$")
+NAO_VALIDO = {"outros", "não válido", "nao valido", "nulo", "branco", "ns/nr",
+              "não sabe", "nao sabe", "indeciso", "nenhum"}
+
+
+def _cargo_uf_turno(url):
+    m = re.search(r"/(\d{4})/(presidente|governador|senador)/([a-z]{2})/(t\d)", url.lower())
+    if not m:
+        raise SystemExit(f"não achei cargo/uf/turno na URL: {url}\n"
+                         "esperado algo como .../2026/governador/pi/t1")
+    return int(m.group(1)), m.group(2), m.group(3).upper(), m.group(4)
+
+
+def _e_percentual(linha):
+    return bool(re.fullmatch(r"[\d.,%\s]+", linha)) and re.search(r"\d", linha)
+
+
+def _nums(linha):
+    return [x.replace(",", ".") for x in re.findall(r"\d+(?:[.,]\d+)?", linha)]
+
+
+def _tipo(nome):
+    return "nao_valido" if re.sub(r"\s+", " ", nome.strip().lower()) in NAO_VALIDO else "candidato"
+
+
+def parsear(texto):
+    """Devolve lista de pesquisas: cada uma com metadados + lista de (candidato_partido, %)."""
+    # Achata tabs em quebras de linha: o copy da tabela mistura os dois.
+    linhas = [l.strip() for l in re.split(r"[\t\n]", texto) if l.strip()]
+    pesquisas = []
+    i = 0
+    while i < len(linhas):
+        # Início de pesquisa: nº de cenários (dígito), instituto, registro.
+        if re.fullmatch(r"\d+", linhas[i]) and i + 2 < len(linhas) and REG.match(linhas[i + 2]):
+            inst, reg, j = linhas[i + 1], linhas[i + 2], i + 3
+            datas = re.search(r"(\d{2}/\d{2}/\d{4})\s+a\s+(\d{2}/\d{2}/\d{4})", linhas[j]) if j < len(linhas) else None
+            if datas:
+                j += 1
+            modo = linhas[j] if j < len(linhas) else ""
+            j += 1
+            if j < len(linhas) and linhas[j].startswith("("):
+                modo += " " + linhas[j]
+                j += 1
+            amostra = re.sub(r"\D", "", linhas[j]) if j < len(linhas) else ""
+            j += 1
+            margem, confianca = "", ""
+            if j < len(linhas):
+                m = re.match(r"±?([\d,]+)%\s*(?:\((\d+)%?\))?", linhas[j])
+                if m:
+                    margem = m.group(1).replace(",", ".")
+                    confianca = m.group(2) or ""
+                    j += 1
+            while j < len(linhas) and linhas[j].startswith(("CNPJ", "CPF")):
+                j += 1
+
+            # Cabeçalho de colunas: "Cenário<tab>cand1", depois (partido), cand2, ...
+            colunas = []
+            if j < len(linhas) and linhas[j].lower().startswith("cenário"):
+                resto = re.sub(r"^cenário\s*", "", linhas[j], flags=re.I).strip()
+                if resto:
+                    colunas.append(resto)
+                j += 1
+                while j < len(linhas):
+                    l = linhas[j]
+                    if l.startswith("(") and colunas:      # partido do candidato anterior
+                        colunas[-1] = colunas[-1] + " " + l
+                        j += 1
+                    elif _e_percentual(l):                  # chegou nos números: fim do cabeçalho
+                        break
+                    else:
+                        # "Outros    Não Válido" às vezes vem numa linha só (espaços, não tab):
+                        # quebra em colunas separadas.
+                        partes = re.split(r"\s{2,}", l)
+                        colunas.extend(partes if len(partes) > 1 else [l])
+                        j += 1
+
+            # Um ou mais cenários: (rótulo) seguido de linha de percentuais.
+            while j < len(linhas):
+                rotulo = None
+                while j < len(linhas) and not _e_percentual(linhas[j]):
+                    if re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
+                        break  # é a próxima pesquisa
+                    rotulo = linhas[j]
+                    j += 1
+                if j >= len(linhas) or not _e_percentual(linhas[j]):
+                    break
+                pcts = _nums(linhas[j])
+                j += 1
+                pesquisas.append({
+                    "registro": reg, "instituto": inst,
+                    "data_campo": datas.group(2) if datas else "", "modo": modo,
+                    "amostra": amostra, "margem": margem, "confianca": confianca,
+                    "scenario_label": rotulo or "Cenário 01",
+                    "colunas": colunas, "percentuais": pcts,
+                })
+                # Se a próxima linha reinicia uma pesquisa, sai do loop de cenários.
+                if j < len(linhas) and re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
+                    break
+            i = j
+        else:
+            i += 1
+    return pesquisas
+
+
+def montar(pesquisas, ano, uf, cargo, turno, fonte_url):
+    agora = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
+    linhas_p, linhas_r, avisos = [], [], []
+    for p in pesquisas:
+        cols, pcts = p["colunas"], p["percentuais"]
+        if len(cols) != len(pcts):
+            avisos.append(f"{p['registro']} / {p['scenario_label']}: "
+                          f"{len(cols)} coluna(s) mas {len(pcts)} percentual(is) — confira")
+        inst = p["instituto"].split("<>")[0].strip()
+        poll_id = f"colar|{uf}|{cargo}|{turno}|{p['registro']}|{p['scenario_label']}"
+        linhas_p.append({
+            "scenario_id": poll_id, "poll_id": poll_id, "ano": ano, "uf": uf,
+            "cargo": cargo, "turno": turno, "instituto": inst,
+            "registro_tse": p["registro"], "data_campo": p["data_campo"], "modo": p["modo"],
+            "amostra": p["amostra"], "margem_erro": p["margem"], "confianca": p["confianca"],
+            "scenario_label": p["scenario_label"], "disputa": "",
+            "fonte_url": fonte_url, "fonte_url_original": fonte_url,
+            "horario_raspagem": agora, "origem": "pollingdata_colar",
+        })
+        for col, pct in zip(cols, pcts):
+            candidato_partido = col.strip()
+            mp = re.search(r"\(([^)]+)\)\s*$", candidato_partido)
+            partido = mp.group(1).strip().upper() if mp else ""
+            nome = re.sub(r"\s*\([^)]*\)\s*$", "", candidato_partido).strip()
+            linhas_r.append({
+                "scenario_id": poll_id, "poll_id": poll_id, "ano": ano, "uf": uf,
+                "cargo": cargo, "turno": turno, "data_campo": p["data_campo"],
+                "instituto": inst, "registro_tse": p["registro"],
+                "scenario_label": p["scenario_label"], "candidato": nome, "partido": partido,
+                "candidato_partido": candidato_partido, "tipo": _tipo(nome),
+                "percentual": pct, "disputa": "", "fonte_url": fonte_url,
+                "horario_raspagem": agora, "origem": "pollingdata_colar",
+            })
+    return linhas_p, linhas_r, avisos
+
+
+def _revisar(linhas_p, linhas_r, avisos):
+    print(f"\n{'='*70}\nREVISÃO — {len(linhas_p)} pesquisa(s), {len(linhas_r)} resultado(s)\n{'='*70}")
+    por_pesq = {}
+    for r in linhas_r:
+        por_pesq.setdefault(r["poll_id"], []).append(r)
+    for p in linhas_p:
+        print(f"\n{p['registro_tse']} · {p['instituto']} · campo {p['data_campo']} · "
+              f"n={p['amostra']} · erro {p['margem_erro']}% ({p['confianca']}%) · {p['scenario_label']}")
+        for r in por_pesq.get(p["poll_id"], []):
+            marca = "" if r["tipo"] == "candidato" else "  [não válido]"
+            print(f"    {r['candidato_partido']:<36} {r['percentual']}%{marca}")
+    if avisos:
+        print("\n⚠️  CONFERIR:")
+        for a in avisos:
+            print("   ", a)
+
+
+# A gravação nas matrizes e a UI ficam na página Streamlit (7_Polling_Colar.py),
+# que reusa o cliente de Sheets e o destino T1/T2 do Polling Manual. Aqui só o
+# parser puro, testável sem Streamlit.
