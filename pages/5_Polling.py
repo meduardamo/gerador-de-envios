@@ -47,7 +47,7 @@ from polling_manual_core import (
 )
 
 
-st.set_page_config(page_title="Polling manual", layout="wide")
+st.set_page_config(page_title="Polling", layout="wide")
 
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
@@ -1751,701 +1751,822 @@ def render_editor_cenarios_polling(
     return cenarios_editados
 
 
-for k, v in [
-    ("polling_manual_texto_fonte", ""),
-    ("polling_manual_payload", None),
-    ("polling_manual_resultado", None),
-    ("polling_manual_duplicatas", None),
-    ("polling_pdf_preview_png", None),
-    ("polling_pdf_resumo", ""),
-]:
-    if k not in st.session_state:
-        st.session_state[k] = v
 
-# "Limpar tudo": zera a pesquisa inteira (fonte, foco, header, cenários). Roda
-# aqui no topo porque apaga chaves de widget, e o Streamlit não deixa alterar o
-# estado de um widget depois de criado na execução atual.
-if st.session_state.pop("polling_limpar_tudo_pendente", False):
-    resetar_estado_pesquisa_polling(limpar_fonte=True)
-    # Textarea/text_input não zeram só com del — o Streamlit restaura o valor do
-    # cache interno do widget quando a chave some. Setar "" antes do widget montar
-    # (aqui no topo) força o campo vazio de fato.
-    st.session_state["polling_manual_texto_fonte"] = ""
-    st.session_state["polling_manual_url_original"] = ""
-    st.session_state["polling_manual_flash"] = "Tudo limpo. Cole ou carregue uma nova pesquisa."
-
-# A troca de pesquisa precisa começar com controles limpos. Esta seção roda
-# antes de qualquer widget, pois o Streamlit não permite alterar o estado de
-# um widget depois de ele ter sido criado na execução atual.
-if st.session_state.pop("polling_reiniciar_controles_apos_extracao", False):
-    for chave in [
-        "polling_foco_cargo",
-        "polling_foco_uf",
-        "polling_foco_turno",
-        "polling_foco_instituto",
-        "polling_foco_instrucoes",
-        "polling_pdf_uploader",
-        "polling_modo_pdf",
-        "polling_pag_ini",
-        "polling_pag_fim",
+def render_manual():
+    for k, v in [
+        ("polling_manual_texto_fonte", ""),
+        ("polling_manual_payload", None),
+        ("polling_manual_resultado", None),
+        ("polling_manual_duplicatas", None),
+        ("polling_pdf_preview_png", None),
+        ("polling_pdf_resumo", ""),
     ]:
-        st.session_state.pop(chave, None)
+        if k not in st.session_state:
+            st.session_state[k] = v
 
-if "polling_manual_url_pendente" in st.session_state:
-    st.session_state["polling_manual_url_original"] = st.session_state.pop(
-        "polling_manual_url_pendente"
-    )
+    # "Limpar tudo": zera a pesquisa inteira (fonte, foco, header, cenários). Roda
+    # aqui no topo porque apaga chaves de widget, e o Streamlit não deixa alterar o
+    # estado de um widget depois de criado na execução atual.
+    if st.session_state.pop("polling_limpar_tudo_pendente", False):
+        resetar_estado_pesquisa_polling(limpar_fonte=True)
+        # Textarea/text_input não zeram só com del — o Streamlit restaura o valor do
+        # cache interno do widget quando a chave some. Setar "" antes do widget montar
+        # (aqui no topo) força o campo vazio de fato.
+        st.session_state["polling_manual_texto_fonte"] = ""
+        st.session_state["polling_manual_url_original"] = ""
+        st.session_state["polling_manual_flash"] = "Tudo limpo. Cole ou carregue uma nova pesquisa."
 
-# O campo principal já pode ter sido criado quando o botão de PDF é acionado.
-# Por isso, a extração fica pendente e só é copiada para o widget nesta nova
-# execução, antes de qualquer widget ser montado.
-if "polling_manual_texto_pendente" in st.session_state:
-    st.session_state["polling_manual_texto_fonte"] = st.session_state.pop(
-        "polling_manual_texto_pendente"
-    )
-    st.session_state["polling_pdf_flash"] = (
-        "Texto do PDF carregado no campo principal. "
-        f"{st.session_state.get('polling_pdf_resumo', '')}"
-    ).strip()
+    # A troca de pesquisa precisa começar com controles limpos. Esta seção roda
+    # antes de qualquer widget, pois o Streamlit não permite alterar o estado de
+    # um widget depois de ele ter sido criado na execução atual.
+    if st.session_state.pop("polling_reiniciar_controles_apos_extracao", False):
+        for chave in [
+            "polling_foco_cargo",
+            "polling_foco_uf",
+            "polling_foco_turno",
+            "polling_foco_instituto",
+            "polling_foco_instrucoes",
+            "polling_pdf_uploader",
+            "polling_modo_pdf",
+            "polling_pag_ini",
+            "polling_pag_fim",
+        ]:
+            st.session_state.pop(chave, None)
+
+    if "polling_manual_url_pendente" in st.session_state:
+        st.session_state["polling_manual_url_original"] = st.session_state.pop(
+            "polling_manual_url_pendente"
+        )
+
+    # O campo principal já pode ter sido criado quando o botão de PDF é acionado.
+    # Por isso, a extração fica pendente e só é copiada para o widget nesta nova
+    # execução, antes de qualquer widget ser montado.
+    if "polling_manual_texto_pendente" in st.session_state:
+        st.session_state["polling_manual_texto_fonte"] = st.session_state.pop(
+            "polling_manual_texto_pendente"
+        )
+        st.session_state["polling_pdf_flash"] = (
+            "Texto do PDF carregado no campo principal. "
+            f"{st.session_state.get('polling_pdf_resumo', '')}"
+        ).strip()
 
 
-# ── sidebar ───────────────────────────────────────────────────────────────────
+    # ── sidebar ───────────────────────────────────────────────────────────────────
 
-with st.sidebar:
-    try:
-        st.image(LOGO_PATH, use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
+    with st.sidebar:
+        try:
+            st.image(LOGO_PATH, use_container_width=True)
+        except Exception:
+            st.caption("Logo não encontrada.")
+        st.markdown(
+            '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
+            'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
+            '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
+            'color:#111;line-height:1.65;margin:0;">'
+            'Cadastre pesquisas eleitorais direto nas matrizes <strong>T1</strong> e '
+            '<strong>T2</strong> a partir de notícias ou relatórios do instituto.'
+            '</p></div>',
+            unsafe_allow_html=True,
+        )
+        if not MATRIZ_T1_SPREADSHEET_ID.strip() or not MATRIZ_T2_SPREADSHEET_ID.strip():
+            faltantes = []
+            if not MATRIZ_T1_SPREADSHEET_ID.strip():
+                faltantes.append("T1")
+            if not MATRIZ_T2_SPREADSHEET_ID.strip():
+                faltantes.append("T2")
+            st.warning(f"Matriz(es) sem ID configurado: {', '.join(faltantes)}.")
+        st.markdown("---")
+        if st.button("↻ Recarregar dados", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+        if st.button("🧹 Limpar tudo", use_container_width=True, help="Zera a pesquisa da tela (fonte, foco, header e cenários) pra começar do zero"):
+            st.session_state["polling_limpar_tudo_pendente"] = True
+            st.rerun()
+        st.markdown("---")
+        st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
+        if _auth_cfg:
+            authenticator.logout("Sair", "sidebar")
+
+
     st.markdown(
-        '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
-        'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
-        '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
-        'color:#111;line-height:1.65;margin:0;">'
-        'Cadastre pesquisas eleitorais direto nas matrizes <strong>T1</strong> e '
-        '<strong>T2</strong> a partir de notícias ou relatórios do instituto.'
-        '</p></div>',
+        '<div class="ge-hero"><div class="ge-hero-title">Polling Manual</div></div>',
         unsafe_allow_html=True,
     )
+
+    mensagem_identificacao = st.session_state.pop("polling_manual_flash", "")
+    if mensagem_identificacao:
+        st.success(mensagem_identificacao)
+
+    mensagem_pdf = st.session_state.pop("polling_pdf_flash", "")
+    if mensagem_pdf:
+        st.success(mensagem_pdf)
+
     if not MATRIZ_T1_SPREADSHEET_ID.strip() or not MATRIZ_T2_SPREADSHEET_ID.strip():
-        faltantes = []
-        if not MATRIZ_T1_SPREADSHEET_ID.strip():
-            faltantes.append("T1")
-        if not MATRIZ_T2_SPREADSHEET_ID.strip():
-            faltantes.append("T2")
-        st.warning(f"Matriz(es) sem ID configurado: {', '.join(faltantes)}.")
-    st.markdown("---")
-    if st.button("↻ Recarregar dados", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-    if st.button("🧹 Limpar tudo", use_container_width=True, help="Zera a pesquisa da tela (fonte, foco, header e cenários) pra começar do zero"):
-        st.session_state["polling_limpar_tudo_pendente"] = True
-        st.rerun()
-    st.markdown("---")
-    st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
-    if _auth_cfg:
-        authenticator.logout("Sair", "sidebar")
+        st.warning("Configure os IDs das matrizes T1 e T2 para habilitar todos os destinos.")
 
+    col1, col2 = st.columns([1.25, 1])
 
-st.markdown(
-    '<div class="ge-hero"><div class="ge-hero-title">Polling Manual</div></div>',
-    unsafe_allow_html=True,
-)
+    with col1:
+        st.text_area(
+            "Texto completo da notícia / PDF OCR",
+            key="polling_manual_texto_fonte",
+            height=300,
+            placeholder="Cole aqui o texto completo da pesquisa.",
+        )
 
-mensagem_identificacao = st.session_state.pop("polling_manual_flash", "")
-if mensagem_identificacao:
-    st.success(mensagem_identificacao)
+    with col2:
+        url_original = st.text_input(
+            "Link da notícia ou relatório (obrigatório)",
+            key="polling_manual_url_original",
+            help="Vai pras colunas fonte_url e fonte_url_original. Uma extração = um "
+                 "material, então o link é o mesmo pra todos os cenários.",
+        )
 
-mensagem_pdf = st.session_state.pop("polling_pdf_flash", "")
-if mensagem_pdf:
-    st.success(mensagem_pdf)
+        with st.expander("Extrair texto de PDF", expanded=False):
+            pdf_file = st.file_uploader("Upload do PDF da pesquisa", type=["pdf"], key="polling_pdf_uploader")
+            if pdf_file is not None:
+                pdf_bytes = pdf_file.getvalue()
+                with fitz.open(stream=pdf_bytes, filetype="pdf") as d:
+                    total_pages = d.page_count
 
-if not MATRIZ_T1_SPREADSHEET_ID.strip() or not MATRIZ_T2_SPREADSHEET_ID.strip():
-    st.warning("Configure os IDs das matrizes T1 e T2 para habilitar todos os destinos.")
-
-col1, col2 = st.columns([1.25, 1])
-
-with col1:
-    st.text_area(
-        "Texto completo da notícia / PDF OCR",
-        key="polling_manual_texto_fonte",
-        height=300,
-        placeholder="Cole aqui o texto completo da pesquisa.",
-    )
-
-with col2:
-    url_original = st.text_input(
-        "Link da notícia ou relatório (obrigatório)",
-        key="polling_manual_url_original",
-        help="Vai pras colunas fonte_url e fonte_url_original. Uma extração = um "
-             "material, então o link é o mesmo pra todos os cenários.",
-    )
-
-    with st.expander("Extrair texto de PDF", expanded=False):
-        pdf_file = st.file_uploader("Upload do PDF da pesquisa", type=["pdf"], key="polling_pdf_uploader")
-        if pdf_file is not None:
-            pdf_bytes = pdf_file.getvalue()
-            with fitz.open(stream=pdf_bytes, filetype="pdf") as d:
-                total_pages = d.page_count
-
-            modo_pdf = st.selectbox("Modo de leitura do PDF", LEITURA_PDF, key="polling_modo_pdf")
-            pagina_ini = int(st.number_input("Pág. inicial", min_value=1, max_value=total_pages, value=1, key="polling_pag_ini"))
-            pagina_fim = int(
-                st.number_input("Pág. final", min_value=1, max_value=total_pages, value=total_pages, key="polling_pag_fim")
-            )
-            if pagina_fim < pagina_ini:
-                pagina_fim = pagina_ini
-
-            if st.button("Ler PDF para texto bruto", use_container_width=True):
-                qtd_paginas = pagina_fim - pagina_ini + 1
-                try:
-                    with st.status(
-                        f"Preparando leitura de {qtd_paginas} página(s)…",
-                        expanded=True,
-                    ) as status_leitura:
-                        etapas_exibidas = set()
-
-                        def atualizar_etapa(mensagem: str):
-                            status_leitura.update(label=mensagem, state="running")
-                            if mensagem not in etapas_exibidas:
-                                status_leitura.write(mensagem)
-                                etapas_exibidas.add(mensagem)
-
-                        texto_pdf, resumo_pdf = processar_pdf_polling_manual(
-                            pdf_bytes=pdf_bytes,
-                            modo=modo_pdf,
-                            page_indices=list(range(pagina_ini - 1, pagina_fim)),
-                            atualizar_etapa=atualizar_etapa,
-                        )
-                        status_leitura.update(label="Leitura concluída.", state="complete", expanded=False)
-                    # Não altere polling_manual_texto_fonte aqui: ele já foi criado
-                    # como widget nesta execução. A cópia ocorre antes dos widgets no rerun.
-                    st.session_state["polling_manual_texto_pendente"] = texto_pdf
-                    st.session_state["polling_pdf_resumo"] = resumo_pdf
-                    st.rerun()
-                except Exception:
-                    st.error(
-                        "Não foi possível concluir a leitura do PDF. "
-                        "Tente reduzir o intervalo de páginas ou trocar o modo de leitura."
-                    )
-
-            if st.session_state.get("polling_pdf_preview_png"):
-                st.image(
-                    st.session_state["polling_pdf_preview_png"],
-                    caption="Prévia da primeira página renderizada",
-                    use_container_width=True,
+                modo_pdf = st.selectbox("Modo de leitura do PDF", LEITURA_PDF, key="polling_modo_pdf")
+                pagina_ini = int(st.number_input("Pág. inicial", min_value=1, max_value=total_pages, value=1, key="polling_pag_ini"))
+                pagina_fim = int(
+                    st.number_input("Pág. final", min_value=1, max_value=total_pages, value=total_pages, key="polling_pag_fim")
                 )
+                if pagina_fim < pagina_ini:
+                    pagina_fim = pagina_ini
 
-    with st.expander("Refinar extração (opcional)", expanded=False):
-        st.caption(
-            "Use quando o material tem várias pesquisas e você quer só uma fatia "
-            "(ex.: pegar só presidente na BA, ignorando outros estados)."
-        )
-        f1, f2, f3, f4 = st.columns(4)
-        with f1:
-            foco_cargo = st.selectbox(
-                "Cargo-alvo",
-                ["(auto-detectar)"] + POLLING_MANUAL_CARGOS,
-                key="polling_foco_cargo",
-            )
-        with f2:
-            foco_uf = st.selectbox(
-                "UF-alvo",
-                ["(auto-detectar)", "BR"] + UFS,
-                key="polling_foco_uf",
-            )
-        with f3:
-            foco_turno = st.selectbox(
-                "Turno-alvo",
-                ["(auto-detectar)"] + POLLING_MANUAL_TURNOS,
-                key="polling_foco_turno",
-            )
-        with f4:
-            foco_instituto = st.text_input(
-                "Instituto-alvo",
-                key="polling_foco_instituto",
-                placeholder="Ex.: Quaest",
-            )
-        foco_instrucoes = st.text_area(
-            "Instruções adicionais",
-            key="polling_foco_instrucoes",
-            height=70,
-            placeholder='Ex.: "Pegar só o cenário sem o Ratinho Junior" ou "Usar o segundo bloco da página 3".',
-        )
+                if st.button("Ler PDF para texto bruto", use_container_width=True):
+                    qtd_paginas = pagina_fim - pagina_ini + 1
+                    try:
+                        with st.status(
+                            f"Preparando leitura de {qtd_paginas} página(s)…",
+                            expanded=True,
+                        ) as status_leitura:
+                            etapas_exibidas = set()
 
-    if st.button("Identificar pesquisa com Gemini", use_container_width=True):
-        texto_fonte = st.session_state.get("polling_manual_texto_fonte", "")
-        if not normalizar_texto_simples(texto_fonte):
-            st.error("Cole o texto completo ou extraia o PDF antes de identificar a pesquisa.")
-        else:
-            # Se o texto mudou e o campo de URL ainda é exatamente o da última
-            # pesquisa, ele é resíduo de tela — não pode acompanhar a nova.
-            texto_atual = normalizar_texto_simples(texto_fonte)
-            texto_anterior = st.session_state.get("polling_manual_ultimo_texto", "")
-            url_anterior = st.session_state.get("polling_manual_ultima_url", "")
-            url_para_extracao = normalizar_texto_simples(url_original)
-            if texto_atual != texto_anterior and url_para_extracao and url_para_extracao == url_anterior:
-                url_para_extracao = ""
+                            def atualizar_etapa(mensagem: str):
+                                status_leitura.update(label=mensagem, state="running")
+                                if mensagem not in etapas_exibidas:
+                                    status_leitura.write(mensagem)
+                                    etapas_exibidas.add(mensagem)
 
-            escopo = {
-                "cargo": "" if foco_cargo == "(auto-detectar)" else foco_cargo,
-                "uf": "" if foco_uf == "(auto-detectar)" else foco_uf,
-                "turno": "" if foco_turno == "(auto-detectar)" else foco_turno,
-                "instituto": foco_instituto,
-                "instrucoes": foco_instrucoes,
-            }
-            tem_foco = any(v for v in escopo.values())
-
-            with st.spinner("Lendo o conteúdo e estruturando a pesquisa..."):
-                try:
-                    payload = extrair_dados_polling_gemini(
-                        texto_fonte,
-                        url_original=url_para_extracao,
-                        escopo=escopo,
-                    )
-                except RuntimeError as exc:
-                    st.error(f"Não consegui identificar a pesquisa: {exc}")
-                    st.info("Tente novamente em alguns segundos ou ajuste o texto e refaça.")
-                else:
-                    payload["fonte_url_original"] = (
-                        url_para_extracao or payload.get("fonte_url_original", "")
-                    )
-
-                    # Detecta caso "filtro definido mas Gemini não achou nada"
-                    cenarios_vazios = not any(
-                        (c.get("itens") or []) for c in (payload.get("cenarios") or [])
-                    )
-                    if tem_foco and cenarios_vazios:
-                        st.error(
-                            "⚠️ O Gemini não encontrou no material um bloco que case com "
-                            "os filtros que você definiu. Veja as pendências abaixo, "
-                            "ajuste o foco ou cole outro material."
-                        )
-                        for pend in payload.get("pendencias") or []:
-                            st.warning(pend)
-                    else:
-                        carregar_payload_polling_no_state(payload)
-                        st.session_state["polling_manual_ultimo_texto"] = texto_atual
-                        st.session_state["polling_manual_ultima_url"] = payload["fonte_url_original"]
-                        st.session_state["polling_manual_url_pendente"] = payload["fonte_url_original"]
-                        st.session_state["polling_reiniciar_controles_apos_extracao"] = True
-                        st.session_state["polling_manual_flash"] = (
-                            "Pesquisa identificada. Revise os campos abaixo antes de salvar."
-                        )
+                            texto_pdf, resumo_pdf = processar_pdf_polling_manual(
+                                pdf_bytes=pdf_bytes,
+                                modo=modo_pdf,
+                                page_indices=list(range(pagina_ini - 1, pagina_fim)),
+                                atualizar_etapa=atualizar_etapa,
+                            )
+                            status_leitura.update(label="Leitura concluída.", state="complete", expanded=False)
+                        # Não altere polling_manual_texto_fonte aqui: ele já foi criado
+                        # como widget nesta execução. A cópia ocorre antes dos widgets no rerun.
+                        st.session_state["polling_manual_texto_pendente"] = texto_pdf
+                        st.session_state["polling_pdf_resumo"] = resumo_pdf
                         st.rerun()
+                    except Exception:
+                        st.error(
+                            "Não foi possível concluir a leitura do PDF. "
+                            "Tente reduzir o intervalo de páginas ou trocar o modo de leitura."
+                        )
 
-payload = st.session_state.get("polling_manual_payload")
-if payload:
-    payload = normalizar_payload_polling(payload)
+                if st.session_state.get("polling_pdf_preview_png"):
+                    st.image(
+                        st.session_state["polling_pdf_preview_png"],
+                        caption="Prévia da primeira página renderizada",
+                        use_container_width=True,
+                    )
 
-    st.markdown('<div class="ge-rule">Dados extraídos</div>', unsafe_allow_html=True)
-    st.caption("Vale pra pesquisa toda. Cargo, turno, UF e registro TSE ficam em cada cenário abaixo.")
-
-    # Cargo/turno/UF/registro não são mais editados aqui — vivem por cenário.
-    # Guardamos os valores da extração como padrão de cenário em branco e como
-    # fallback do que o cenário não especificar.
-    cargo = normalizar_texto_simples(st.session_state.get("polling_meta_cargo") or payload.get("cargo")).lower()
-    if cargo not in POLLING_MANUAL_CARGOS:
-        cargo = "governador"
-    turno = normalizar_texto_simples(st.session_state.get("polling_meta_turno") or payload.get("turno")).lower()
-    if turno not in POLLING_MANUAL_TURNOS:
-        turno = "t1"
-    uf = normalizar_texto_simples(st.session_state.get("polling_meta_uf") or payload.get("uf")).upper()
-    if uf not in (["BR"] + UFS):
-        uf = "BR"
-    registro_tse = normalizar_texto_simples(
-        st.session_state.get("polling_meta_registro") or payload.get("registro_tse")
-    )
-
-    meta1, meta2, meta3 = st.columns(3)
-    with meta1:
-        # T1 e T2 são a fonte canônica dos institutos. O seletor aceita um
-        # texto novo, mas confere por uma chave insensível a caixa e acentos.
-        catalogo_institutos, origem_catalogo_institutos = carregar_catalogo_institutos_matrizes(
-            VERSAO_CATALOGO_INSTITUTOS
-        )
-        st.session_state["polling_catalogo_institutos"] = catalogo_institutos
-        institutos_conhecidos = sorted(
-            {entrada["instituto"] for entrada in catalogo_institutos.values()},
-            key=str.casefold,
-        )
-        sugerido = normalizar_texto_simples(payload.get("instituto", ""))
-        entrada_sugerida = catalogo_institutos.get(chave_instituto_catalogo(sugerido))
-        if entrada_sugerida:
-            sugerido = entrada_sugerida["instituto"]
-        valor_widget_instituto = normalizar_texto_simples(
-            st.session_state.get("polling_meta_instituto", "")
-        )
-        entrada_widget = catalogo_institutos.get(
-            chave_instituto_catalogo(valor_widget_instituto)
-        )
-        if (
-            entrada_widget
-            and valor_widget_instituto != entrada_widget["instituto"]
-        ):
-            # O widget ainda não foi criado nesta execução; é seguro alinhar
-            # a grafia exibida ao valor canônico da matriz.
-            st.session_state["polling_meta_instituto"] = entrada_widget["instituto"]
-        opcoes_inst = [""] + institutos_conhecidos
-        if sugerido and sugerido not in opcoes_inst:
-            opcoes_inst.append(sugerido)
-        instituto = st.selectbox(
-            "Instituto",
-            opcoes_inst,
-            index=None,
-            key="polling_meta_instituto",
-            placeholder="Selecione ou digite o instituto",
-            accept_new_options=True,
-            on_change=aplicar_grafia_canonica_do_instituto,
-        )
-        entrada_instituto = catalogo_institutos.get(chave_instituto_catalogo(instituto))
-        instituto_canonico = (
-            entrada_instituto["instituto"]
-            if entrada_instituto
-            else normalizar_instituto(instituto or "")
-        )
-        classificacao_canonica = (
-            entrada_instituto.get("classificacao", "") if entrada_instituto else ""
-        )
-        if instituto_canonico and not entrada_instituto:
-            sugestoes_chave = get_close_matches(
-                chave_instituto_catalogo(instituto_canonico),
-                list(catalogo_institutos),
-                n=3,
-                cutoff=0.62,
+        with st.expander("Refinar extração (opcional)", expanded=False):
+            st.caption(
+                "Use quando o material tem várias pesquisas e você quer só uma fatia "
+                "(ex.: pegar só presidente na BA, ignorando outros estados)."
             )
-            sugestoes = [catalogo_institutos[chave]["instituto"] for chave in sugestoes_chave]
-            aviso_grafia = "⚠️ Confira a grafia: este nome não está no catálogo canônico de T1 e T2."
-            if sugestoes:
-                aviso_grafia += " Possíveis correspondências nas matrizes: " + ", ".join(sugestoes) + "."
-            st.warning(aviso_grafia)
-        elif origem_catalogo_institutos != "T1 e T2":
-            st.caption("Catálogo de T1/T2 indisponível no momento; usando o dicionário local temporariamente.")
-
-        amostra = st.number_input("Amostra", min_value=0, step=1, key="polling_meta_amostra")
-    with meta2:
-        data_campo = st.text_input("Data do campo (YYYY-MM-DD)", key="polling_meta_data")
-        margem_erro = st.number_input(
-            "Margem de erro (%)",
-            min_value=0.0,
-            max_value=100.0,
-            step=0.1,
-            key="polling_meta_margem",
-        )
-    with meta3:
-        confianca = st.text_input(
-            "Confiança (%)",
-            key="polling_meta_confianca",
-            placeholder="Ex.: 95",
-        )
-
-    modo_extraido = normalizar_texto_simples(payload.get("modo"))
-    opcoes_modo = MODOS_COLETA + [OUTRO_MODO_COLETA]
-    if modo_extraido in MODOS_COLETA:
-        indice_modo = opcoes_modo.index(modo_extraido)
-    elif modo_extraido:
-        indice_modo = opcoes_modo.index(OUTRO_MODO_COLETA)
-    else:
-        indice_modo = 0
-    modo_escolhido = st.selectbox(
-        "Modo de coleta",
-        opcoes_modo,
-        index=indice_modo,
-        key="polling_meta_modo_sel",
-    )
-    if modo_escolhido == OUTRO_MODO_COLETA:
-        modo_pesquisa = st.text_input(
-            "Outro modo de coleta",
-            key="polling_meta_modo",
-            placeholder="Ex.: WhatsApp, presencial e online…",
-        )
-    else:
-        modo_pesquisa = modo_escolhido
-
-    if "polling_meta_observacoes" not in st.session_state:
-        st.session_state["polling_meta_observacoes"] = payload.get("observacoes", "")
-    observacoes = st.text_area(
-        "Observações da extração",
-        key="polling_meta_observacoes",
-        height=90,
-    )
-
-    for pendencia in payload.get("pendencias") or []:
-        st.warning(pendencia)
-
-    partidos_da_base = st.session_state.get("polling_partidos_da_base") or []
-    if partidos_da_base:
-        st.warning(
-            "Atenção: estes partidos não vieram da pesquisa, foram puxados da nossa "
-            "base (matrizes T1/T2). Confira: " + ", ".join(partidos_da_base) + "."
-        )
-
-    st.markdown('<div class="ge-rule">Cenários e candidatos</div>', unsafe_allow_html=True)
-    if st.button("Adicionar cenário em branco"):
-        payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)
-        payload_atual["cenarios"].append({
-            "scenario_label": str(len(payload_atual["cenarios"]) + 1),
-            "cargo": cargo,
-            "turno": turno,
-            "uf": uf,
-            "itens": [],
-        })
-        st.session_state["polling_manual_payload"] = payload_atual
-        st.rerun()
-
-    cenarios_fonte = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)["cenarios"]
-    cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno, uf, registro_tse)
-
-    st.markdown('<div class="ge-rule">Salvar</div>', unsafe_allow_html=True)
-    duplicatas_alerta = st.session_state.get("polling_manual_duplicatas")
-    forcar_salvar = False
-    if isinstance(duplicatas_alerta, pd.DataFrame) and not duplicatas_alerta.empty:
-        st.warning(
-            "Encontrei pesquisa(s) parecida(s) já salvas. Revise antes de gravar para evitar duplicidade."
-        )
-        st.dataframe(
-            duplicatas_alerta[
-                [
-                    "motivo",
-                    "uf",
-                    "cargo",
-                    "turno",
-                    "instituto",
-                    "registro_tse",
-                    "data_campo",
-                    "poll_id",
-                    "fonte_url",
-                    "origem",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
-        col_cancelar, col_forcar = st.columns(2)
-        with col_cancelar:
-            if st.button("Cancelar e revisar", use_container_width=True, key="polling_dup_cancelar"):
-                st.session_state["polling_manual_duplicatas"] = None
-                st.rerun()
-        with col_forcar:
-            forcar_salvar = st.button(
-                "Salvar mesmo assim",
-                use_container_width=True,
-                key="polling_dup_forcar",
-                type="primary",
-                help="Use só se conferiu que não é a mesma pesquisa.",
+            f1, f2, f3, f4 = st.columns(4)
+            with f1:
+                foco_cargo = st.selectbox(
+                    "Cargo-alvo",
+                    ["(auto-detectar)"] + POLLING_MANUAL_CARGOS,
+                    key="polling_foco_cargo",
+                )
+            with f2:
+                foco_uf = st.selectbox(
+                    "UF-alvo",
+                    ["(auto-detectar)", "BR"] + UFS,
+                    key="polling_foco_uf",
+                )
+            with f3:
+                foco_turno = st.selectbox(
+                    "Turno-alvo",
+                    ["(auto-detectar)"] + POLLING_MANUAL_TURNOS,
+                    key="polling_foco_turno",
+                )
+            with f4:
+                foco_instituto = st.text_input(
+                    "Instituto-alvo",
+                    key="polling_foco_instituto",
+                    placeholder="Ex.: Quaest",
+                )
+            foco_instrucoes = st.text_area(
+                "Instruções adicionais",
+                key="polling_foco_instrucoes",
+                height=70,
+                placeholder='Ex.: "Pegar só o cenário sem o Ratinho Junior" ou "Usar o segundo bloco da página 3".',
             )
 
-    # marcar_topline_extraida_manual (chamado logo abaixo) fecha a linha da fila
-    # 'relatorios' (Registro TSE + Cargo) assim que QUALQUER cenário é salvo, sem
-    # saber se ainda faltam outros cenários desse mesmo cargo pra lançar depois
-    # (o eixo-eleicoes nunca revisita uma linha já marcada "sim" - ver
-    # marcar_topline_extraida_manual). Institutos variam demais no número de
-    # cenários por relatório pra dar pra adivinhar isso automaticamente, então
-    # a decisão fica explícita aqui: desmarque só quando tiver certeza de que vai
-    # voltar depois com mais cenários deste MESMO Registro TSE + Cargo.
-    concluir_linha_fila = st.checkbox(
-        "Marcar esta pesquisa (Registro TSE + Cargo) como concluída na fila do eixo-eleicoes",
-        value=True,
-        key="polling_concluir_linha_fila",
-        help=(
-            "Desmarque se ainda faltam cenários deste mesmo Registro TSE + Cargo pra "
-            "lançar depois - a linha correspondente na aba 'relatorios' fica pendente "
-            "em vez de ser marcada como concluída."
-        ),
-    )
-    if not concluir_linha_fila:
-        st.caption(
-            "A linha da fila (Registro TSE + Cargo) NÃO será marcada como concluída "
-            "ao salvar - continuará pendente pra você voltar e lançar o restante."
-        )
-
-    salvar_clicado = st.button("Salvar pesquisa na planilha", use_container_width=True, key="polling_salvar")
-    if salvar_clicado or forcar_salvar:
-        erros = []
-        if not normalizar_texto_simples(instituto):
-            erros.append("Preencha o instituto.")
-        if not normalizar_texto_simples(data_campo):
-            erros.append("Preencha a data do campo.")
-        confianca_normalizada = normalizar_inteiro_simples(confianca)
-        if normalizar_texto_simples(confianca) and (
-            confianca_normalizada is None or not 1 <= confianca_normalizada <= 100
-        ):
-            erros.append("Confiança deve ser um percentual inteiro entre 1 e 100 ou ficar em branco.")
-        data_campo_normalizada = normalizar_data_campo_segura(normalizar_texto_simples(data_campo))
-        if data_campo_normalizada.startswith("2026"):
-            # O registro é por cenário (cai pro global só como fallback). Barra
-            # apenas se algum cenário com resultado ficar sem registro válido —
-            # não exige um registro global, que fica vazio quando a tela preenche
-            # só o do cenário.
-            cenarios_sem_registro = [
-                c for c in cenarios_editados
-                if (c.get("itens") or [])
-                and not registro_tse_valido(
-                    normalizar_texto_simples(c.get("registro_tse")) or registro_tse
-                )
-            ]
-            if cenarios_sem_registro:
-                erros.append("Registro TSE é obrigatório para pesquisas de 2026.")
-            # Formato conferido antes de gravar: o app não sabe se o registro
-            # EXISTE no TSE, mas sabe reprovar dígito a mais/a menos e ano
-            # impossível. Registro torto entra no poll_id, escapa do detector de
-            # duplicata e não casa com a linha da fila de relatórios.
-            registros_tortos = []
-            for cenario in cenarios_editados:
-                if not (cenario.get("itens") or []):
-                    continue
-                bruto = normalizar_texto_simples(cenario.get("registro_tse")) or registro_tse
-                if bruto and not registro_tse_formato_ok(bruto):
-                    registros_tortos.append(normalizar_registro_tse(bruto))
-            if registros_tortos:
-                erros.append(
-                    "Registro TSE fora do formato UF-NNNNN/AAAA (ex.: DF-04765/2026): "
-                    + ", ".join(dict.fromkeys(registros_tortos))
-                    + ". Confira contra o PDF."
-                )
-        if sum(len(cenario.get("itens") or []) for cenario in cenarios_editados) == 0:
-            erros.append("Inclua pelo menos um resultado em algum cenário.")
-        # Link da fonte é obrigatório: alimenta fonte_url e fonte_url_original.
-        # Global de propósito — uma extração vem de UM material só, então todos
-        # os cenários compartilham o mesmo link (se a notícia trouxe os
-        # candidatos, é porque eles estão nela).
-        link_fonte = normalizar_texto_simples(url_original)
-        if not link_fonte:
-            erros.append(
-                "Cole o link da notícia ou relatório — é obrigatório "
-                "(vai pras colunas fonte_url e fonte_url_original)."
-            )
-        elif not link_fonte.lower().startswith("http"):
-            erros.append("O link da notícia ou relatório precisa ser uma URL (começar com http).")
-
-        if erros:
-            for erro in erros:
-                st.error(erro)
-        else:
-            # Aviso leve, não bloqueia: candidato de verdade sem partido
-            # costuma ser esquecimento no cadastro. Salva do mesmo jeito.
-            sem_partido = []
-            for cenario in cenarios_editados:
-                for item in cenario.get("itens") or []:
-                    cand = normalizar_texto_simples(item.get("candidato"))
-                    tipo_item = classificar_tipo_resultado_manual(cand, item.get("tipo", ""))
-                    if cand and tipo_item == "candidato" and not normalizar_texto_simples(item.get("partido")):
-                        sem_partido.append(cand)
-            if sem_partido:
-                st.warning(
-                    "Sem partido: " + ", ".join(dict.fromkeys(sem_partido))
-                    + ". Salvei assim mesmo — preencha se for esquecimento."
-                )
-
-            gc = get_polling_sheets_client()
-            # Usa o link do campo (já validado como obrigatório acima), não o
-            # que ficou no payload da extração — se ela ajustou o link depois de
-            # extrair, é esse que vale.
-            fonte_url_original_atual = link_fonte
-            if not gc:
-                st.error("Credenciais do Google Sheets não encontradas.")
+        if st.button("Identificar pesquisa com Gemini", use_container_width=True):
+            texto_fonte = st.session_state.get("polling_manual_texto_fonte", "")
+            if not normalizar_texto_simples(texto_fonte):
+                st.error("Cole o texto completo ou extraia o PDF antes de identificar a pesquisa.")
             else:
-                payload_final = {
-                    "cargo": cargo,
-                    "turno": turno,
-                    "uf": uf,
-                    "instituto": instituto_canonico,
-                    "registro_tse": registro_tse,
-                    "data_campo": data_campo,
-                    "amostra": amostra or None,
-                    "margem_erro": margem_erro or None,
-                    "confianca": confianca_normalizada,
-                    "modo": modo_pesquisa,
-                    "metodologia": "",
-                    "fonte_url_original": fonte_url_original_atual,
-                    "observacoes": observacoes,
-                    "cenarios": cenarios_editados,
+                # Se o texto mudou e o campo de URL ainda é exatamente o da última
+                # pesquisa, ele é resíduo de tela — não pode acompanhar a nova.
+                texto_atual = normalizar_texto_simples(texto_fonte)
+                texto_anterior = st.session_state.get("polling_manual_ultimo_texto", "")
+                url_anterior = st.session_state.get("polling_manual_ultima_url", "")
+                url_para_extracao = normalizar_texto_simples(url_original)
+                if texto_atual != texto_anterior and url_para_extracao and url_para_extracao == url_anterior:
+                    url_para_extracao = ""
+
+                escopo = {
+                    "cargo": "" if foco_cargo == "(auto-detectar)" else foco_cargo,
+                    "uf": "" if foco_uf == "(auto-detectar)" else foco_uf,
+                    "turno": "" if foco_turno == "(auto-detectar)" else foco_turno,
+                    "instituto": foco_instituto,
+                    "instrucoes": foco_instrucoes,
                 }
-                df_p, df_r = montar_dataframes_polling_manual(
-                    payload=payload_final,
-                    fonte_url=link_fonte,
-                    fonte_url_original=fonte_url_original_atual,
-                    classificacao_canonica=classificacao_canonica,
+                tem_foco = any(v for v in escopo.values())
+
+                with st.spinner("Lendo o conteúdo e estruturando a pesquisa..."):
+                    try:
+                        payload = extrair_dados_polling_gemini(
+                            texto_fonte,
+                            url_original=url_para_extracao,
+                            escopo=escopo,
+                        )
+                    except RuntimeError as exc:
+                        st.error(f"Não consegui identificar a pesquisa: {exc}")
+                        st.info("Tente novamente em alguns segundos ou ajuste o texto e refaça.")
+                    else:
+                        payload["fonte_url_original"] = (
+                            url_para_extracao or payload.get("fonte_url_original", "")
+                        )
+
+                        # Detecta caso "filtro definido mas Gemini não achou nada"
+                        cenarios_vazios = not any(
+                            (c.get("itens") or []) for c in (payload.get("cenarios") or [])
+                        )
+                        if tem_foco and cenarios_vazios:
+                            st.error(
+                                "⚠️ O Gemini não encontrou no material um bloco que case com "
+                                "os filtros que você definiu. Veja as pendências abaixo, "
+                                "ajuste o foco ou cole outro material."
+                            )
+                            for pend in payload.get("pendencias") or []:
+                                st.warning(pend)
+                        else:
+                            carregar_payload_polling_no_state(payload)
+                            st.session_state["polling_manual_ultimo_texto"] = texto_atual
+                            st.session_state["polling_manual_ultima_url"] = payload["fonte_url_original"]
+                            st.session_state["polling_manual_url_pendente"] = payload["fonte_url_original"]
+                            st.session_state["polling_reiniciar_controles_apos_extracao"] = True
+                            st.session_state["polling_manual_flash"] = (
+                                "Pesquisa identificada. Revise os campos abaixo antes de salvar."
+                            )
+                            st.rerun()
+
+    payload = st.session_state.get("polling_manual_payload")
+    if payload:
+        payload = normalizar_payload_polling(payload)
+
+        st.markdown('<div class="ge-rule">Dados extraídos</div>', unsafe_allow_html=True)
+        st.caption("Vale pra pesquisa toda. Cargo, turno, UF e registro TSE ficam em cada cenário abaixo.")
+
+        # Cargo/turno/UF/registro não são mais editados aqui — vivem por cenário.
+        # Guardamos os valores da extração como padrão de cenário em branco e como
+        # fallback do que o cenário não especificar.
+        cargo = normalizar_texto_simples(st.session_state.get("polling_meta_cargo") or payload.get("cargo")).lower()
+        if cargo not in POLLING_MANUAL_CARGOS:
+            cargo = "governador"
+        turno = normalizar_texto_simples(st.session_state.get("polling_meta_turno") or payload.get("turno")).lower()
+        if turno not in POLLING_MANUAL_TURNOS:
+            turno = "t1"
+        uf = normalizar_texto_simples(st.session_state.get("polling_meta_uf") or payload.get("uf")).upper()
+        if uf not in (["BR"] + UFS):
+            uf = "BR"
+        registro_tse = normalizar_texto_simples(
+            st.session_state.get("polling_meta_registro") or payload.get("registro_tse")
+        )
+
+        meta1, meta2, meta3 = st.columns(3)
+        with meta1:
+            # T1 e T2 são a fonte canônica dos institutos. O seletor aceita um
+            # texto novo, mas confere por uma chave insensível a caixa e acentos.
+            catalogo_institutos, origem_catalogo_institutos = carregar_catalogo_institutos_matrizes(
+                VERSAO_CATALOGO_INSTITUTOS
+            )
+            st.session_state["polling_catalogo_institutos"] = catalogo_institutos
+            institutos_conhecidos = sorted(
+                {entrada["instituto"] for entrada in catalogo_institutos.values()},
+                key=str.casefold,
+            )
+            sugerido = normalizar_texto_simples(payload.get("instituto", ""))
+            entrada_sugerida = catalogo_institutos.get(chave_instituto_catalogo(sugerido))
+            if entrada_sugerida:
+                sugerido = entrada_sugerida["instituto"]
+            valor_widget_instituto = normalizar_texto_simples(
+                st.session_state.get("polling_meta_instituto", "")
+            )
+            entrada_widget = catalogo_institutos.get(
+                chave_instituto_catalogo(valor_widget_instituto)
+            )
+            if (
+                entrada_widget
+                and valor_widget_instituto != entrada_widget["instituto"]
+            ):
+                # O widget ainda não foi criado nesta execução; é seguro alinhar
+                # a grafia exibida ao valor canônico da matriz.
+                st.session_state["polling_meta_instituto"] = entrada_widget["instituto"]
+            opcoes_inst = [""] + institutos_conhecidos
+            if sugerido and sugerido not in opcoes_inst:
+                opcoes_inst.append(sugerido)
+            instituto = st.selectbox(
+                "Instituto",
+                opcoes_inst,
+                index=None,
+                key="polling_meta_instituto",
+                placeholder="Selecione ou digite o instituto",
+                accept_new_options=True,
+                on_change=aplicar_grafia_canonica_do_instituto,
+            )
+            entrada_instituto = catalogo_institutos.get(chave_instituto_catalogo(instituto))
+            instituto_canonico = (
+                entrada_instituto["instituto"]
+                if entrada_instituto
+                else normalizar_instituto(instituto or "")
+            )
+            classificacao_canonica = (
+                entrada_instituto.get("classificacao", "") if entrada_instituto else ""
+            )
+            if instituto_canonico and not entrada_instituto:
+                sugestoes_chave = get_close_matches(
+                    chave_instituto_catalogo(instituto_canonico),
+                    list(catalogo_institutos),
+                    n=3,
+                    cutoff=0.62,
+                )
+                sugestoes = [catalogo_institutos[chave]["instituto"] for chave in sugestoes_chave]
+                aviso_grafia = "⚠️ Confira a grafia: este nome não está no catálogo canônico de T1 e T2."
+                if sugestoes:
+                    aviso_grafia += " Possíveis correspondências nas matrizes: " + ", ".join(sugestoes) + "."
+                st.warning(aviso_grafia)
+            elif origem_catalogo_institutos != "T1 e T2":
+                st.caption("Catálogo de T1/T2 indisponível no momento; usando o dicionário local temporariamente.")
+
+            amostra = st.number_input("Amostra", min_value=0, step=1, key="polling_meta_amostra")
+        with meta2:
+            data_campo = st.text_input("Data do campo (YYYY-MM-DD)", key="polling_meta_data")
+            margem_erro = st.number_input(
+                "Margem de erro (%)",
+                min_value=0.0,
+                max_value=100.0,
+                step=0.1,
+                key="polling_meta_margem",
+            )
+        with meta3:
+            confianca = st.text_input(
+                "Confiança (%)",
+                key="polling_meta_confianca",
+                placeholder="Ex.: 95",
+            )
+
+        modo_extraido = normalizar_texto_simples(payload.get("modo"))
+        opcoes_modo = MODOS_COLETA + [OUTRO_MODO_COLETA]
+        if modo_extraido in MODOS_COLETA:
+            indice_modo = opcoes_modo.index(modo_extraido)
+        elif modo_extraido:
+            indice_modo = opcoes_modo.index(OUTRO_MODO_COLETA)
+        else:
+            indice_modo = 0
+        modo_escolhido = st.selectbox(
+            "Modo de coleta",
+            opcoes_modo,
+            index=indice_modo,
+            key="polling_meta_modo_sel",
+        )
+        if modo_escolhido == OUTRO_MODO_COLETA:
+            modo_pesquisa = st.text_input(
+                "Outro modo de coleta",
+                key="polling_meta_modo",
+                placeholder="Ex.: WhatsApp, presencial e online…",
+            )
+        else:
+            modo_pesquisa = modo_escolhido
+
+        if "polling_meta_observacoes" not in st.session_state:
+            st.session_state["polling_meta_observacoes"] = payload.get("observacoes", "")
+        observacoes = st.text_area(
+            "Observações da extração",
+            key="polling_meta_observacoes",
+            height=90,
+        )
+
+        for pendencia in payload.get("pendencias") or []:
+            st.warning(pendencia)
+
+        partidos_da_base = st.session_state.get("polling_partidos_da_base") or []
+        if partidos_da_base:
+            st.warning(
+                "Atenção: estes partidos não vieram da pesquisa, foram puxados da nossa "
+                "base (matrizes T1/T2). Confira: " + ", ".join(partidos_da_base) + "."
+            )
+
+        st.markdown('<div class="ge-rule">Cenários e candidatos</div>', unsafe_allow_html=True)
+        if st.button("Adicionar cenário em branco"):
+            payload_atual = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)
+            payload_atual["cenarios"].append({
+                "scenario_label": str(len(payload_atual["cenarios"]) + 1),
+                "cargo": cargo,
+                "turno": turno,
+                "uf": uf,
+                "itens": [],
+            })
+            st.session_state["polling_manual_payload"] = payload_atual
+            st.rerun()
+
+        cenarios_fonte = normalizar_payload_polling(st.session_state.get("polling_manual_payload") or payload)["cenarios"]
+        cenarios_editados = render_editor_cenarios_polling(cenarios_fonte, cargo, turno, uf, registro_tse)
+
+        st.markdown('<div class="ge-rule">Salvar</div>', unsafe_allow_html=True)
+        duplicatas_alerta = st.session_state.get("polling_manual_duplicatas")
+        forcar_salvar = False
+        if isinstance(duplicatas_alerta, pd.DataFrame) and not duplicatas_alerta.empty:
+            st.warning(
+                "Encontrei pesquisa(s) parecida(s) já salvas. Revise antes de gravar para evitar duplicidade."
+            )
+            st.dataframe(
+                duplicatas_alerta[
+                    [
+                        "motivo",
+                        "uf",
+                        "cargo",
+                        "turno",
+                        "instituto",
+                        "registro_tse",
+                        "data_campo",
+                        "poll_id",
+                        "fonte_url",
+                        "origem",
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+            col_cancelar, col_forcar = st.columns(2)
+            with col_cancelar:
+                if st.button("Cancelar e revisar", use_container_width=True, key="polling_dup_cancelar"):
+                    st.session_state["polling_manual_duplicatas"] = None
+                    st.rerun()
+            with col_forcar:
+                forcar_salvar = st.button(
+                    "Salvar mesmo assim",
+                    use_container_width=True,
+                    key="polling_dup_forcar",
+                    type="primary",
+                    help="Use só se conferiu que não é a mesma pesquisa.",
                 )
 
-                # Um material pode trazer T1 e T2 juntos (cenário com turno próprio,
-                # ver montar_dataframes_polling_manual) — cada turno vai pra uma
-                # planilha diferente, então agrupa e salva um destino por vez.
-                turnos_presentes = sorted(df_p["turno"].dropna().unique().tolist()) if not df_p.empty else []
-                grupos = []
-                destino_invalido = False
-                for turno_grupo in turnos_presentes:
-                    spreadsheet_destino, nome_destino = planilha_destino_polling(turno_grupo)
-                    if not spreadsheet_destino:
-                        st.error(f"Falta configurar o ID da {nome_destino} (necessário pro cenário de {turno_grupo}).")
-                        destino_invalido = True
+        # marcar_topline_extraida_manual (chamado logo abaixo) fecha a linha da fila
+        # 'relatorios' (Registro TSE + Cargo) assim que QUALQUER cenário é salvo, sem
+        # saber se ainda faltam outros cenários desse mesmo cargo pra lançar depois
+        # (o eixo-eleicoes nunca revisita uma linha já marcada "sim" - ver
+        # marcar_topline_extraida_manual). Institutos variam demais no número de
+        # cenários por relatório pra dar pra adivinhar isso automaticamente, então
+        # a decisão fica explícita aqui: desmarque só quando tiver certeza de que vai
+        # voltar depois com mais cenários deste MESMO Registro TSE + Cargo.
+        concluir_linha_fila = st.checkbox(
+            "Marcar esta pesquisa (Registro TSE + Cargo) como concluída na fila do eixo-eleicoes",
+            value=True,
+            key="polling_concluir_linha_fila",
+            help=(
+                "Desmarque se ainda faltam cenários deste mesmo Registro TSE + Cargo pra "
+                "lançar depois - a linha correspondente na aba 'relatorios' fica pendente "
+                "em vez de ser marcada como concluída."
+            ),
+        )
+        if not concluir_linha_fila:
+            st.caption(
+                "A linha da fila (Registro TSE + Cargo) NÃO será marcada como concluída "
+                "ao salvar - continuará pendente pra você voltar e lançar o restante."
+            )
+
+        salvar_clicado = st.button("Salvar pesquisa na planilha", use_container_width=True, key="polling_salvar")
+        if salvar_clicado or forcar_salvar:
+            erros = []
+            if not normalizar_texto_simples(instituto):
+                erros.append("Preencha o instituto.")
+            if not normalizar_texto_simples(data_campo):
+                erros.append("Preencha a data do campo.")
+            confianca_normalizada = normalizar_inteiro_simples(confianca)
+            if normalizar_texto_simples(confianca) and (
+                confianca_normalizada is None or not 1 <= confianca_normalizada <= 100
+            ):
+                erros.append("Confiança deve ser um percentual inteiro entre 1 e 100 ou ficar em branco.")
+            data_campo_normalizada = normalizar_data_campo_segura(normalizar_texto_simples(data_campo))
+            if data_campo_normalizada.startswith("2026"):
+                # O registro é por cenário (cai pro global só como fallback). Barra
+                # apenas se algum cenário com resultado ficar sem registro válido —
+                # não exige um registro global, que fica vazio quando a tela preenche
+                # só o do cenário.
+                cenarios_sem_registro = [
+                    c for c in cenarios_editados
+                    if (c.get("itens") or [])
+                    and not registro_tse_valido(
+                        normalizar_texto_simples(c.get("registro_tse")) or registro_tse
+                    )
+                ]
+                if cenarios_sem_registro:
+                    erros.append("Registro TSE é obrigatório para pesquisas de 2026.")
+                # Formato conferido antes de gravar: o app não sabe se o registro
+                # EXISTE no TSE, mas sabe reprovar dígito a mais/a menos e ano
+                # impossível. Registro torto entra no poll_id, escapa do detector de
+                # duplicata e não casa com a linha da fila de relatórios.
+                registros_tortos = []
+                for cenario in cenarios_editados:
+                    if not (cenario.get("itens") or []):
                         continue
-                    grupos.append((
-                        turno_grupo, spreadsheet_destino, nome_destino,
-                        df_p[df_p["turno"] == turno_grupo].reset_index(drop=True),
-                        df_r[df_r["turno"] == turno_grupo].reset_index(drop=True) if not df_r.empty else df_r,
-                    ))
+                    bruto = normalizar_texto_simples(cenario.get("registro_tse")) or registro_tse
+                    if bruto and not registro_tse_formato_ok(bruto):
+                        registros_tortos.append(normalizar_registro_tse(bruto))
+                if registros_tortos:
+                    erros.append(
+                        "Registro TSE fora do formato UF-NNNNN/AAAA (ex.: DF-04765/2026): "
+                        + ", ".join(dict.fromkeys(registros_tortos))
+                        + ". Confira contra o PDF."
+                    )
+            if sum(len(cenario.get("itens") or []) for cenario in cenarios_editados) == 0:
+                erros.append("Inclua pelo menos um resultado em algum cenário.")
+            # Link da fonte é obrigatório: alimenta fonte_url e fonte_url_original.
+            # Global de propósito — uma extração vem de UM material só, então todos
+            # os cenários compartilham o mesmo link (se a notícia trouxe os
+            # candidatos, é porque eles estão nela).
+            link_fonte = normalizar_texto_simples(url_original)
+            if not link_fonte:
+                erros.append(
+                    "Cole o link da notícia ou relatório — é obrigatório "
+                    "(vai pras colunas fonte_url e fonte_url_original)."
+                )
+            elif not link_fonte.lower().startswith("http"):
+                erros.append("O link da notícia ou relatório precisa ser uma URL (começar com http).")
 
-                if destino_invalido:
-                    pass  # erro(s) já exibido(s) acima; não salva nada até configurar
-                elif not grupos:
-                    st.error("Nenhum cenário válido para salvar.")
+            if erros:
+                for erro in erros:
+                    st.error(erro)
+            else:
+                # Aviso leve, não bloqueia: candidato de verdade sem partido
+                # costuma ser esquecimento no cadastro. Salva do mesmo jeito.
+                sem_partido = []
+                for cenario in cenarios_editados:
+                    for item in cenario.get("itens") or []:
+                        cand = normalizar_texto_simples(item.get("candidato"))
+                        tipo_item = classificar_tipo_resultado_manual(cand, item.get("tipo", ""))
+                        if cand and tipo_item == "candidato" and not normalizar_texto_simples(item.get("partido")):
+                            sem_partido.append(cand)
+                if sem_partido:
+                    st.warning(
+                        "Sem partido: " + ", ".join(dict.fromkeys(sem_partido))
+                        + ". Salvei assim mesmo — preencha se for esquecimento."
+                    )
+
+                gc = get_polling_sheets_client()
+                # Usa o link do campo (já validado como obrigatório acima), não o
+                # que ficou no payload da extração — se ela ajustou o link depois de
+                # extrair, é esse que vale.
+                fonte_url_original_atual = link_fonte
+                if not gc:
+                    st.error("Credenciais do Google Sheets não encontradas.")
                 else:
-                    with st.spinner("Conferindo possíveis duplicatas na planilha..."):
-                        duplicatas_por_grupo = []
-                        try:
-                            for turno_grupo, spreadsheet_destino, _, df_p_g, _ in grupos:
-                                dup = buscar_duplicatas_polling_manual(gc, spreadsheet_destino, df_p_g)
-                                if not dup.empty:
-                                    duplicatas_por_grupo.append(dup)
-                        except Exception as exc:
-                            st.error(f"Não foi possível conferir duplicatas antes de salvar: {exc}")
-                            st.stop()
+                    payload_final = {
+                        "cargo": cargo,
+                        "turno": turno,
+                        "uf": uf,
+                        "instituto": instituto_canonico,
+                        "registro_tse": registro_tse,
+                        "data_campo": data_campo,
+                        "amostra": amostra or None,
+                        "margem_erro": margem_erro or None,
+                        "confianca": confianca_normalizada,
+                        "modo": modo_pesquisa,
+                        "metodologia": "",
+                        "fonte_url_original": fonte_url_original_atual,
+                        "observacoes": observacoes,
+                        "cenarios": cenarios_editados,
+                    }
+                    df_p, df_r = montar_dataframes_polling_manual(
+                        payload=payload_final,
+                        fonte_url=link_fonte,
+                        fonte_url_original=fonte_url_original_atual,
+                        classificacao_canonica=classificacao_canonica,
+                    )
 
-                    if duplicatas_por_grupo and not forcar_salvar:
-                        st.session_state["polling_manual_duplicatas"] = pd.concat(
-                            duplicatas_por_grupo, ignore_index=True)
-                        st.error(
-                            "Possível duplicata encontrada. Revise o alerta acima e use "
-                            "“Salvar mesmo assim” se quiser gravar as duas entradas."
-                        )
-                        st.rerun()
+                    # Um material pode trazer T1 e T2 juntos (cenário com turno próprio,
+                    # ver montar_dataframes_polling_manual) — cada turno vai pra uma
+                    # planilha diferente, então agrupa e salva um destino por vez.
+                    turnos_presentes = sorted(df_p["turno"].dropna().unique().tolist()) if not df_p.empty else []
+                    grupos = []
+                    destino_invalido = False
+                    for turno_grupo in turnos_presentes:
+                        spreadsheet_destino, nome_destino = planilha_destino_polling(turno_grupo)
+                        if not spreadsheet_destino:
+                            st.error(f"Falta configurar o ID da {nome_destino} (necessário pro cenário de {turno_grupo}).")
+                            destino_invalido = True
+                            continue
+                        grupos.append((
+                            turno_grupo, spreadsheet_destino, nome_destino,
+                            df_p[df_p["turno"] == turno_grupo].reset_index(drop=True),
+                            df_r[df_r["turno"] == turno_grupo].reset_index(drop=True) if not df_r.empty else df_r,
+                        ))
 
-                    with st.spinner("Salvando na planilha..."):
-                        total_pesquisas = total_resultados = total_fila = 0
-                        avisos_fila_total: list[str] = []
-                        destinos_salvos: list[str] = []
-                        for turno_grupo, spreadsheet_destino, nome_destino, df_p_g, df_r_g in grupos:
-                            salvar_tudo(gc, spreadsheet_destino, df_p_g, df_r_g)
-                            if concluir_linha_fila:
-                                linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_g)
-                                total_fila += linhas_fila
-                                avisos_fila_total.extend(avisos_fila)
-                            total_pesquisas += len(df_p_g)
-                            total_resultados += len(df_r_g)
-                            destinos_salvos.append(f"{nome_destino} ({len(df_p_g)} cenário(s))")
+                    if destino_invalido:
+                        pass  # erro(s) já exibido(s) acima; não salva nada até configurar
+                    elif not grupos:
+                        st.error("Nenhum cenário válido para salvar.")
+                    else:
+                        with st.spinner("Conferindo possíveis duplicatas na planilha..."):
+                            duplicatas_por_grupo = []
+                            try:
+                                for turno_grupo, spreadsheet_destino, _, df_p_g, _ in grupos:
+                                    dup = buscar_duplicatas_polling_manual(gc, spreadsheet_destino, df_p_g)
+                                    if not dup.empty:
+                                        duplicatas_por_grupo.append(dup)
+                            except Exception as exc:
+                                st.error(f"Não foi possível conferir duplicatas antes de salvar: {exc}")
+                                st.stop()
 
-                        st.session_state["polling_manual_payload"] = payload_final
-                        st.session_state["polling_manual_duplicatas"] = None
-                        st.session_state["polling_manual_resultado"] = {
-                            "pesquisas": total_pesquisas,
-                            "resultados": total_resultados,
-                            "destino": " + ".join(destinos_salvos),
-                            "linhas_fila": total_fila,
-                            "avisos_fila": avisos_fila_total,
-                        }
-                        st.success(
-                            f"Pesquisa salva com sucesso em {' e '.join(destinos_salvos)}. "
-                            f"{total_pesquisas} cenário(s) e {total_resultados} resultado(s). "
-                            "A média móvel é reconstruída de 4 em 4 horas."
-                        )
-                        if total_fila:
-                            st.caption(f"Também marquei {total_fila} linha(s) como concluída na fila de relatórios.")
-                        for aviso in avisos_fila_total:
-                            st.caption(f"⚠️ Fila de relatórios: {aviso}")
+                        if duplicatas_por_grupo and not forcar_salvar:
+                            st.session_state["polling_manual_duplicatas"] = pd.concat(
+                                duplicatas_por_grupo, ignore_index=True)
+                            st.error(
+                                "Possível duplicata encontrada. Revise o alerta acima e use "
+                                "“Salvar mesmo assim” se quiser gravar as duas entradas."
+                            )
+                            st.rerun()
 
-resultado = st.session_state.get("polling_manual_resultado")
-if resultado:
-    st.info(
-        f"Último salvamento ({resultado.get('destino', 'matriz')}): {resultado['pesquisas']} linha(s) em `pesquisas` "
-        f"e {resultado['resultados']} linha(s) em `resultados`."
-    )
+                        with st.spinner("Salvando na planilha..."):
+                            total_pesquisas = total_resultados = total_fila = 0
+                            avisos_fila_total: list[str] = []
+                            destinos_salvos: list[str] = []
+                            for turno_grupo, spreadsheet_destino, nome_destino, df_p_g, df_r_g in grupos:
+                                salvar_tudo(gc, spreadsheet_destino, df_p_g, df_r_g)
+                                if concluir_linha_fila:
+                                    linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_g)
+                                    total_fila += linhas_fila
+                                    avisos_fila_total.extend(avisos_fila)
+                                total_pesquisas += len(df_p_g)
+                                total_resultados += len(df_r_g)
+                                destinos_salvos.append(f"{nome_destino} ({len(df_p_g)} cenário(s))")
+
+                            st.session_state["polling_manual_payload"] = payload_final
+                            st.session_state["polling_manual_duplicatas"] = None
+                            st.session_state["polling_manual_resultado"] = {
+                                "pesquisas": total_pesquisas,
+                                "resultados": total_resultados,
+                                "destino": " + ".join(destinos_salvos),
+                                "linhas_fila": total_fila,
+                                "avisos_fila": avisos_fila_total,
+                            }
+                            st.success(
+                                f"Pesquisa salva com sucesso em {' e '.join(destinos_salvos)}. "
+                                f"{total_pesquisas} cenário(s) e {total_resultados} resultado(s). "
+                                "A média móvel é reconstruída de 4 em 4 horas."
+                            )
+                            if total_fila:
+                                st.caption(f"Também marquei {total_fila} linha(s) como concluída na fila de relatórios.")
+                            for aviso in avisos_fila_total:
+                                st.caption(f"⚠️ Fila de relatórios: {aviso}")
+
+    resultado = st.session_state.get("polling_manual_resultado")
+    if resultado:
+        st.info(
+            f"Último salvamento ({resultado.get('destino', 'matriz')}): {resultado['pesquisas']} linha(s) em `pesquisas` "
+            f"e {resultado['resultados']} linha(s) em `resultados`."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Polling Colar — cadastra colando o texto da tela do PollingData (sem PDF/Gemini)
+# ══════════════════════════════════════════════════════════════════════════════
+from polling_colar_core import parsear as _colar_parsear, montar as _colar_montar, _cargo_uf_turno as _colar_cargo_uf_turno
+
+
+def _colar_registros_existentes(gc, sheet_id):
+    """(registro_tse, cargo) já na aba 'pesquisas', pra avisar de repetição."""
+    try:
+        valores = gc.open_by_key(sheet_id).worksheet("pesquisas").get_all_values()
+    except Exception:
+        return set()
+    if not valores:
+        return set()
+    h = {c.strip().lower(): i for i, c in enumerate(valores[0])}
+    ir, ic = h.get("registro_tse"), h.get("cargo")
+    if ir is None or ic is None:
+        return set()
+    return {(r[ir].strip().upper(), r[ic].strip().lower())
+            for r in valores[1:] if len(r) > max(ir, ic) and r[ir].strip()}
+
+
+def render_colar():
+    st.markdown('<div class="ge-hero"><div class="ge-hero-title">Polling Colar</div></div>',
+                unsafe_allow_html=True)
+    st.caption("Cola o texto do PollingData e grava nas mesmas abas do Polling Manual. "
+               "Sem PDF, sem Gemini, sem raspagem.")
+
+    col_url, col_info = st.columns([2, 1])
+    with col_url:
+        url = st.text_input(
+            "URL da página do PollingData",
+            key="colar_url",
+            placeholder="https://flex.pollingdata.com.br/pdvoto/2026/governador/pi/t1",
+            help="É dela que saem cargo, UF e turno.")
+    with col_info:
+        if url.strip():
+            try:
+                _, cargo, uf, turno = _colar_cargo_uf_turno(url)
+                st.success(f"{cargo.capitalize()} · {uf} · {turno.upper()}")
+            except SystemExit:
+                st.error("URL fora do padrão .../2026/cargo/uf/t1")
+
+    texto = st.text_area(
+        "Texto copiado da seção “Dados das Pesquisas”",
+        key="colar_texto", height=260,
+        placeholder="Cole aqui o conteúdo copiado da tabela de pesquisas.")
+
+    if st.button("Processar", use_container_width=True, type="primary", key="colar_processar"):
+        st.session_state.pop("colar_resultado", None)
+        if not url.strip() or not texto.strip():
+            st.error("Preencha a URL e cole o texto.")
+        else:
+            try:
+                ano, cargo, uf, turno = _colar_cargo_uf_turno(url)
+            except SystemExit as e:
+                st.error(str(e))
+                st.stop()
+            pesquisas = _colar_parsear(texto)
+            if not pesquisas:
+                st.error("Não reconheci nenhuma pesquisa no texto. Confira se copiou a seção certa.")
+            else:
+                lp, lr, avisos = _colar_montar(pesquisas, ano, uf, cargo, turno, url.strip())
+                st.session_state["colar_resultado"] = {
+                    "linhas_p": lp, "linhas_r": lr, "avisos": avisos, "turno": turno}
+
+    res = st.session_state.get("colar_resultado")
+    if not res:
+        return
+    st.markdown('<div class="ge-rule">Revisão</div>', unsafe_allow_html=True)
+    st.write(f"**{len(res['linhas_p'])} pesquisa(s)** · **{len(res['linhas_r'])} resultado(s)** · "
+             f"vai pra Matriz **{res['turno'].upper()}**")
+    for aviso in res["avisos"]:
+        st.markdown(f'<div class="ge-alerta-cenario">⚠️ {aviso}</div>', unsafe_allow_html=True)
+
+    df = pd.DataFrame(res["linhas_r"])[
+        ["registro_tse", "instituto", "data_campo", "scenario_label",
+         "candidato_partido", "partido", "tipo", "percentual"]]
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    st.markdown('<div class="ge-rule">Gravar</div>', unsafe_allow_html=True)
+    if res["avisos"]:
+        st.warning("Há avisos de conferência acima (nº de colunas ≠ nº de percentuais). Confira antes de gravar.")
+    sheet_id, nome_destino = planilha_destino_polling(res["turno"])
+    if not sheet_id:
+        st.error(f"ID da {nome_destino} não configurado nos Secrets.")
+        return
+    gc = get_polling_sheets_client()
+    if gc:
+        existentes = _colar_registros_existentes(gc, sheet_id)
+        repetidos = sorted({(p["registro_tse"], p["cargo"]) for p in res["linhas_p"]
+                            if (p["registro_tse"].upper(), p["cargo"].lower()) in existentes})
+        if repetidos:
+            lista_rep = ", ".join(f"{r} ({c})" for r, c in repetidos)
+            msg_rep = (
+                "<div class=\"ge-alerta-cenario\">Já existe(m) na matriz (registro + cargo): "
+                + lista_rep
+                + ". Cenário idêntico não duplica; cenário novo do mesmo registro é adicionado.</div>"
+            )
+            st.markdown(msg_rep, unsafe_allow_html=True)
+    if st.button(f"Gravar na {nome_destino}", use_container_width=True, key="colar_gravar"):
+        if not gc:
+            st.error("Credenciais do Google Sheets não encontradas.")
+        else:
+            with st.spinner("Gravando nas abas pesquisas / resultados..."):
+                salvar_tudo(gc, sheet_id, pd.DataFrame(res["linhas_p"]), pd.DataFrame(res["linhas_r"]))
+            st.success(f"Gravado: {len(res['linhas_p'])} pesquisa(s) e {len(res['linhas_r'])} "
+                       f"resultado(s) na {nome_destino}. A média móvel é reconstruída de 4 em 4 horas.")
+            st.session_state.pop("colar_resultado", None)
+
+
+# ── página: uma só, com as duas abas ──────────────────────────────────────────
+_tab_manual, _tab_colar = st.tabs(["Polling Manual", "Polling Colar"])
+with _tab_manual:
+    render_manual()
+with _tab_colar:
+    render_colar()
