@@ -75,6 +75,14 @@ def _tipo(nome):
     return "nao_valido" if re.sub(r"\s+", " ", nome.strip().lower()) in NAO_VALIDO else "candidato"
 
 
+def _e_rotulo_cenario(linha):
+    """Rótulo de cenário (ex.: 'Intenção de voto (estimulada) para Senado ...'),
+    para separá-lo das colunas de candidato."""
+    return bool(re.search(
+        r"inten[çc]|voto|turno|op[çc][ãa]o|cen[áa]rio|estimulad|espont[âa]n|1[ªº]|2[ªº]",
+        linha, re.I))
+
+
 def parsear(texto):
     """Devolve lista de pesquisas: cada uma com metadados + lista de (candidato_partido, %)."""
     # Achata tabs em quebras de linha: o copy da tabela mistura os dois.
@@ -119,6 +127,8 @@ def parsear(texto):
                         j += 1
                     elif _e_percentual(l):                  # chegou nos números: fim do cabeçalho
                         break
+                    elif _e_rotulo_cenario(l):              # rótulo do 1º cenário: acabaram as colunas
+                        break
                     else:
                         # "Outros    Não Válido" às vezes vem numa linha só (espaços, não tab):
                         # quebra em colunas separadas.
@@ -126,7 +136,7 @@ def parsear(texto):
                         colunas.extend(partes if len(partes) > 1 else [l])
                         j += 1
 
-            # Um ou mais cenários: (rótulo) seguido de linha de percentuais.
+            # Um ou mais cenários: (rótulo) seguido da(s) linha(s) de percentuais.
             while j < len(linhas):
                 rotulo = None
                 while j < len(linhas) and not _e_percentual(linhas[j]):
@@ -136,8 +146,12 @@ def parsear(texto):
                     j += 1
                 if j >= len(linhas) or not _e_percentual(linhas[j]):
                     break
-                pcts = _nums(linhas[j])
-                j += 1
+                # Junta linhas de percentuais consecutivas: o copy separa as
+                # células por TAB, e o split atomiza cada % numa linha própria.
+                pcts = []
+                while j < len(linhas) and _e_percentual(linhas[j]):
+                    pcts += _nums(linhas[j])
+                    j += 1
                 pesquisas.append({
                     "registro_tse": reg, "instituto": inst,
                     "data_campo": datas.group(2) if datas else "", "modo": modo,
