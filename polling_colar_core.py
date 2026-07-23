@@ -114,8 +114,15 @@ def parsear(texto, cargo=""):
     pesquisas = []
 
     def eh_inicio(k):
-        return (k + 2 < len(linhas) and re.fullmatch(r"\d+", linhas[k])
-                and REG.match(linhas[k + 2]))
+        if not (k + 2 < len(linhas) and re.fullmatch(r"\d+", linhas[k])):
+            return False
+        if REG.match(linhas[k + 2]):
+            return True
+        # pesquisa sem registro TSE ("-"): reconhece pela data logo em seguida,
+        # pra ela ser uma FRONTEIRA (não deixa os cenários dela vazarem pra
+        # pesquisa anterior). Não é emitida (sem registro não forma poll_id).
+        return (linhas[k + 2] in ("-", "—", "–") and k + 3 < len(linhas)
+                and bool(re.search(r"\d{1,2}/\d{1,2}/\d{4}", linhas[k + 3])))
 
     i = 0
     while i < len(linhas):
@@ -123,6 +130,7 @@ def parsear(texto, cargo=""):
             i += 1
             continue
         inst, reg, j = linhas[i + 1], linhas[i + 2], i + 3
+        emitir = bool(REG.match(reg))  # sem registro TSE não vai pra matriz
 
         datas = (re.search(r"(\d{1,2}/\d{1,2}/\d{4})\s+a\s+(\d{1,2}/\d{1,2}/\d{4})", linhas[j])
                  if j < len(linhas) else None)
@@ -191,13 +199,14 @@ def parsear(texto, cargo=""):
                 crus = prim
 
         # A matriz rotula o cenário por número (1, 2, 3...), não pelo texto.
-        for n_cen, (rotulo, cells) in enumerate(crus, start=1):
-            pesquisas.append({
-                "registro_tse": reg, "instituto": inst, "data_campo": data_fim,
-                "modo": modo, "amostra": amostra, "margem": margem,
-                "confianca": confianca, "scenario_label": str(n_cen),
-                "colunas": colunas, "percentuais": cells,
-            })
+        if emitir:
+            for n_cen, (rotulo, cells) in enumerate(crus, start=1):
+                pesquisas.append({
+                    "registro_tse": reg, "instituto": inst, "data_campo": data_fim,
+                    "modo": modo, "amostra": amostra, "margem": margem,
+                    "confianca": confianca, "scenario_label": str(n_cen),
+                    "colunas": colunas, "percentuais": cells,
+                })
         i = j
     return pesquisas
 
