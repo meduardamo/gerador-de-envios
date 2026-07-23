@@ -89,8 +89,13 @@ def _e_rotulo_cenario(linha):
         linha, re.I))
 
 
-def parsear(texto):
-    """Devolve lista de pesquisas: cada uma com metadados + lista de (candidato_partido, %)."""
+def parsear(texto, cargo=""):
+    """Devolve lista de pesquisas: cada uma com metadados + lista de (candidato_partido, %).
+
+    cargo (opcional) vem da URL: pro senador, mantém só o cenário de '1ª opção de
+    voto' (a matriz usa escala de voto único ~100%; a soma 1º+2º ~200% e a 2ª
+    opção quebrariam a média entre cenários)."""
+    cargo = (cargo or "").strip().lower()
     # Achata tabs em quebras de linha: o copy da tabela mistura os dois.
     linhas = [l.strip() for l in re.split(r"[\t\n]", texto) if l.strip()]
     pesquisas = []
@@ -142,15 +147,15 @@ def parsear(texto):
                         colunas.extend(partes if len(partes) > 1 else [l])
                         j += 1
 
-            # Um ou mais cenários: (rótulo) seguido da(s) linha(s) de percentuais.
-            # A matriz rotula o cenário por número (1, 2, 3...), não pelo texto do
-            # portal, então numeramos na ordem em que aparecem nesta pesquisa.
-            n_cen = 0
+            # Coleta os cenários crus: rótulo do portal + percentuais.
+            crus = []
             while j < len(linhas):
+                rotulo = ""
                 while j < len(linhas) and not _e_percentual(linhas[j]):
                     if re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
                         break  # é a próxima pesquisa
-                    j += 1  # pula o rótulo descritivo do portal
+                    rotulo = linhas[j]
+                    j += 1
                 if j >= len(linhas) or not _e_percentual(linhas[j]):
                     break
                 # Junta linhas de percentuais consecutivas: o copy separa as
@@ -159,7 +164,20 @@ def parsear(texto):
                 while j < len(linhas) and _e_percentual(linhas[j]):
                     pcts += _nums(linhas[j])
                     j += 1
-                n_cen += 1
+                crus.append((rotulo, pcts))
+                # Se a próxima linha reinicia uma pesquisa, sai do loop de cenários.
+                if j < len(linhas) and re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
+                    break
+
+            # Senador: mantém só a "1ª opção de voto" (escala ~100% da matriz).
+            # Fallback: se não achar rótulo de 1ª opção, mantém todos os cenários.
+            if cargo == "senador":
+                prim = [c for c in crus if re.search(r"1[ªaº°]\s*op[çc]", c[0], re.I)]
+                if prim:
+                    crus = prim
+
+            # A matriz rotula o cenário por número (1, 2, 3...), não pelo texto.
+            for n_cen, (rotulo, pcts) in enumerate(crus, start=1):
                 pesquisas.append({
                     "registro_tse": reg, "instituto": inst,
                     "data_campo": _data_iso(datas.group(2)) if datas else "", "modo": modo,
@@ -167,9 +185,6 @@ def parsear(texto):
                     "scenario_label": str(n_cen),
                     "colunas": colunas, "percentuais": pcts,
                 })
-                # Se a próxima linha reinicia uma pesquisa, sai do loop de cenários.
-                if j < len(linhas) and re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
-                    break
             i = j
         else:
             i += 1

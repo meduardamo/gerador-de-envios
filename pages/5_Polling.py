@@ -2532,7 +2532,7 @@ def render_colar():
                 st.error(str(e))
                 st.stop()
             disputa = _colar_disputa_da_url(url)
-            pesquisas = _colar_parsear(texto)
+            pesquisas = _colar_parsear(texto, cargo)
             if not pesquisas:
                 st.error("Não reconheci nenhuma pesquisa no texto. Confira se copiou a seção certa.")
             else:
