@@ -89,6 +89,18 @@ def _e_rotulo_cenario(linha):
         linha, re.I))
 
 
+def _e_linha_valores(l):
+    """Linha de percentuais de um cenário: só %, traços e espaços, com ao menos
+    um %. Traço ('-') = candidato ausente naquele cenário. Um inteiro solto (o
+    'nº de cenários' da próxima pesquisa) NÃO casa, porque não tem %."""
+    return bool(re.fullmatch(r"[\d.,%\s\-–—]+", l or "")) and "%" in (l or "")
+
+
+def _celulas(l):
+    """Tokeniza a linha de valores em células: cada % ou traço vira um token."""
+    return re.findall(r"[\d.,]+%|[-–—]", l or "")
+
+
 def parsear(texto, cargo=""):
     """Devolve lista de pesquisas: cada uma com metadados + lista de (candidato_partido, %).
 
@@ -96,98 +108,97 @@ def parsear(texto, cargo=""):
     voto' (a matriz usa escala de voto único ~100%; a soma 1º+2º ~200% e a 2ª
     opção quebrariam a média entre cenários)."""
     cargo = (cargo or "").strip().lower()
-    # Achata tabs em quebras de linha: o copy da tabela mistura os dois.
-    linhas = [l.strip() for l in re.split(r"[\t\n]", texto) if l.strip()]
+    # Divide SÓ por linha (mantém tabs/espaços dentro da linha): assim a linha de
+    # percentuais fica inteira e o inteiro solto do 'nº de cenários' não vira %.
+    linhas = [l.strip() for l in texto.split("\n") if l.strip()]
     pesquisas = []
+
+    def eh_inicio(k):
+        return (k + 2 < len(linhas) and re.fullmatch(r"\d+", linhas[k])
+                and REG.match(linhas[k + 2]))
+
     i = 0
     while i < len(linhas):
-        # Início de pesquisa: nº de cenários (dígito), instituto, registro.
-        if re.fullmatch(r"\d+", linhas[i]) and i + 2 < len(linhas) and REG.match(linhas[i + 2]):
-            inst, reg, j = linhas[i + 1], linhas[i + 2], i + 3
-            datas = re.search(r"(\d{2}/\d{2}/\d{4})\s+a\s+(\d{2}/\d{2}/\d{4})", linhas[j]) if j < len(linhas) else None
-            if datas:
-                j += 1
-            modo = linhas[j] if j < len(linhas) else ""
-            j += 1
-            if j < len(linhas) and linhas[j].startswith("("):
-                modo += " " + linhas[j]
-                j += 1
-            amostra = re.sub(r"\D", "", linhas[j]) if j < len(linhas) else ""
-            j += 1
-            margem, confianca = "", ""
-            if j < len(linhas):
-                m = re.match(r"±?([\d,]+)%\s*(?:\((\d+)%?\))?", linhas[j])
-                if m:
-                    margem = m.group(1).replace(",", ".")
-                    confianca = m.group(2) or ""
-                    j += 1
-            while j < len(linhas) and linhas[j].startswith(("CNPJ", "CPF")):
-                j += 1
-
-            # Cabeçalho de colunas: "Cenário<tab>cand1", depois (partido), cand2, ...
-            colunas = []
-            if j < len(linhas) and linhas[j].lower().startswith("cenário"):
-                resto = re.sub(r"^cenário\s*", "", linhas[j], flags=re.I).strip()
-                if resto:
-                    colunas.append(resto)
-                j += 1
-                while j < len(linhas):
-                    l = linhas[j]
-                    if l.startswith("(") and colunas:      # partido do candidato anterior
-                        colunas[-1] = colunas[-1] + " " + l
-                        j += 1
-                    elif _e_percentual(l):                  # chegou nos números: fim do cabeçalho
-                        break
-                    elif _e_rotulo_cenario(l):              # rótulo do 1º cenário: acabaram as colunas
-                        break
-                    else:
-                        # "Outros    Não Válido" às vezes vem numa linha só (espaços, não tab):
-                        # quebra em colunas separadas.
-                        partes = re.split(r"\s{2,}", l)
-                        colunas.extend(partes if len(partes) > 1 else [l])
-                        j += 1
-
-            # Coleta os cenários crus: rótulo do portal + percentuais.
-            crus = []
-            while j < len(linhas):
-                rotulo = ""
-                while j < len(linhas) and not _e_percentual(linhas[j]):
-                    if re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
-                        break  # é a próxima pesquisa
-                    rotulo = linhas[j]
-                    j += 1
-                if j >= len(linhas) or not _e_percentual(linhas[j]):
-                    break
-                # Junta linhas de percentuais consecutivas: o copy separa as
-                # células por TAB, e o split atomiza cada % numa linha própria.
-                pcts = []
-                while j < len(linhas) and _e_percentual(linhas[j]):
-                    pcts += _nums(linhas[j])
-                    j += 1
-                crus.append((rotulo, pcts))
-                # Se a próxima linha reinicia uma pesquisa, sai do loop de cenários.
-                if j < len(linhas) and re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
-                    break
-
-            # Senador: mantém só a "1ª opção de voto" (escala ~100% da matriz).
-            # Fallback: se não achar rótulo de 1ª opção, mantém todos os cenários.
-            if cargo == "senador":
-                prim = [c for c in crus if re.search(r"1[ªaº°]\s*op[çc]", c[0], re.I)]
-                if prim:
-                    crus = prim
-
-            # A matriz rotula o cenário por número (1, 2, 3...), não pelo texto.
-            for n_cen, (rotulo, pcts) in enumerate(crus, start=1):
-                pesquisas.append({
-                    "registro_tse": reg, "instituto": inst,
-                    "data_campo": _data_iso(datas.group(2)) if datas else "", "modo": modo,
-                    "amostra": amostra, "margem": margem, "confianca": confianca,
-                    "scenario_label": str(n_cen),
-                    "colunas": colunas, "percentuais": pcts,
-                })
-            i = j
-        else:
+        if not eh_inicio(i):
             i += 1
+            continue
+        inst, reg, j = linhas[i + 1], linhas[i + 2], i + 3
+
+        datas = (re.search(r"(\d{1,2}/\d{1,2}/\d{4})\s+a\s+(\d{1,2}/\d{1,2}/\d{4})", linhas[j])
+                 if j < len(linhas) else None)
+        data_fim = ""
+        if datas:
+            data_fim = _data_iso(datas.group(2))
+            j += 1
+        elif j < len(linhas) and re.search(r"\d{1,2}/\d{1,2}/\d{4}", linhas[j]):
+            data_fim = _data_iso(re.search(r"(\d{1,2}/\d{1,2}/\d{4})", linhas[j]).group(1))
+            j += 1
+
+        modo = linhas[j] if j < len(linhas) else ""
+        j += 1
+        if j < len(linhas) and linhas[j].startswith("("):
+            modo += " " + linhas[j]
+            j += 1
+        amostra = re.sub(r"\D", "", linhas[j]) if j < len(linhas) else ""
+        j += 1
+        margem, confianca = "", ""
+        if j < len(linhas):
+            m = re.match(r"±?([\d,]+)%\s*(?:\((\d+)%?\))?", linhas[j])
+            if m:
+                margem = m.group(1).replace(",", ".")
+                confianca = m.group(2) or ""
+                j += 1
+        while j < len(linhas) and linhas[j].startswith(("CNPJ", "CPF")):
+            j += 1
+
+        # Cabeçalho de colunas: "Cenário<tab>cand1<tab>cand2...", partido pode vir
+        # na linha de baixo entre parênteses.
+        colunas = []
+        if j < len(linhas) and linhas[j].lower().startswith("cenário"):
+            resto = re.sub(r"^cenário", "", linhas[j], flags=re.I).strip()
+            colunas += [c.strip() for c in re.split(r"\t", resto) if c.strip()]
+            j += 1
+            while j < len(linhas):
+                l = linhas[j]
+                if l.startswith("(") and colunas:      # partido do candidato anterior
+                    colunas[-1] = colunas[-1] + " " + l
+                    j += 1
+                elif _e_linha_valores(l) or _e_rotulo_cenario(l) or eh_inicio(j):
+                    break
+                else:
+                    colunas += [c.strip() for c in re.split(r"\t", l) if c.strip()]
+                    j += 1
+
+        # Cenários: cada um é (rótulo do portal) + uma linha de percentuais.
+        crus = []
+        while j < len(linhas) and not eh_inicio(j):
+            rotulo = ""
+            while j < len(linhas) and not _e_linha_valores(linhas[j]):
+                if eh_inicio(j):
+                    break
+                rotulo = linhas[j]
+                j += 1
+            if j >= len(linhas) or not _e_linha_valores(linhas[j]):
+                break
+            crus.append((rotulo, _celulas(linhas[j])))
+            j += 1
+
+        # Senador: mantém só a "1ª opção de voto" (escala ~100% da matriz).
+        # Fallback: se não achar rótulo de 1ª opção, mantém todos os cenários.
+        if cargo == "senador":
+            prim = [c for c in crus if re.search(r"1[ªaº°]\s*op[çc]", c[0], re.I)]
+            if prim:
+                crus = prim
+
+        # A matriz rotula o cenário por número (1, 2, 3...), não pelo texto.
+        for n_cen, (rotulo, cells) in enumerate(crus, start=1):
+            pesquisas.append({
+                "registro_tse": reg, "instituto": inst, "data_campo": data_fim,
+                "modo": modo, "amostra": amostra, "margem": margem,
+                "confianca": confianca, "scenario_label": str(n_cen),
+                "colunas": colunas, "percentuais": cells,
+            })
+        i = j
     return pesquisas
 
 
@@ -235,6 +246,10 @@ def montar(pesquisas, ano, uf, cargo, turno, fonte_url, disputa=""):
             "metodologia": obter_metodologia(instituto), "origem": ORIGEM_COLAR,
         })
         for col, pct in zip(cols, pcts):
+            # traço = candidato ausente naquele cenário; não vira linha (a média
+            # entre cenários ignora ausência, não conta como zero).
+            if str(pct).strip() in ("-", "–", "—"):
+                continue
             bruto = col.strip()
             mp = re.search(r"\(([^)]+)\)\s*$", bruto)
             partido = normalizar_partido(mp.group(1)) if mp else ""
@@ -242,7 +257,7 @@ def montar(pesquisas, ano, uf, cargo, turno, fonte_url, disputa=""):
             tipo = _tipo(nome)
             candidato_partido = nome if tipo == "nao_valido" else (f"{nome} ({partido})" if partido else nome)
             try:
-                percentual = round(float(str(pct).replace(",", ".")), 1)
+                percentual = round(float(str(pct).replace("%", "").replace(",", ".")), 1)
             except (ValueError, TypeError):
                 percentual = None
             linhas_r.append({
