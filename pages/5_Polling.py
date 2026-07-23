@@ -2456,7 +2456,27 @@ def render_manual():
 # ══════════════════════════════════════════════════════════════════════════════
 # Polling Colar — cadastra colando o texto da tela do PollingData (sem PDF/Gemini)
 # ══════════════════════════════════════════════════════════════════════════════
-from polling_colar_core import parsear as _colar_parsear, montar as _colar_montar, _cargo_uf_turno as _colar_cargo_uf_turno
+from polling_colar_core import (parsear as _colar_parsear, montar as _colar_montar,
+                                _cargo_uf_turno as _colar_cargo_uf_turno,
+                                _disputa_da_url as _colar_disputa_da_url)
+
+# Modo teste: grava nas abas _novas em vez das de produção, sem rebuild de BI.
+MODO_TESTE_COLAR = True
+ABA_TESTE_PESQUISAS = "pesquisas_novas"
+ABA_TESTE_RESULTADOS = "resultados_novos"
+
+
+def _colar_gravar_teste(gc, sheet_id, df_p, df_r):
+    """Anexa os DataFrames nas abas de teste, alinhando ao cabeçalho existente."""
+    for aba, df in ((ABA_TESTE_PESQUISAS, df_p), (ABA_TESTE_RESULTADOS, df_r)):
+        ws = gc.open_by_key(sheet_id).worksheet(aba)
+        header = ws.row_values(1) or list(df.columns)
+        if not ws.row_values(1):
+            ws.update([header], "A1")
+        linhas = [["" if r.get(c, "") is None else str(r.get(c, "")) for c in header]
+                  for _, r in df.iterrows()]
+        if linhas:
+            ws.append_rows(linhas, value_input_option="RAW")
 
 
 def _colar_registros_existentes(gc, sheet_id):
@@ -2476,7 +2496,7 @@ def _colar_registros_existentes(gc, sheet_id):
 
 
 def render_colar():
-    st.markdown('<div class="ge-hero"><div class="ge-hero-title">Polling Colar</div></div>',
+    st.markdown('<div class="ge-hero"><div class="ge-hero-title">Colar Pesquisa</div></div>',
                 unsafe_allow_html=True)
     st.caption("Cola o texto do PollingData e grava nas mesmas abas do Polling Manual. "
                "Sem PDF, sem Gemini, sem raspagem.")
@@ -2511,11 +2531,13 @@ def render_colar():
             except SystemExit as e:
                 st.error(str(e))
                 st.stop()
+            disputa = _colar_disputa_da_url(url)
             pesquisas = _colar_parsear(texto)
             if not pesquisas:
                 st.error("Não reconheci nenhuma pesquisa no texto. Confira se copiou a seção certa.")
             else:
-                lp, lr, avisos = _colar_montar(pesquisas, ano, uf, cargo, turno, url.strip())
+                lp, lr, avisos = _colar_montar(pesquisas, ano, uf, cargo, turno, url.strip(),
+                                               disputa=disputa)
                 st.session_state["colar_resultado"] = {
                     "linhas_p": lp, "linhas_r": lr, "avisos": avisos, "turno": turno}
 
@@ -2553,9 +2575,19 @@ def render_colar():
                 + ". Cenário idêntico não duplica; cenário novo do mesmo registro é adicionado.</div>"
             )
             st.markdown(msg_rep, unsafe_allow_html=True)
-    if st.button(f"Gravar na {nome_destino}", use_container_width=True, key="colar_gravar"):
+    rotulo_botao = (f"[TESTE] Gravar nas abas _novas da {nome_destino}"
+                    if MODO_TESTE_COLAR else f"Gravar na {nome_destino}")
+    if st.button(rotulo_botao, use_container_width=True, key="colar_gravar"):
         if not gc:
             st.error("Credenciais do Google Sheets não encontradas.")
+        elif MODO_TESTE_COLAR:
+            with st.spinner(f"[TESTE] Gravando em {ABA_TESTE_PESQUISAS} / {ABA_TESTE_RESULTADOS}..."):
+                _colar_gravar_teste(gc, sheet_id, pd.DataFrame(res["linhas_p"]),
+                                    pd.DataFrame(res["linhas_r"]))
+            st.success(f"[MODO TESTE] {len(res['linhas_p'])} pesquisa(s) e "
+                       f"{len(res['linhas_r'])} resultado(s) nas abas _novas da {nome_destino}. "
+                       f"Nada gravado na produção.")
+            st.session_state.pop("colar_resultado", None)
         else:
             with st.spinner("Gravando nas abas pesquisas / resultados..."):
                 salvar_tudo(gc, sheet_id, pd.DataFrame(res["linhas_p"]), pd.DataFrame(res["linhas_r"]))
@@ -2565,7 +2597,7 @@ def render_colar():
 
 
 # ── página: uma só, com as duas abas ──────────────────────────────────────────
-_tab_manual, _tab_colar = st.tabs(["Polling Manual", "Polling Colar"])
+_tab_manual, _tab_colar = st.tabs(["Polling Manual", "Colar Pesquisa"])
 with _tab_manual:
     render_manual()
 with _tab_colar:

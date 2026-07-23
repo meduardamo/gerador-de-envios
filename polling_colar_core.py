@@ -52,6 +52,17 @@ def _cargo_uf_turno(url):
     return int(m.group(1)), m.group(2), m.group(3).upper(), m.group(4)
 
 
+def _disputa_da_url(url):
+    """Slug do confronto de 2º turno na URL (t2_lula-zema -> 't2_lula-zema').
+    Só vale no t2; no t1 fica vazio, senão serrilha a média móvel."""
+    m = re.search(r"/(?:presidente|governador|senador)/[a-z]{2}/(t\d)_([a-z0-9-]+)",
+                  url.lower())
+    if not m:
+        return ""
+    turno, slug = m.group(1), m.group(2)
+    return f"{turno}_{slug}" if turno == "t2" else ""
+
+
 def _e_percentual(linha):
     return bool(re.fullmatch(r"[\d.,%\s]+", linha)) and re.search(r"\d", linha)
 
@@ -143,7 +154,7 @@ def parsear(texto):
     return pesquisas
 
 
-def montar(pesquisas, ano, uf, cargo, turno, fonte_url):
+def montar(pesquisas, ano, uf, cargo, turno, fonte_url, disputa=""):
     """Constrói linhas no MESMO schema do Polling Manual, usando os helpers do
     core (poll_id, classificação, metodologia, normalização de nome/partido/%).
 
@@ -169,7 +180,7 @@ def montar(pesquisas, ano, uf, cargo, turno, fonte_url):
         # Mesma identidade do Polling Manual: registro entra no poll_id; sem
         # block_hash na chave pública (só compat).
         poll_id = gerar_poll_id(uf, instituto, registro, data_campo, cargo, turno, "",
-                                disputa="", exigir_registro=False)
+                                disputa=disputa, exigir_registro=False)
         scenario_id = gerar_scenario_id(poll_id, p["scenario_label"])
         if scenario_id in vistos:
             avisos.append(f"{registro} / {p['scenario_label']}: cenário duplicado no texto colado")
@@ -178,7 +189,7 @@ def montar(pesquisas, ano, uf, cargo, turno, fonte_url):
 
         linhas_p.append({
             "scenario_id": scenario_id, "poll_id": poll_id, "ano": ano, "uf": uf,
-            "cargo": cargo, "turno": turno, "disputa": "",
+            "cargo": cargo, "turno": turno, "disputa": disputa,
             "instituto": instituto, "classificacao_instituto": classificar_instituto(instituto),
             "registro_tse": registro, "data_campo": data_campo, "modo": p["modo"],
             "amostra": p["amostra"], "margem_erro": p["margem"], "confianca": p["confianca"],
@@ -199,7 +210,7 @@ def montar(pesquisas, ano, uf, cargo, turno, fonte_url):
                 percentual = None
             linhas_r.append({
                 "scenario_id": scenario_id, "poll_id": poll_id, "ano": ano, "uf": uf,
-                "cargo": cargo, "turno": turno, "disputa": "", "data_campo": data_campo,
+                "cargo": cargo, "turno": turno, "disputa": disputa, "data_campo": data_campo,
                 "instituto": instituto, "classificacao_instituto": classificar_instituto(instituto),
                 "registro_tse": registro, "scenario_label": p["scenario_label"],
                 "candidato": nome, "partido": partido, "candidato_partido": candidato_partido,
