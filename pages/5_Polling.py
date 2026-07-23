@@ -1774,6 +1774,11 @@ def render_manual():
         # (aqui no topo) força o campo vazio de fato.
         st.session_state["polling_manual_texto_fonte"] = ""
         st.session_state["polling_manual_url_original"] = ""
+        # Zera também a aba Colar Pesquisa (roda antes dos widgets dela, que são
+        # criados em render_colar depois deste render_manual).
+        st.session_state["colar_url"] = ""
+        st.session_state["colar_texto"] = ""
+        st.session_state.pop("colar_resultado", None)
         st.session_state["polling_manual_flash"] = "Tudo limpo. Cole ou carregue uma nova pesquisa."
 
     # A troca de pesquisa precisa começar com controles limpos. Esta seção roda
