@@ -75,6 +75,12 @@ def _tipo(nome):
     return "nao_valido" if re.sub(r"\s+", " ", nome.strip().lower()) in NAO_VALIDO else "candidato"
 
 
+def _data_iso(d):
+    """DD/MM/YYYY (formato do flex) -> YYYY-MM-DD (convenção da matriz)."""
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", (d or "").strip())
+    return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}" if m else (d or "").strip()
+
+
 def _e_rotulo_cenario(linha):
     """Rótulo de cenário (ex.: 'Intenção de voto (estimulada) para Senado ...'),
     para separá-lo das colunas de candidato."""
@@ -137,13 +143,14 @@ def parsear(texto):
                         j += 1
 
             # Um ou mais cenários: (rótulo) seguido da(s) linha(s) de percentuais.
+            # A matriz rotula o cenário por número (1, 2, 3...), não pelo texto do
+            # portal, então numeramos na ordem em que aparecem nesta pesquisa.
+            n_cen = 0
             while j < len(linhas):
-                rotulo = None
                 while j < len(linhas) and not _e_percentual(linhas[j]):
                     if re.fullmatch(r"\d+", linhas[j]) and j + 2 < len(linhas) and REG.match(linhas[j + 2]):
                         break  # é a próxima pesquisa
-                    rotulo = linhas[j]
-                    j += 1
+                    j += 1  # pula o rótulo descritivo do portal
                 if j >= len(linhas) or not _e_percentual(linhas[j]):
                     break
                 # Junta linhas de percentuais consecutivas: o copy separa as
@@ -152,11 +159,12 @@ def parsear(texto):
                 while j < len(linhas) and _e_percentual(linhas[j]):
                     pcts += _nums(linhas[j])
                     j += 1
+                n_cen += 1
                 pesquisas.append({
                     "registro_tse": reg, "instituto": inst,
-                    "data_campo": datas.group(2) if datas else "", "modo": modo,
+                    "data_campo": _data_iso(datas.group(2)) if datas else "", "modo": modo,
                     "amostra": amostra, "margem": margem, "confianca": confianca,
-                    "scenario_label": rotulo or "Cenário 01",
+                    "scenario_label": str(n_cen),
                     "colunas": colunas, "percentuais": pcts,
                 })
                 # Se a próxima linha reinicia uma pesquisa, sai do loop de cenários.
