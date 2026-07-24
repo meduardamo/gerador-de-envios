@@ -168,10 +168,16 @@ def parsear(texto, cargo=""):
             j += 1
             while j < len(linhas):
                 l = linhas[j]
+                proximo_e_valores = (j + 1 < len(linhas)
+                                     and _e_linha_valores(linhas[j + 1]))
                 if l.startswith("(") and colunas:      # partido do candidato anterior
                     colunas[-1] = colunas[-1] + " " + l
                     j += 1
-                elif _e_linha_valores(l) or _e_rotulo_cenario(l) or eh_inicio(j):
+                elif (_e_linha_valores(l) or _e_rotulo_cenario(l) or eh_inicio(j)
+                      or (not l.startswith("(") and proximo_e_valores)):
+                    # a última condição: uma linha seguida direto pela linha de
+                    # percentuais é o rótulo do 1º cenário, não uma coluna (pega
+                    # rótulos sem palavra-chave, ex.: "Governador (Pergunta 10...)")
                     break
                 else:
                     colunas += [c.strip() for c in re.split(r"\t", l) if c.strip()]
