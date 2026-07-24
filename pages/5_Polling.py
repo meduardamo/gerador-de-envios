@@ -2466,7 +2466,7 @@ from polling_colar_core import (parsear as _colar_parsear, montar as _colar_mont
                                 _disputa_da_url as _colar_disputa_da_url)
 
 # Modo teste: grava nas abas _novas em vez das de produção, sem rebuild de BI.
-MODO_TESTE_COLAR = True
+MODO_TESTE_COLAR = False
 ABA_TESTE_PESQUISAS = "pesquisas_novas"
 ABA_TESTE_RESULTADOS = "resultados_novos"
 
