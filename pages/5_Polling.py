@@ -2550,8 +2550,10 @@ def render_colar():
     if not res:
         return
     st.markdown('<div class="ge-rule">Revisão</div>', unsafe_allow_html=True)
-    st.write(f"**{len(res['linhas_p'])} pesquisa(s)** · **{len(res['linhas_r'])} resultado(s)** · "
-             f"vai pra Matriz **{res['turno'].upper()}**")
+    n_pesquisas = len({p.get("poll_id") for p in res["linhas_p"]})  # registros únicos
+    n_cenarios = len(res["linhas_p"])                               # 1 linha por cenário
+    st.write(f"**{n_pesquisas} pesquisa(s)** · **{n_cenarios} cenário(s)** · "
+             f"**{len(res['linhas_r'])} resultado(s)** · vai pra Matriz **{res['turno'].upper()}**")
     for aviso in res["avisos"]:
         st.markdown(f'<div class="ge-alerta-cenario">⚠️ {aviso}</div>', unsafe_allow_html=True)
 
@@ -2589,7 +2591,7 @@ def render_colar():
             with st.spinner(f"[TESTE] Gravando em {ABA_TESTE_PESQUISAS} / {ABA_TESTE_RESULTADOS}..."):
                 _colar_gravar_teste(gc, sheet_id, pd.DataFrame(res["linhas_p"]),
                                     pd.DataFrame(res["linhas_r"]))
-            st.success(f"[MODO TESTE] {len(res['linhas_p'])} pesquisa(s) e "
+            st.success(f"[MODO TESTE] {len(res['linhas_p'])} cenário(s) e "
                        f"{len(res['linhas_r'])} resultado(s) nas abas _novas da {nome_destino}. "
                        f"Nada gravado na produção.")
             st.session_state.pop("colar_resultado", None)
