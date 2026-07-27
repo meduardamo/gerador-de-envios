@@ -305,9 +305,11 @@ def gerar_grafico_pesquisa(
     # Geometria dos dois modos do eixo X. Girado, o rótulo desce e vai PRA
     # ESQUERDA do próprio tique, então a margem esquerda abre junto, senão o
     # primeiro nome sai da figura.
-    RETO = (0.07, 0.17, 0.62)
-    GIRADO = (0.115, 0.32, 0.47)
-    esquerda, base, altura = (0.26, 0.17, 0.62) if not vertical else RETO
+    # A altura sobe até 0.83 porque não há mais legenda ocupando a faixa abaixo
+    # do título.
+    RETO = (0.07, 0.17, 0.66)
+    GIRADO = (0.115, 0.32, 0.51)
+    esquerda, base, altura = (0.26, 0.17, 0.66) if not vertical else RETO
     ax = fig.add_axes([esquerda, base, 0.955 - esquerda, altura])
     ax.set_facecolor(GELO)
 
@@ -388,19 +390,9 @@ def gerar_grafico_pesquisa(
     fig.text(0.5, 0.93, titulo, ha="center", va="center", fontfamily=familia,
              fontsize=17, fontweight="bold", color=MARINHO)
 
-    # Legenda só quando as duas cores aparecem: com uma cor só, ela não informa.
-    # Fica abaixo do título, na horizontal: ali não briga com barra alta nem
-    # depende da escala escolhida.
-    if invalidos and candidatos:
-        from matplotlib.patches import Patch
-        ax.legend(
-            handles=[Patch(facecolor=VINHO, label="Candidatos"),
-                     Patch(facecolor=VINHO_CLARO, label="Brancos, nulos e indecisos")],
-            loc="lower center", bbox_to_anchor=(0.5, 1.005), ncol=2,
-            frameon=False, prop={"family": familia, "size": 9.5},
-            labelcolor=SUBTEXTO, handlelength=1.1, handleheight=1.1,
-            borderpad=0, columnspacing=1.8,
-        )
+    # Sem legenda de propósito. A cor mais clara distingue branco/nulo/indeciso,
+    # mas quem diz o que a barra é já é o rótulo do eixo ("Brancos e nulos",
+    # "Indecisos"): a legenda só repetia o que estava escrito ali embaixo.
 
     if rodape:
         _desenhar_rodape(fig, rodape, familia)

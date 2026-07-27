@@ -13,6 +13,8 @@ tira do caminho a alucinação de percentual e de registro TSE.
 """
 
 import re
+import urllib.request
+from urllib.parse import quote, urlparse
 
 REGRAS_POLITICOS = (
     "Formatação de políticos (obrigatório):\n"
@@ -166,3 +168,27 @@ def compilar_alerta_pesquisa(texto: str, titulo: str, uf: str = "",
     if (link or "").strip():
         partes += ["", f"Link: {link.strip()}"]
     return "\n".join(partes)
+
+
+# ── link ─────────────────────────────────────────────────────────────────────
+
+def normalizar_link(raw: str) -> str | None:
+    s = (raw or "").strip()
+    if not s:
+        return None
+    if not re.match(r"^https?://", s, flags=re.IGNORECASE):
+        s = "https://" + s
+    p = urlparse(s)
+    if p.scheme not in ("http", "https") or not p.netloc:
+        return None
+    return s
+
+def encurtar_link(url: str) -> str:
+    if not url:
+        return url
+    try:
+        api_url = f"http://tinyurl.com/api-create.php?url={quote(url)}"
+        with urllib.request.urlopen(api_url, timeout=5) as resp:
+            return resp.read().decode()
+    except Exception:
+        return url

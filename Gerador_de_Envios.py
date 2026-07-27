@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime
-from urllib.parse import quote, urlparse
-import urllib.request
+from urllib.parse import quote
 import os
 import re
 import json
@@ -21,7 +20,12 @@ import streamlit_authenticator as stauth
 
 import fitz  # PyMuPDF
 
-from alerta_pesquisa_core import REGRAS_POLITICOS, _instrucao_pesquisa_eleitoral
+from alerta_pesquisa_core import (
+    REGRAS_POLITICOS,
+    _instrucao_pesquisa_eleitoral,
+    encurtar_link,
+    normalizar_link,
+)
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Gerador de Envios", layout="wide")
@@ -411,26 +415,6 @@ def limpar_prefixo_alerta_envio(resumo: str) -> str:
     s = re.sub(r"^(ALERTA|ENVIO)\s*(?:[-–—]|:)\s*", "", s, flags=re.IGNORECASE)
     return s.strip()
 
-def normalizar_link(raw: str) -> str | None:
-    s = (raw or "").strip()
-    if not s:
-        return None
-    if not re.match(r"^https?://", s, flags=re.IGNORECASE):
-        s = "https://" + s
-    p = urlparse(s)
-    if p.scheme not in ("http", "https") or not p.netloc:
-        return None
-    return s
-
-def encurtar_link(url: str) -> str:
-    if not url:
-        return url
-    try:
-        api_url = f"http://tinyurl.com/api-create.php?url={quote(url)}"
-        with urllib.request.urlopen(api_url, timeout=5) as resp:
-            return resp.read().decode()
-    except Exception:
-        return url
 
 def gerar_resumo_seguro(resp) -> str:
     texto = limpar_prefixo_alerta_envio((getattr(resp, "text", "") or "").strip())

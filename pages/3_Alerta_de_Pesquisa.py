@@ -44,7 +44,9 @@ from polling_extracao_core import (
 from polling_manual_core import normalizar_nome_candidato, normalizar_partido
 from alerta_pesquisa_core import (
     compilar_alerta_pesquisa,
+    encurtar_link,
     gerar_texto_alerta_pesquisa,
+    normalizar_link,
 )
 from graficos_pesquisa_core import (
     ESCALAS_EXPORT,
@@ -205,6 +207,14 @@ def _limpar(limpar_fonte: bool = False):
         st.session_state.pop(chave, None)
     for chave in [k for k in st.session_state if k.startswith("alerta_item_")]:
         st.session_state.pop(chave, None)
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _link_curto(url: str) -> str:
+    """Encurta no TinyURL, igual ao Gerador de Envios. Em cache porque a prévia
+    do envio é remontada a cada interação da página, e sem isso cada clique
+    viraria uma chamada de rede."""
+    return encurtar_link(url)
 
 
 def _processar_pdf(pdf_bytes: bytes, modo: str, paginas: list[int]) -> str:
@@ -526,12 +536,22 @@ with aba_alerta:
                 link_alerta = st.text_input("Link",
                                             st.session_state.get("alerta_url") or "",
                                             key="alerta_link_envio")
+                encurtar = st.checkbox("Encurtar o link", True, key="alerta_encurtar",
+                                       help="Passa pelo TinyURL, igual ao Gerador "
+                                            "de Envios")
+
+            link_final = normalizar_link(link_alerta or "")
+            if link_alerta.strip() and not link_final:
+                st.warning("O link parece inválido. Cole uma URL completa (http/https).")
+            if link_final and encurtar:
+                link_final = _link_curto(link_final)
+
             with col_prev:
                 st.caption("Prévia do envio")
                 st.code(compilar_alerta_pesquisa(
                     texto, titulo_alerta,
                     uf=(cenario_final.get("uf") or payload.get("uf") or ""),
-                    link=link_alerta,
+                    link=link_final or "",
                     data_envio=datetime.now(BRT).strftime("%d/%m/%Y"),
                 ), language=None)
         else:
