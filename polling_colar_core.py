@@ -304,6 +304,6 @@ def _revisar(linhas_p, linhas_r, avisos):
             print("   ", a)
 
 
-# A gravação nas matrizes e a UI ficam na página Streamlit (7_Polling_Colar.py),
+# A gravação nas matrizes e a UI ficam na página Streamlit (a aba Colar Pesquisa de pages/2_Polling.py),
 # que reusa o cliente de Sheets e o destino T1/T2 do Polling Manual. Aqui só o
 # parser puro, testável sem Streamlit.

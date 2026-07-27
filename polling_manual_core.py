@@ -1,7 +1,7 @@
 """Núcleo do Polling Manual.
 
 Concentra as regras de normalização, identificação, persistência e BI usadas
-pela página ``5_Polling_Manual.py``. A coleta automática do PollingData
+pela página ``pages/2_Polling.py``. A coleta automática do PollingData
 pertence ao repositório ``eixo-eleicoes``.
 """
 

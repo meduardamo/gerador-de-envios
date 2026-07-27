@@ -2,7 +2,7 @@
 Extração de pesquisa eleitoral (texto ou PDF) para o payload estruturado que o
 Polling Manual e o Alerta de Pesquisa consomem.
 
-Saiu de pages/5_Polling.py para virar código único: as armadilhas já validadas
+Saiu de pages/2_Polling.py para virar código único: as armadilhas já validadas
 contra PDF real (senador nunca tem t2, cargo/turno por cenário, coluna
 "Porcentual" vs "Porcentagem válida", confiança só quando declarada na fonte)
 valem para as duas páginas. Corrigir o prompt aqui conserta as duas.
