@@ -115,16 +115,38 @@ def _quebrar(texto: str, limite: int = 12) -> str:
     return "\n".join(linhas)
 
 
+def _desenhar_rodape(fig, texto: str, familia: str) -> None:
+    """Ficha técnica em UMA linha, encolhendo a fonte até caber.
+
+    Quebrar em duas linhas afasta o rodapé do eixo e desequilibra a peça, então
+    a largura manda: mede o texto de verdade e reduz o corpo até entrar. Só se
+    não couber nem no menor corpo é que quebra.
+    """
+    esquerda, direita = 0.045, 0.955
+    alvo = fig.text(esquerda, 0.045, texto, ha="left", va="center",
+                    fontfamily=familia, fontsize=8.5, color=SUBTEXTO)
+    for corpo in (8.5, 8.0, 7.5, 7.0, 6.5, 6.0):
+        alvo.set_fontsize(corpo)
+        fig.canvas.draw()
+        largura = alvo.get_window_extent().width / fig.bbox.width
+        if largura <= (direita - esquerda):
+            return
+    # Ficha muito longa (instituto de nome comprido + tudo preenchido): aí sim
+    # quebra, já no menor corpo.
+    alvo.set_text(_quebrar_rodape(texto, orcamento=118))
+    alvo.set_linespacing(1.6)
+
+
 def _quebrar_rodape(texto: str, orcamento: int = 96) -> str:
     """Quebra a ficha técnica nos separadores ' | ', respeitando um orçamento de
     caracteres por linha. Sem isso o rodapé atravessa a figura e passa por baixo
     da logo (o wrap do matplotlib usa a largura cheia e ignora a logo)."""
     if not texto:
         return ""
-    blocos = texto.split("  |  ")
+    blocos = texto.split(" | ")
     linhas, atual = [], ""
     for bloco in blocos:
-        teste = f"{atual}  |  {bloco}" if atual else bloco
+        teste = f"{atual} | {bloco}" if atual else bloco
         if len(teste) <= orcamento or not atual:
             atual = teste
         else:
@@ -188,6 +210,8 @@ def _px_em_dados(ax, px: float) -> tuple[float, float]:
 
 
 def _colocar_logo(fig, caminho: str) -> None:
+    """Canto superior direito, na altura do título. Embaixo ela disputava espaço
+    com a ficha técnica, que é a linha mais larga do gráfico."""
     if not caminho or not os.path.exists(caminho):
         return
     try:
@@ -195,9 +219,10 @@ def _colocar_logo(fig, caminho: str) -> None:
     except Exception:
         return
     altura, largura = imagem.shape[0], imagem.shape[1]
-    larg_fig = 0.115                       # fração da largura da figura
+    larg_fig = 0.10                        # fração da largura da figura
     alt_fig = larg_fig * (altura / largura) * (LARGURA_PX / ALTURA_PX)
-    eixo = fig.add_axes([0.955 - larg_fig, 0.025, larg_fig, alt_fig], zorder=5)
+    eixo = fig.add_axes([0.955 - larg_fig, 0.945 - alt_fig, larg_fig, alt_fig],
+                        zorder=5)
     eixo.imshow(imagem)
     eixo.axis("off")
 
@@ -367,8 +392,7 @@ def gerar_grafico_pesquisa(
         )
 
     if rodape:
-        fig.text(0.045, 0.06, _quebrar_rodape(rodape), ha="left", va="center",
-                 fontfamily=familia, fontsize=8.5, color=SUBTEXTO, linespacing=1.6)
+        _desenhar_rodape(fig, rodape, familia)
 
     if incluir_logo:
         _colocar_logo(fig, caminho_logo or LOGO_PADRAO)
@@ -440,7 +464,7 @@ def rodape_padrao(payload: dict) -> str:
         partes.append(f"Nível de confiança: {_num(p['confianca'])}%")
     if str(p.get("registro_tse") or "").strip():
         partes.append(f"Reg. TSE: {str(p['registro_tse']).strip()}")
-    return "  |  ".join(partes)
+    return " | ".join(partes)
 
 
 def slug_arquivo(payload: dict, cenario: dict | None = None,
