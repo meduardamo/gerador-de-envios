@@ -202,6 +202,17 @@ def _path_barra(x0, x1, y0, y1, raio_x, raio_y, vertical: bool) -> Path:
     return Path(vertices, codigos)
 
 
+def _rotulos_x_colidem(fig, ax, respiro_px: float = 6.0) -> bool:
+    """Algum nome no eixo X encosta no vizinho?
+
+    Contar candidato não resolve: o que colide é o comprimento do nome. Mede a
+    caixa de cada rótulo já renderizado e compara com a do vizinho.
+    """
+    fig.canvas.draw()
+    caixas = [t.get_window_extent() for t in ax.get_xticklabels() if t.get_text()]
+    return any(a.x1 + respiro_px > b.x0 for a, b in zip(caixas, caixas[1:]))
+
+
 def _px_em_dados(ax, px: float) -> tuple[float, float]:
     """Converte px de tela em unidades de dado nos dois eixos, pra ponta
     arredondada sair redonda de verdade e não oval."""
@@ -291,19 +302,12 @@ def gerar_grafico_pesquisa(
     fig.patch.set_facecolor(GELO)
     vertical = orientacao == "vertical"
 
-    # Disputa com muito candidato (RJ 2026 teve 12 linhas) não cabe com o nome
-    # deitado: a 850px, cada fatia sobra com ~60px e os nomes se sobrepõem.
-    # Acima de 7, o rótulo gira e a base do gráfico sobe pra abrir espaço.
-    girar_rotulos = vertical and len(ordenados) > 7
-
-    # Girado, o rótulo desce e vai PRA ESQUERDA do próprio tique, então o
-    # primeiro nome sai da figura se a margem esquerda não abrir junto.
-    if not vertical:
-        esquerda, base, altura = 0.26, 0.17, 0.62
-    elif girar_rotulos:
-        esquerda, base, altura = 0.115, 0.32, 0.47
-    else:
-        esquerda, base, altura = 0.07, 0.17, 0.62
+    # Geometria dos dois modos do eixo X. Girado, o rótulo desce e vai PRA
+    # ESQUERDA do próprio tique, então a margem esquerda abre junto, senão o
+    # primeiro nome sai da figura.
+    RETO = (0.07, 0.17, 0.62)
+    GIRADO = (0.115, 0.32, 0.47)
+    esquerda, base, altura = (0.26, 0.17, 0.62) if not vertical else RETO
     ax = fig.add_axes([esquerda, base, 0.955 - esquerda, altura])
     ax.set_facecolor(GELO)
 
@@ -323,12 +327,7 @@ def gerar_grafico_pesquisa(
         ax.set_yticks(marcas)
         ax.set_yticklabels(rotulos_marcas)
         ax.set_xticks(posicoes)
-        if girar_rotulos:
-            # Girado, o nome fica em UMA linha: quebra mais rotação vira serrote.
-            ax.set_xticklabels(rotulos, rotation=32, ha="right",
-                               rotation_mode="anchor")
-        else:
-            ax.set_xticklabels([_quebrar(r) for r in rotulos])
+        ax.set_xticklabels([_quebrar(r) for r in rotulos])
         ax.grid(axis="y", color=SUBTEXTO, alpha=0.28, linewidth=0.8,
                 linestyle=(0, (2, 4)), zorder=0)
     else:
@@ -351,7 +350,18 @@ def gerar_grafico_pesquisa(
     for rotulo in (ax.get_xticklabels() if vertical else ax.get_yticklabels()):
         rotulo.set_color(TINTA)
 
-    # O raio só existe depois que os eixos têm escala definida.
+    # Girar ou não é decidido MEDINDO, não contando candidato. Quem causa
+    # colisão é o comprimento do nome: "Coronel Busnello (MISSAO)" encosta no
+    # vizinho já com 7 barras, enquanto sete nomes curtos cabem folgados.
+    if vertical and _rotulos_x_colidem(fig, ax):
+        esquerda, base, altura = GIRADO
+        ax.set_position([esquerda, base, 0.955 - esquerda, altura])
+        # Girado o nome fica em UMA linha: quebra mais rotação vira serrote.
+        ax.set_xticklabels(rotulos, rotation=32, ha="right",
+                           rotation_mode="anchor", fontfamily=familia,
+                           color=TINTA, fontsize=corpo_rotulo)
+
+    # O raio só existe depois que os eixos têm posição e escala definitivas.
     fig.canvas.draw()
     raio_x, raio_y = _px_em_dados(ax, RAIO_PONTA_PX)
 
