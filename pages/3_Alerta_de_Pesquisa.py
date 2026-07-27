@@ -47,7 +47,9 @@ from alerta_pesquisa_core import (
     gerar_texto_alerta_pesquisa,
 )
 from graficos_pesquisa_core import (
+    ESCALAS_EXPORT,
     gerar_grafico_pesquisa,
+    resolucao,
     montserrat_disponivel,
     rodape_padrao,
     slug_arquivo,
@@ -197,7 +199,8 @@ CHAVES_PESQUISA = ("alerta_payload", "alerta_texto", "alerta_png", "alerta_cenar
 def _limpar(limpar_fonte: bool = False):
     alvos = list(CHAVES_PESQUISA)
     if limpar_fonte:
-        alvos += ["alerta_texto_fonte", "alerta_url", "alerta_pdf"]
+        alvos += ["alerta_texto_fonte", "alerta_texto_pendente", "alerta_url",
+                  "alerta_pdf"]
     for chave in alvos:
         st.session_state.pop(chave, None)
     for chave in [k for k in st.session_state if k.startswith("alerta_item_")]:
@@ -232,13 +235,11 @@ with st.sidebar:
         'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
-        'Cole a pesquisa ou suba o PDF do instituto <strong>uma vez</strong> e '
-        'saia com as duas peças: o <strong>gráfico em PNG</strong>, no padrão '
-        'visual da casa, e o <strong>texto do alerta</strong> pro WhatsApp.'
+        'Cole a pesquisa ou suba o PDF do instituto e gere o '
+        '<strong>gráfico</strong> e o <strong>texto do alerta</strong>.'
         '</p></div>',
         unsafe_allow_html=True,
     )
-    st.caption("Não grava nada nas matrizes. Para cadastrar a pesquisa, use o Polling.")
     if not montserrat_disponivel():
         st.warning("Montserrat não encontrada em fontes/. O gráfico sai fora da "
                    "tipografia da casa.")
@@ -255,228 +256,284 @@ with st.sidebar:
         authenticator.logout("Sair", "sidebar")
 
 
-# ── 1. fonte ──────────────────────────────────────────────────────────────────
+# ── abas ──────────────────────────────────────────────────────────────────────
+# Os quatro passos são abas, e não uma coluna só: a revisão de uma disputa
+# grande passa de 12 linhas de formulário, e empilhado com o resto exige rolar
+# a página inteira pra conferir um número. Como as abas do Streamlit renderizam
+# tudo no mesmo run, o estado corre entre elas por variável comum — por isso
+# nenhuma etapa usa st.stop(), que mataria as abas seguintes.
 
-st.markdown('<div class="ge-rule">1. Dados da pesquisa</div>', unsafe_allow_html=True)
+aba_dados, aba_revisao, aba_grafico, aba_alerta = st.tabs(
+    ["1. Dados", "2. Revisão", "3. Gráfico", "4. Alerta"])
 
-col_txt, col_cfg = st.columns([2, 1])
 
-with col_txt:
-    texto_fonte = st.text_area(
-        "Texto da notícia, release ou PDF lido",
-        key="alerta_texto_fonte", height=210,
-        placeholder="Cole aqui o material da pesquisa…",
-    )
-    url_original = st.text_input("Link da fonte (opcional)", key="alerta_url")
+with aba_dados:
+    # O Streamlit proíbe escrever na chave de um widget depois que ele existe, e
+    # a leitura do PDF acontece abaixo do campo de texto. Então o resultado entra
+    # numa chave pendente e é transferido aqui, antes do widget nascer.
+    if "alerta_texto_pendente" in st.session_state:
+        st.session_state["alerta_texto_fonte"] = st.session_state.pop(
+            "alerta_texto_pendente")
 
-with col_cfg:
-    st.caption("Foco da extração — deixe em branco se o material tiver só uma pesquisa.")
-    foco_cargo = st.selectbox("Cargo", [""] + POLLING_MANUAL_CARGOS, key="alerta_foco_cargo")
-    foco_uf = st.selectbox("UF", [""] + ["BR"] + UFS, key="alerta_foco_uf")
-    foco_turno = st.selectbox("Turno", [""] + POLLING_MANUAL_TURNOS, key="alerta_foco_turno")
+    col_txt, col_cfg = st.columns([2, 1])
 
-with st.expander("Extrair texto de PDF"):
-    pdf = st.file_uploader("Relatório do instituto", type=["pdf"], key="alerta_pdf")
-    if pdf:
-        import fitz
-        with fitz.open(stream=pdf.getvalue(), filetype="pdf") as doc:
-            n_pag = doc.page_count
-        st.caption(f"{n_pag} página(s). Recorte: PDF inteiro no modo Auto costuma "
-                   "escolher texto e devolver número sem nome.")
-        c1, c2, c3 = st.columns(3)
-        modo = c1.selectbox("Modo de leitura", LEITURA_PDF, key="alerta_modo_pdf")
-        p_ini = c2.number_input("Página inicial", 1, n_pag, 1, key="alerta_pag_ini")
-        p_fim = c3.number_input("Página final", 1, n_pag, min(n_pag, 4), key="alerta_pag_fim")
-        if st.button("Ler PDF para texto"):
-            paginas = list(range(int(p_ini) - 1, int(p_fim)))
-            with st.spinner("Lendo o PDF…"):
+    with col_txt:
+        st.text_area(
+            "Texto da notícia, release ou PDF lido",
+            key="alerta_texto_fonte", height=240,
+            placeholder="Cole aqui o material da pesquisa…",
+        )
+        url_original = st.text_input("Link da fonte (opcional)", key="alerta_url")
+
+    with col_cfg:
+        st.caption("Foco da extração — deixe em branco se o material tiver só uma "
+                   "pesquisa.")
+        foco_cargo = st.selectbox("Cargo", [""] + POLLING_MANUAL_CARGOS,
+                                  key="alerta_foco_cargo")
+        foco_uf = st.selectbox("UF", [""] + ["BR"] + UFS, key="alerta_foco_uf")
+        foco_turno = st.selectbox("Turno", [""] + POLLING_MANUAL_TURNOS,
+                                  key="alerta_foco_turno")
+
+    with st.expander("Extrair texto de PDF"):
+        pdf = st.file_uploader("Relatório do instituto", type=["pdf"], key="alerta_pdf")
+        if pdf:
+            import fitz
+            with fitz.open(stream=pdf.getvalue(), filetype="pdf") as doc:
+                n_pag = doc.page_count
+            st.caption(f"{n_pag} página(s). Recorte: PDF inteiro no modo Auto costuma "
+                       "escolher texto e devolver número sem nome.")
+            c1, c2, c3 = st.columns(3)
+            modo = c1.selectbox("Modo de leitura", LEITURA_PDF, key="alerta_modo_pdf")
+            p_ini = c2.number_input("Página inicial", 1, n_pag, 1, key="alerta_pag_ini")
+            p_fim = c3.number_input("Página final", 1, n_pag, min(n_pag, 4),
+                                    key="alerta_pag_fim")
+            if st.button("Ler PDF para texto"):
+                paginas = list(range(int(p_ini) - 1, int(p_fim)))
+                with st.spinner("Lendo o PDF…"):
+                    try:
+                        st.session_state["alerta_texto_pendente"] = _processar_pdf(
+                            pdf.getvalue(), modo, paginas)
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Falha ao ler o PDF: {exc}")
+
+    if st.button("Extrair dados", type="primary"):
+        if not (st.session_state.get("alerta_texto_fonte") or "").strip():
+            st.error("Cole o texto da pesquisa ou leia um PDF primeiro.")
+        else:
+            with st.spinner("Extraindo com o Gemini…"):
                 try:
-                    st.session_state["alerta_texto_fonte"] = _processar_pdf(
-                        pdf.getvalue(), modo, paginas)
+                    novo = extrair_dados_polling_gemini(
+                        st.session_state["alerta_texto_fonte"], url_original or "",
+                        escopo={"cargo": foco_cargo, "uf": foco_uf, "turno": foco_turno},
+                    )
+                    # A matriz tolera o nome como veio; uma peça publicada não.
+                    for cen in novo.get("cenarios") or []:
+                        for item in cen.get("itens") or []:
+                            item["candidato"] = normalizar_nome_candidato(item.get("candidato"))
+                            item["partido"] = normalizar_partido(item.get("partido"))
+                    _limpar()
+                    st.session_state["alerta_payload"] = novo
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Falha ao ler o PDF: {exc}")
+                    st.error(f"Falha na extração: {exc}")
 
-if st.button("Extrair dados", type="primary"):
-    if not (st.session_state.get("alerta_texto_fonte") or "").strip():
-        st.error("Cole o texto da pesquisa ou leia um PDF primeiro.")
-    else:
-        with st.spinner("Extraindo com o Gemini…"):
-            try:
-                payload = extrair_dados_polling_gemini(
-                    st.session_state["alerta_texto_fonte"],
-                    url_original or "",
-                    escopo={"cargo": foco_cargo, "uf": foco_uf, "turno": foco_turno},
-                )
-                # A matriz tolera o nome como veio; uma peça publicada não.
-                # Grafia canônica (partículas em minúscula, siglas conhecidas)
-                # já aqui, pra você revisar o nome que vai sair no gráfico.
-                for cen in payload.get("cenarios") or []:
-                    for item in cen.get("itens") or []:
-                        item["candidato"] = normalizar_nome_candidato(item.get("candidato"))
-                        item["partido"] = normalizar_partido(item.get("partido"))
-                _limpar()
-                st.session_state["alerta_payload"] = payload
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Falha na extração: {exc}")
+    if st.session_state.get("alerta_payload"):
+        st.success("Dados extraídos. Confira na aba **2. Revisão**.")
 
 
 payload = st.session_state.get("alerta_payload")
-if not payload:
-    st.info("Extraia os dados para liberar a revisão, o gráfico e o alerta.")
-    st.stop()
+itens_editados: list[dict] = []
+cenario_final: dict = {}
+AVISO_SEM_DADOS = "Extraia os dados na aba **1. Dados** para liberar esta etapa."
 
 
-# ── 2. revisão ────────────────────────────────────────────────────────────────
-
-st.markdown('<div class="ge-rule">2. Revisão</div>', unsafe_allow_html=True)
-st.caption("O que o Gemini não achou fica em branco de propósito. Complete na mão: "
-           "nada aqui é preenchido por suposição.")
-
-cenarios = payload.get("cenarios") or []
-rotulos_cen = [
-    f"{i + 1}. {c.get('scenario_label') or i + 1} "
-    f"({(c.get('cargo') or '').capitalize()} {(c.get('uf') or '')} {(c.get('turno') or '').upper()})"
-    for i, c in enumerate(cenarios)
-]
-idx = 0
-if len(cenarios) > 1:
-    idx = st.radio("Cenário", range(len(cenarios)), format_func=lambda i: rotulos_cen[i],
-                   key="alerta_cenario_idx", horizontal=True)
-cenario = cenarios[idx] if cenarios else {"itens": []}
-
-m1, m2, m3, m4 = st.columns(4)
-payload["instituto"] = m1.text_input("Instituto", payload.get("instituto") or "")
-payload["registro_tse"] = m2.text_input("Registro TSE", payload.get("registro_tse") or "")
-payload["data_campo"] = m3.text_input("Data final de campo (AAAA-MM-DD)",
-                                      payload.get("data_campo") or "")
-payload["amostra"] = m4.number_input("Amostra", 0, 200000,
-                                     int(payload.get("amostra") or 0), step=50)
-m5, m6, m7 = st.columns(3)
-payload["margem_erro"] = m5.number_input(
-    "Margem de erro (p.p.)", 0.0, 100.0, float(payload.get("margem_erro") or 0.0), step=0.1)
-confianca_txt = m6.text_input("Nível de confiança (%)",
-                              "" if payload.get("confianca") is None else str(payload["confianca"]))
-payload["confianca"] = normalizar_percentual_resultado(confianca_txt)
-cargo_atual = (cenario.get("cargo") or payload.get("cargo") or "governador")
-uf_atual = (cenario.get("uf") or payload.get("uf") or "BR")
-m7.text_input("Cargo e UF do cenário", f"{cargo_atual} · {uf_atual}", disabled=True)
-
-# O number_input não tem estado "vazio": ele devolve 0. Zero aqui é campo em
-# branco, não medida — nenhuma pesquisa tem amostra de 0 pessoa nem margem de
-# erro de 0 p.p. Sem isso o rodapé publicaria "Margem de erro: ±0 p.p.".
-if not payload.get("amostra"):
-    payload["amostra"] = None
-if not payload.get("margem_erro"):
-    payload["margem_erro"] = None
-
-FICHA = [("instituto", "instituto"), ("registro_tse", "registro TSE"),
-         ("data_campo", "data de campo"), ("amostra", "amostra"),
-         ("margem_erro", "margem de erro"), ("confianca", "nível de confiança")]
-faltando = [rotulo for chave, rotulo in FICHA if not payload.get(chave)]
-if faltando:
-    st.warning(
-        "Ficha técnica incompleta: falta " + ", ".join(faltando) + ". "
-        "Esses campos simplesmente não entram no rodapé nem no texto, então o "
-        "gráfico sai sem eles. Complete acima se o material trouxer.")
-
-st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
-itens_editados = []
-for i, item in enumerate(cenario.get("itens") or []):
-    c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
-    ligado = c_on.checkbox("", True, key=f"alerta_item_on_{idx}_{i}",
-                           label_visibility="collapsed")
-    nome = c_nome.text_input("Candidato", item.get("candidato") or "",
-                             key=f"alerta_item_nome_{idx}_{i}", label_visibility="collapsed")
-    partido = c_part.text_input("Partido", item.get("partido") or "",
-                                key=f"alerta_item_part_{idx}_{i}", label_visibility="collapsed")
-    pct = c_pct.number_input("%", 0.0, 100.0, float(item.get("percentual") or 0.0),
-                             step=0.1, key=f"alerta_item_pct_{idx}_{i}",
-                             label_visibility="collapsed")
-    tipo_atual = item.get("tipo") or classificar_tipo_resultado_manual(nome)
-    tipo = c_tipo.selectbox("Tipo", ["candidato", "nao_valido"],
-                            index=0 if tipo_atual == "candidato" else 1,
-                            key=f"alerta_item_tipo_{idx}_{i}", label_visibility="collapsed")
-    if ligado and normalizar_texto_simples(nome):
-        itens_editados.append({"candidato": nome, "partido": partido,
-                               "percentual": pct, "tipo": tipo})
-
-soma = sum(i["percentual"] for i in itens_editados)
-if itens_editados:
-    st.caption(f"Soma dos itens marcados: {soma:.1f}%".replace(".", ","))
-    if soma > 105:
-        st.warning("Soma acima de 105%. Confira se não entrou mais de um cenário na mesma lista.")
-
-if not itens_editados:
-    st.error("Nenhum item marcado. Marque ao menos um para gerar o gráfico e o texto.")
-    st.stop()
-
-cenario_final = dict(cenario, itens=itens_editados)
-
-
-# ── 3. gráfico e 4. alerta ────────────────────────────────────────────────────
-
-col_g, col_a = st.columns(2)
-
-with col_g:
-    st.markdown('<div class="ge-rule">3. Gráfico</div>', unsafe_allow_html=True)
-
-    o1, o2 = st.columns(2)
-    orientacao = o1.radio("Orientação", ["vertical", "horizontal"], horizontal=True,
-                          key="alerta_orientacao")
-    incluir_logo = o2.checkbox("Logo da Eixo", True, key="alerta_logo")
-    escala_cheia = st.checkbox(
-        "Escala de 0 a 100%", True, key="alerta_escala",
-        help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam comparáveis. "
-             "Desligado, o topo aperta até um pouco acima do maior valor, o que ajuda "
-             "quando a disputa é fragmentada. A base fica no zero nos dois casos.")
-
-    titulo_grafico = st.text_input("Título do gráfico",
-                                   titulo_padrao(payload, cenario_final),
-                                   key="alerta_titulo")
-    rodape_grafico = st.text_area("Ficha técnica (rodapé)", rodape_padrao(payload),
-                                  key="alerta_rodape", height=80)
-
-    try:
-        png = gerar_grafico_pesquisa(
-            titulo_grafico, itens_editados, rodape_grafico,
-            orientacao=orientacao, incluir_logo=incluir_logo, escala_cheia=escala_cheia,
-        )
-        st.image(png, use_container_width=True)
-        st.download_button("Baixar PNG", png, file_name=slug_arquivo(payload, cenario_final),
-                           mime="image/png", use_container_width=True)
-    except Exception as exc:
-        st.error(f"Falha ao gerar o gráfico: {exc}")
-
-with col_a:
-    st.markdown('<div class="ge-rule">4. Alerta</div>', unsafe_allow_html=True)
-
-    if st.button("Gerar texto do alerta", type="primary", use_container_width=True):
-        with st.spinner("Redigindo…"):
-            try:
-                st.session_state["alerta_texto"] = gerar_texto_alerta_pesquisa(
-                    payload, cenario_final,
-                    gerar_conteudo=gerar_conteudo_gemini, modelo=GEMINI_MODEL,
-                )
-            except Exception as exc:
-                st.error(f"Falha ao gerar o texto: {exc}")
-
-    if st.session_state.get("alerta_texto"):
-        texto = st.text_area("Texto (edite à vontade)", st.session_state["alerta_texto"],
-                             height=230, key="alerta_texto_edit")
-        titulo_alerta = st.text_input("Título do alerta", titulo_grafico,
-                                      key="alerta_titulo_envio")
-        link_alerta = st.text_input("Link", st.session_state.get("alerta_url") or "",
-                                    key="alerta_link_envio")
-
-        final = compilar_alerta_pesquisa(
-            texto, titulo_alerta,
-            uf=(cenario_final.get("uf") or payload.get("uf") or ""),
-            link=link_alerta,
-            data_envio=datetime.now(BRT).strftime("%d/%m/%Y"),
-        )
-        st.caption("Prévia do envio")
-        st.code(final, language=None)
+with aba_revisao:
+    if not payload:
+        st.info(AVISO_SEM_DADOS)
     else:
-        st.info("Os números acima já estão prontos. Clique em gerar para escrever o texto.")
+        st.caption("O que o Gemini não achou fica em branco de propósito. Complete "
+                   "na mão: nada aqui é preenchido por suposição.")
+
+        cenarios = payload.get("cenarios") or []
+        idx = 0
+        if len(cenarios) > 1:
+            rotulos_cen = [
+                f"{i + 1}. {c.get('scenario_label') or i + 1} "
+                f"({(c.get('cargo') or '').capitalize()} {(c.get('uf') or '')} "
+                f"{(c.get('turno') or '').upper()})"
+                for i, c in enumerate(cenarios)
+            ]
+            idx = st.selectbox("Cenário", range(len(cenarios)),
+                               format_func=lambda i: rotulos_cen[i],
+                               key="alerta_cenario_idx")
+        cenario = cenarios[idx] if cenarios else {"itens": []}
+
+        with st.expander("Ficha técnica", expanded=True):
+            m1, m2, m3, m4 = st.columns(4)
+            payload["instituto"] = m1.text_input("Instituto", payload.get("instituto") or "")
+            payload["registro_tse"] = m2.text_input("Registro TSE",
+                                                    payload.get("registro_tse") or "")
+            payload["data_campo"] = m3.text_input("Data final de campo (AAAA-MM-DD)",
+                                                  payload.get("data_campo") or "")
+            payload["amostra"] = m4.number_input("Amostra", 0, 200000,
+                                                 int(payload.get("amostra") or 0), step=50)
+            m5, m6, m7 = st.columns(3)
+            payload["margem_erro"] = m5.number_input(
+                "Margem de erro (p.p.)", 0.0, 100.0,
+                float(payload.get("margem_erro") or 0.0), step=0.1)
+            confianca_txt = m6.text_input(
+                "Nível de confiança (%)",
+                "" if payload.get("confianca") is None else str(payload["confianca"]))
+            payload["confianca"] = normalizar_percentual_resultado(confianca_txt)
+            m7.text_input("Cargo e UF do cenário",
+                          f"{cenario.get('cargo') or payload.get('cargo') or ''} · "
+                          f"{cenario.get('uf') or payload.get('uf') or ''}", disabled=True)
+
+            # O number_input não tem estado "vazio": devolve 0. Zero aqui é campo
+            # em branco, não medida — sem isto o rodapé publicaria "±0 p.p.".
+            if not payload.get("amostra"):
+                payload["amostra"] = None
+            if not payload.get("margem_erro"):
+                payload["margem_erro"] = None
+
+            FICHA = [("instituto", "instituto"), ("registro_tse", "registro TSE"),
+                     ("data_campo", "data de campo"), ("amostra", "amostra"),
+                     ("margem_erro", "margem de erro"), ("confianca", "nível de confiança")]
+            faltando = [rot for chave, rot in FICHA if not payload.get(chave)]
+            if faltando:
+                st.warning("Falta " + ", ".join(faltando) +
+                           ". Esses campos não entram no rodapé nem no texto.")
+
+        st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
+        for i, item in enumerate(cenario.get("itens") or []):
+            c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
+            ligado = c_on.checkbox("", True, key=f"alerta_item_on_{idx}_{i}",
+                                   label_visibility="collapsed")
+            nome = c_nome.text_input("Candidato", item.get("candidato") or "",
+                                     key=f"alerta_item_nome_{idx}_{i}",
+                                     label_visibility="collapsed")
+            partido = c_part.text_input("Partido", item.get("partido") or "",
+                                        key=f"alerta_item_part_{idx}_{i}",
+                                        label_visibility="collapsed")
+            pct = c_pct.number_input("%", 0.0, 100.0, float(item.get("percentual") or 0.0),
+                                     step=0.1, key=f"alerta_item_pct_{idx}_{i}",
+                                     label_visibility="collapsed")
+            tipo_atual = item.get("tipo") or classificar_tipo_resultado_manual(nome)
+            tipo = c_tipo.selectbox("Tipo", ["candidato", "nao_valido"],
+                                    index=0 if tipo_atual == "candidato" else 1,
+                                    key=f"alerta_item_tipo_{idx}_{i}",
+                                    label_visibility="collapsed")
+            if ligado and normalizar_texto_simples(nome):
+                itens_editados.append({"candidato": nome, "partido": partido,
+                                       "percentual": pct, "tipo": tipo})
+
+        if itens_editados:
+            soma = sum(i["percentual"] for i in itens_editados)
+            st.caption(f"Soma dos itens marcados: {soma:.1f}%".replace(".", ","))
+            if soma > 105:
+                st.warning("Soma acima de 105%. Confira se não entrou mais de um "
+                           "cenário na mesma lista.")
+            cenario_final = dict(cenario, itens=itens_editados)
+        else:
+            st.error("Nenhum item marcado. Marque ao menos um para gerar o gráfico "
+                     "e o texto.")
+
+
+with aba_grafico:
+    if not itens_editados:
+        st.info(AVISO_SEM_DADOS if not payload else
+                "Marque ao menos um item na aba **2. Revisão**.")
+    else:
+        col_ctl, col_prev = st.columns([1, 2])
+
+        with col_ctl:
+            orientacao = st.radio("Orientação", ["vertical", "horizontal"],
+                                  key="alerta_orientacao")
+            incluir_logo = st.checkbox("Logo da Eixo", True, key="alerta_logo")
+            escala_cheia = st.checkbox(
+                "Escala de 0 a 100%", True, key="alerta_escala",
+                help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam "
+                     "comparáveis. Desligado, o topo aperta até um pouco acima do "
+                     "maior valor. A base fica no zero nos dois casos.")
+            titulo_grafico = st.text_input("Título do gráfico",
+                                           titulo_padrao(payload, cenario_final),
+                                           key="alerta_titulo")
+            rodape_grafico = st.text_area("Ficha técnica (rodapé)",
+                                          rodape_padrao(payload),
+                                          key="alerta_rodape", height=90)
+
+        comum = dict(orientacao=orientacao, incluir_logo=incluir_logo,
+                     escala_cheia=escala_cheia)
+        try:
+            with col_prev:
+                st.image(gerar_grafico_pesquisa(titulo_grafico, itens_editados,
+                                                rodape_grafico, **comum),
+                         use_container_width=True)
+
+            st.markdown("---")
+            e1, e2, e3 = st.columns([2, 1, 1])
+            escala = e1.radio(
+                "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
+                index=list(ESCALAS_EXPORT).index(2), key="alerta_escala_export",
+                format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}",
+            )
+            larg, alt = resolucao(escala)
+            e1.caption(f"Resolução: {larg} × {alt}px")
+
+            e2.download_button(
+                f"Baixar PNG ({escala}×)",
+                gerar_grafico_pesquisa(titulo_grafico, itens_editados, rodape_grafico,
+                                       escala=escala, **comum),
+                file_name=slug_arquivo(payload, cenario_final),
+                mime="image/png", use_container_width=True)
+            # SVG é vetor: a escala não muda nada, por isso fica fora do seletor.
+            e3.download_button(
+                "Baixar SVG",
+                gerar_grafico_pesquisa(titulo_grafico, itens_editados, rodape_grafico,
+                                       formato="svg", **comum),
+                file_name=slug_arquivo(payload, cenario_final, "svg"),
+                mime="image/svg+xml", use_container_width=True,
+                help="Vetor, para editar depois no Illustrator ou no Figma")
+        except Exception as exc:
+            st.error(f"Falha ao gerar o gráfico: {exc}")
+
+
+with aba_alerta:
+    if not itens_editados:
+        st.info(AVISO_SEM_DADOS if not payload else
+                "Marque ao menos um item na aba **2. Revisão**.")
+    else:
+        if st.button("Gerar texto do alerta", type="primary"):
+            with st.spinner("Redigindo…"):
+                try:
+                    st.session_state["alerta_texto"] = gerar_texto_alerta_pesquisa(
+                        payload, cenario_final,
+                        gerar_conteudo=gerar_conteudo_gemini, modelo=GEMINI_MODEL,
+                    )
+                except Exception as exc:
+                    st.error(f"Falha ao gerar o texto: {exc}")
+
+        if st.session_state.get("alerta_texto"):
+            col_edit, col_prev = st.columns(2)
+            with col_edit:
+                texto = st.text_area("Texto (edite à vontade)",
+                                     st.session_state["alerta_texto"], height=260,
+                                     key="alerta_texto_edit")
+                titulo_alerta = st.text_input(
+                    "Título do alerta", titulo_padrao(payload, cenario_final),
+                    key="alerta_titulo_envio")
+                link_alerta = st.text_input("Link",
+                                            st.session_state.get("alerta_url") or "",
+                                            key="alerta_link_envio")
+            with col_prev:
+                st.caption("Prévia do envio")
+                st.code(compilar_alerta_pesquisa(
+                    texto, titulo_alerta,
+                    uf=(cenario_final.get("uf") or payload.get("uf") or ""),
+                    link=link_alerta,
+                    data_envio=datetime.now(BRT).strftime("%d/%m/%Y"),
+                ), language=None)
+        else:
+            st.info("Os números da revisão já estão prontos. Clique em gerar para "
+                    "escrever o texto.")

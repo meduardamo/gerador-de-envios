@@ -45,9 +45,24 @@ SUBTEXTO = "#767672"    # eixo, grade e rodapé
 
 LARGURA_PX = 850
 ALTURA_PX = 600
-DPI_EXPORT = 200         # 1700x1200 no arquivo final, nítido no WhatsApp
 RAIO_PONTA_PX = 4
 ORIENTACOES = ("vertical", "horizontal")
+FORMATOS = ("png", "svg")
+
+# Multiplicador sobre 850x600. O 2x é o padrão: 1700x1200 é nítido no WhatsApp
+# sem virar arquivo pesado.
+ESCALAS_EXPORT = {
+    1: "Original",
+    2: "Alta qualidade",
+    3: "Impressão",
+    4: "Ultra HD",
+}
+
+
+def resolucao(escala: int = 2) -> tuple[int, int]:
+    """Dimensão final do PNG naquela escala, pra página mostrar antes de baixar."""
+    escala = escala if escala in ESCALAS_EXPORT else 2
+    return LARGURA_PX * escala, ALTURA_PX * escala
 
 _FONTE_PRONTA = False
 
@@ -196,8 +211,16 @@ def gerar_grafico_pesquisa(
     incluir_logo: bool = True,
     caminho_logo: str = "",
     escala_cheia: bool = True,
+    escala: int = 2,
+    formato: str = "png",
 ) -> bytes:
-    """Devolve o PNG em bytes, pronto pro st.image e pro st.download_button.
+    """Devolve o arquivo em bytes, pronto pro st.image e pro st.download_button.
+
+    escala multiplica 850x600 (2 = 1700x1200). Não muda o desenho, só a
+    resolução: o layout é definido em polegadas e o dpi é que varia.
+
+    formato "svg" sai em vetor, para quem for editar depois no Illustrator.
+    O texto vira contorno, então o arquivo abre igual em máquina sem Montserrat.
 
     itens: [{candidato, partido, percentual, tipo}] — o formato que
     normalizar_payload_polling() já entrega em cada cenário.
@@ -209,6 +232,10 @@ def gerar_grafico_pesquisa(
     """
     familia = _registrar_fonte()
     orientacao = orientacao if orientacao in ORIENTACOES else "vertical"
+    formato = formato if formato in FORMATOS else "png"
+    escala = escala if escala in ESCALAS_EXPORT else 2
+    # Texto do SVG vira contorno: o arquivo abre igual em máquina sem Montserrat.
+    matplotlib.rcParams["svg.fonttype"] = "path"
 
     validos = [i for i in itens or [] if i.get("percentual") is not None]
     if not validos:
@@ -347,7 +374,7 @@ def gerar_grafico_pesquisa(
         _colocar_logo(fig, caminho_logo or LOGO_PADRAO)
 
     buffer = io.BytesIO()
-    fig.savefig(buffer, format="png", dpi=DPI_EXPORT, facecolor=GELO)
+    fig.savefig(buffer, format=formato, dpi=100 * escala, facecolor=GELO)
     plt.close(fig)
     return buffer.getvalue()
 
@@ -416,8 +443,9 @@ def rodape_padrao(payload: dict) -> str:
     return "  |  ".join(partes)
 
 
-def slug_arquivo(payload: dict, cenario: dict | None = None) -> str:
-    """Nome do PNG baixado: pesquisa_pe_governador_quaest_2026-03-20.png"""
+def slug_arquivo(payload: dict, cenario: dict | None = None,
+                 extensao: str = "png") -> str:
+    """Nome do arquivo baixado: pesquisa_pe_governador_quaest_2026-03-20.png"""
     cenario = cenario or {}
     pedacos = [
         (cenario.get("uf") or payload.get("uf") or ""),
@@ -429,4 +457,4 @@ def slug_arquivo(payload: dict, cenario: dict | None = None) -> str:
     bruto = unicodedata.normalize("NFKD", bruto)
     bruto = "".join(c for c in bruto if not unicodedata.combining(c))
     bruto = re.sub(r"[^A-Za-z0-9_-]+", "-", bruto).strip("-_").lower()
-    return f"pesquisa_{bruto or 'grafico'}.png"
+    return f"pesquisa_{bruto or 'grafico'}.{extensao}"
