@@ -21,6 +21,8 @@ import streamlit_authenticator as stauth
 
 import fitz  # PyMuPDF
 
+from alerta_pesquisa_core import REGRAS_POLITICOS, _instrucao_pesquisa_eleitoral
+
 # ─── Config ──────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Gerador de Envios", layout="wide")
 
@@ -496,36 +498,6 @@ def salvar_no_sheets(tipo, area, uf, formato, cliente, titulo, resumo, analise_e
 
 
 # ─── Prompts e geração de texto ───────────────────────────────────────────────
-REGRAS_POLITICOS = (
-    "Formatação de políticos (obrigatório):\n"
-    "- Formato: 'Nome (PARTIDO/UF)'. Use barra, nunca hífen entre PARTIDO e UF.\n"
-    "- Use PARTIDO e UF em caixa alta.\n"
-    "- Se partido/UF não estiverem no texto, não invente.\n"
-    "- Se o texto trouxer '(PARTIDO-UF)', padronize para '(PARTIDO/UF)'.\n"
-    "- PRIMEIRA menção de um político: use 'Nome (PARTIDO/UF)'.\n"
-    "- MENÇÕES SEGUINTES do mesmo político no texto: use apenas o nome, sem repetir partido/UF.\n"
-    "- Nunca repita o partido do mesmo político mais de uma vez no texto final.\n"
-)
-
-def _instrucao_pesquisa_eleitoral() -> str:
-    return (
-        "Escreva um texto curto para WhatsApp (PT-BR), factual e direto, sobre RESULTADO DE PESQUISA ELEITORAL.\n"
-        "Sem opinião, sem especulação, sem bullets e sem emojis.\n"
-        "Use 1 parágrafo (no máximo 90–110 palavras).\n"
-        "Não comece com 'ALERTA'/'ENVIO' nem títulos.\n"
-        "Foque somente em (1) cenário estimulado 1 e (2) ficha técnica.\n"
-        f"\n{REGRAS_POLITICOS}\n"
-        "Regras de conteúdo:\n"
-        "1) Priorize o cenário estimulado 1. Se houver mais de um, ignore os demais.\n"
-        "2) Liste candidatos e percentuais. Se líder isolado, comece por ele.\n"
-        "   Se empate técnico, diga 'empatados dentro da margem de erro'.\n"
-        "   Exceção: se indecisos forem o maior percentual, abra com 'Indecisos lideram...'.\n"
-        "3) Brancos/nulos e indecisos no fim, em frase curta.\n"
-        "4) Inclua ficha técnica: registro TSE, margem de erro, confiança, amostra e datas de campo.\n"
-        "5) Preserve nomes, cargos, datas e números exatamente como no texto.\n"
-        "6) Se algum item não estiver no texto, omita — não invente.\n"
-        "\nFormato: comece pelos percentuais do cenário 1; feche com a ficha técnica em texto corrido.\n"
-    )
 
 
 def gerar_resumo_gemini(

@@ -14,5 +14,8 @@ pillow==10.4.0
 numpy<2
 pandas==2.2.3
 plotly
+# Gráfico da pesquisa (graficos_pesquisa_core). Versão conferida contra numpy<2,
+# que é o pino acima; plotly precisaria do kaleido pra exportar PNG.
+matplotlib==3.11.1
 selenium
 webdriver-manager
