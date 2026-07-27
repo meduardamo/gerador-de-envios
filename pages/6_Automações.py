@@ -428,7 +428,7 @@ with st.sidebar:
         st.caption("Logo não encontrada.")
     st.markdown(
         f'<div style="border-left:3px solid {EIXO["vinho"]};padding:10px 12px;'
-        f'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
+        f'margin:10px 0 0 0;background:transparent;">'
         f'<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         f'color:{EIXO["tinta"]};line-height:1.65;margin:0;">'
         f'Resultados das <strong>automações de monitoramento</strong> por cliente.'

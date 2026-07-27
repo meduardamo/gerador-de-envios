@@ -1053,7 +1053,7 @@ with st.sidebar:
         st.caption("Logo não encontrada.")
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
-        'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
+        'margin:10px 0 0 0;background:transparent;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
         'Cole o texto ou suba um PDF, selecione o cliente e o tipo de documento, '
