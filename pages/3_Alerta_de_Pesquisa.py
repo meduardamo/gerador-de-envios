@@ -184,6 +184,7 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY",
 definir_api_key(GEMINI_API_KEY)
 
 BRT = timezone(timedelta(hours=-3))
+LOGO_PATH = str(ROOT_DIR / "Marca_eixo_vetor_Logo horizontal magenta.png")
 LEITURA_PDF = [
     "Auto (texto se tiver; imagem se for scan)",
     "Texto (PyMuPDF)",
@@ -222,15 +223,36 @@ st.markdown('<div class="ge-hero"><div class="ge-hero-title">Alerta de Pesquisa<
             unsafe_allow_html=True)
 
 with st.sidebar:
-    st.caption(f"Logado como {name or username}")
-    authenticator.logout("Sair", "sidebar")
-    if st.button("Limpar tudo", use_container_width=True):
+    try:
+        st.image(LOGO_PATH, use_container_width=True)
+    except Exception:
+        st.caption("Logo não encontrada.")
+    st.markdown(
+        '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
+        'margin:10px 0 0 0;background:#fff;border-radius:0 4px 4px 0;">'
+        '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
+        'color:#111;line-height:1.65;margin:0;">'
+        'Cole a pesquisa ou suba o PDF do instituto <strong>uma vez</strong> e '
+        'saia com as duas peças: o <strong>gráfico em PNG</strong>, no padrão '
+        'visual da casa, e o <strong>texto do alerta</strong> pro WhatsApp.'
+        '</p></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Não grava nada nas matrizes. Para cadastrar a pesquisa, use o Polling.")
+    if not montserrat_disponivel():
+        st.warning("Montserrat não encontrada em fontes/. O gráfico sai fora da "
+                   "tipografia da casa.")
+    st.markdown("---")
+    if st.button("🧹 Limpar tudo", use_container_width=True,
+                 help="Zera a pesquisa da tela (texto, extração, gráfico e alerta) "
+                      "pra começar do zero"):
         _limpar(limpar_fonte=True)
         st.rerun()
-
-if not montserrat_disponivel():
-    st.warning("Montserrat não encontrada em fontes/. O gráfico sai na fonte padrão, "
-               "fora da tipografia da casa.")
+    st.markdown("---")
+    st.caption(f"Usuário: **{st.session_state.get('name', '')}** "
+               f"({st.session_state.get('username', '')})")
+    if _auth_cfg:
+        authenticator.logout("Sair", "sidebar")
 
 
 # ── 1. fonte ──────────────────────────────────────────────────────────────────
