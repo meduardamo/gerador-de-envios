@@ -40,7 +40,8 @@ LOGO_PADRAO = os.path.join(RAIZ, "Marca_eixo_vetor_Logo horizontal magenta.png")
 VINHO = "#962E4D"       # candidato
 VINHO_CLARO = "#AE7286"  # branco/nulo/indeciso: mesmo matiz, passo mais claro
 GELO = "#F4F3EF"        # fundo
-TINTA = "#111111"       # título e rótulo de valor
+MARINHO = "#192D4E"     # título
+TINTA = "#111111"       # rótulo de valor e nome no eixo
 SUBTEXTO = "#767672"    # eixo, grade e rodapé
 
 LARGURA_PX = 850
@@ -375,7 +376,7 @@ def gerar_grafico_pesquisa(
                     color=TINTA, zorder=4)
 
     fig.text(0.5, 0.93, titulo, ha="center", va="center", fontfamily=familia,
-             fontsize=17, fontweight="bold", color=TINTA)
+             fontsize=17, fontweight="bold", color=MARINHO)
 
     # Legenda só quando as duas cores aparecem: com uma cor só, ela não informa.
     # Fica abaixo do título, na horizontal: ali não briga com barra alta nem
