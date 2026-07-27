@@ -341,8 +341,23 @@ cargo_atual = (cenario.get("cargo") or payload.get("cargo") or "governador")
 uf_atual = (cenario.get("uf") or payload.get("uf") or "BR")
 m7.text_input("Cargo e UF do cenário", f"{cargo_atual} · {uf_atual}", disabled=True)
 
-if payload.get("amostra") == 0:
+# O number_input não tem estado "vazio": ele devolve 0. Zero aqui é campo em
+# branco, não medida — nenhuma pesquisa tem amostra de 0 pessoa nem margem de
+# erro de 0 p.p. Sem isso o rodapé publicaria "Margem de erro: ±0 p.p.".
+if not payload.get("amostra"):
     payload["amostra"] = None
+if not payload.get("margem_erro"):
+    payload["margem_erro"] = None
+
+FICHA = [("instituto", "instituto"), ("registro_tse", "registro TSE"),
+         ("data_campo", "data de campo"), ("amostra", "amostra"),
+         ("margem_erro", "margem de erro"), ("confianca", "nível de confiança")]
+faltando = [rotulo for chave, rotulo in FICHA if not payload.get(chave)]
+if faltando:
+    st.warning(
+        "Ficha técnica incompleta: falta " + ", ".join(faltando) + ". "
+        "Esses campos simplesmente não entram no rodapé nem no texto, então o "
+        "gráfico sai sem eles. Complete acima se o material trouxer.")
 
 st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
 itens_editados = []

@@ -238,8 +238,20 @@ def gerar_grafico_pesquisa(
     fig.patch.set_facecolor(GELO)
     vertical = orientacao == "vertical"
 
-    esquerda = 0.07 if vertical else 0.26
-    ax = fig.add_axes([esquerda, 0.17, 0.955 - esquerda, 0.62])
+    # Disputa com muito candidato (RJ 2026 teve 12 linhas) não cabe com o nome
+    # deitado: a 850px, cada fatia sobra com ~60px e os nomes se sobrepõem.
+    # Acima de 7, o rótulo gira e a base do gráfico sobe pra abrir espaço.
+    girar_rotulos = vertical and len(ordenados) > 7
+
+    # Girado, o rótulo desce e vai PRA ESQUERDA do próprio tique, então o
+    # primeiro nome sai da figura se a margem esquerda não abrir junto.
+    if not vertical:
+        esquerda, base, altura = 0.26, 0.17, 0.62
+    elif girar_rotulos:
+        esquerda, base, altura = 0.115, 0.32, 0.47
+    else:
+        esquerda, base, altura = 0.07, 0.17, 0.62
+    ax = fig.add_axes([esquerda, base, 0.955 - esquerda, altura])
     ax.set_facecolor(GELO)
 
     for lado in ("top", "right", "left" if vertical else "bottom"):
@@ -258,7 +270,12 @@ def gerar_grafico_pesquisa(
         ax.set_yticks(marcas)
         ax.set_yticklabels(rotulos_marcas)
         ax.set_xticks(posicoes)
-        ax.set_xticklabels([_quebrar(r) for r in rotulos])
+        if girar_rotulos:
+            # Girado, o nome fica em UMA linha: quebra mais rotação vira serrote.
+            ax.set_xticklabels(rotulos, rotation=32, ha="right",
+                               rotation_mode="anchor")
+        else:
+            ax.set_xticklabels([_quebrar(r) for r in rotulos])
         ax.grid(axis="y", color=SUBTEXTO, alpha=0.28, linewidth=0.8,
                 linestyle=(0, (2, 4)), zorder=0)
     else:
@@ -387,9 +404,12 @@ def rodape_padrao(payload: dict) -> str:
         partes.append(f"Campo até {_data_br(p['data_campo'])}")
     if p.get("amostra"):
         partes.append(f"{_num(p['amostra'])} entrevistas")
-    if p.get("margem_erro") is not None:
+    # Zero é campo vazio, não medida: nenhuma pesquisa tem margem de erro de 0
+    # p.p. nem 0% de confiança. Publicar "±0 p.p." seria afirmar algo falso
+    # sobre a metodologia, então o campo some do rodapé.
+    if p.get("margem_erro"):
         partes.append(f"Margem de erro: ±{_num(p['margem_erro'])} p.p.")
-    if p.get("confianca") is not None:
+    if p.get("confianca"):
         partes.append(f"Nível de confiança: {_num(p['confianca'])}%")
     if str(p.get("registro_tse") or "").strip():
         partes.append(f"Reg. TSE: {str(p['registro_tse']).strip()}")
