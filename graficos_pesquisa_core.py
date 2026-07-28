@@ -37,10 +37,9 @@ DIR_FONTES = os.path.join(RAIZ, "fontes")
 LOGO_PADRAO = os.path.join(RAIZ, "Marca_eixo_vetor_Logo horizontal magenta.png")
 
 # Paleta Eixo (mesma do app, ver Gerador_de_Envios.py).
-VINHO = "#962E4D"       # candidato
-VINHO_CLARO = "#AE7286"  # branco/nulo/indeciso: mesmo matiz, passo mais claro
+MARINHO = "#192D4E"      # candidato e título
+MARINHO_CLARO = "#485B7B"  # branco/nulo/indeciso: mesmo matiz, passo mais claro
 GELO = "#F4F3EF"        # fundo
-MARINHO = "#192D4E"     # título
 TINTA = "#111111"       # rótulo de valor e nome no eixo
 SUBTEXTO = "#767672"    # eixo, grade e rodapé
 
@@ -288,7 +287,7 @@ def gerar_grafico_pesquisa(
 
     rotulos = [_rotulo_candidato(i) for i in ordenados]
     valores = [float(i["percentual"]) for i in ordenados]
-    cores = [VINHO_CLARO if i.get("tipo") == "nao_valido" else VINHO for i in ordenados]
+    cores = [MARINHO_CLARO if i.get("tipo") == "nao_valido" else MARINHO for i in ordenados]
 
     if escala_cheia:
         topo, marcas = 100, [0, 25, 50, 75, 100]
