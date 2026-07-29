@@ -202,7 +202,7 @@ LEITURA_PDF = [
 ]
 
 CHAVES_PESQUISA = ("alerta_payload", "alerta_texto", "alerta_png",
-                   "alerta_cenario_idx", "alerta_cenario_visto")
+                   "alerta_cenario_op", "alerta_cenario_visto")
 
 # Widgets cujo valor inicial é derivado do cenário escolhido. O Streamlit ignora
 # o valor padrão de um widget que já existe na sessão: sem apagar estas chaves,
@@ -223,7 +223,7 @@ def _limpar(limpar_fonte: bool = False):
     # Itens e soma de cenários apontam para a extração anterior: índice guardado
     # aqui pode nem existir na pesquisa nova.
     for chave in [k for k in st.session_state
-                  if k.startswith(("alerta_item_", "alerta_soma_",
+                  if k.startswith(("alerta_item_", "alerta_comb_",
                                    "alerta_modo_comb_"))]:
         st.session_state.pop(chave, None)
 
@@ -419,50 +419,78 @@ with aba_revisao:
             f"{(c.get('turno') or '').upper()})"
             for i, c in enumerate(cenarios)
         ]
-        idx = 0
-        if len(cenarios) > 1:
-            idx = st.selectbox("Cenário", range(len(cenarios)),
-                               format_func=lambda i: rotulos_cen[i],
-                               key="alerta_cenario_idx")
-        cenario = cenarios[idx] if cenarios else {"itens": []}
+        # A média entra como MAIS UMA opção do seletor de cenário, do lado dos
+        # cenários publicados. Senado de 2 vagas é o caso: parte dos institutos
+        # entrega o consolidado numa pergunta só (AtlasIntel), parte publica dois
+        # ou três cenários estimulados (Quaest) e a leitura da disputa é a média
+        # deles. Só existe média dentro do mesmo cargo/UF/turno: relatório com
+        # presidente e governador juntos não tem média que faça sentido.
+        grupos: dict[tuple, list[int]] = {}
+        for i, c in enumerate(cenarios):
+            grupos.setdefault(((c.get("cargo") or ""), (c.get("uf") or ""),
+                               (c.get("turno") or "")), []).append(i)
+        # Só 1º turno: cenário de 2º turno é confronto entre nomes diferentes
+        # (Cadu x Álvaro, Cadu x Allyson), e média entre confrontos não existe.
+        medias = {f"m{n}": indices
+                  for n, ((_, _, turno_gr), indices) in enumerate(grupos.items())
+                  if len(indices) > 1 and turno_gr != "t2"}
 
-        # Senado tem duas vagas e o eleitor cita dois nomes. Parte dos institutos
-        # publica isso consolidado numa pergunta só (AtlasIntel: "cada
-        # entrevistado citou o primeiro e o segundo votos"), parte publica dois
-        # ou três cenários estimulados separados (Quaest). Não dá pra decidir por
-        # código qual é qual: quem lê a matéria escolhe aqui.
+        def _rotulo_opcao(opcao: str) -> str:
+            if opcao.startswith("c"):
+                return rotulos_cen[int(opcao[1:])]
+            indices = medias[opcao]
+            c0 = cenarios[indices[0]]
+            return (f"Média dos cenários {', '.join(str(i + 1) for i in indices)} "
+                    f"({(c0.get('cargo') or '').capitalize()} {(c0.get('uf') or '')} "
+                    f"{(c0.get('turno') or '').upper()})")
+
+        opcoes = [f"c{i}" for i in range(len(cenarios))] + list(medias)
+        escolha = opcoes[0] if opcoes else "c0"
+        if len(opcoes) > 1:
+            escolha = st.selectbox("Cenário", opcoes, format_func=_rotulo_opcao,
+                                   key="alerta_cenario_op")
+
         combinar, modo_comb = [], "media"
-        if len(cenarios) > 1:
-            # Sobra de uma extração anterior com mais cenários derrubaria a
-            # página no cenarios[i] logo abaixo.
-            st.session_state[f"alerta_soma_{idx}"] = [
-                i for i in st.session_state.get(f"alerta_soma_{idx}", [])
-                if isinstance(i, int) and 0 <= i < len(cenarios) and i != idx
-            ]
-            combinar = st.multiselect(
-                "Combinar com outro cenário",
-                [i for i in range(len(cenarios)) if i != idx],
-                format_func=lambda i: rotulos_cen[i],
-                key=f"alerta_soma_{idx}",
-                help="Para o Senado de 2 vagas, quando o instituto publica mais "
-                     "de um cenário estimulado em vez do consolidado.",
-            )
-            if combinar:
+        if escolha in medias:
+            grupo = medias[escolha]
+            chave_comb = f"alerta_comb_{escolha}"
+            # Sobra de uma extração anterior derrubaria a página no cenarios[i].
+            if chave_comb in st.session_state:
+                st.session_state[chave_comb] = [
+                    i for i in st.session_state[chave_comb] if i in grupo]
+            c_sel, c_modo = st.columns([2, 1])
+            with c_sel:
+                combinar = st.multiselect(
+                    "Cenários na média", grupo, default=grupo,
+                    format_func=lambda i: rotulos_cen[i], key=chave_comb,
+                    help="Tire da conta o cenário que não for variação da mesma "
+                         "pergunta.")
+            with c_modo:
                 modo_comb = st.radio(
                     "Como combinar", ["media", "soma"], horizontal=True,
-                    format_func=lambda m: ("Média dos disponíveis" if m == "media"
+                    format_func=lambda m: ("Média" if m == "media"
                                            else "Soma (1º + 2º voto)"),
-                    key=f"alerta_modo_comb_{idx}",
+                    key=f"alerta_modo_comb_{escolha}",
                     help="Média divide cada nome só pelos cenários em que ele "
                          "aparece, então quem está em um cenário só não é diluído. "
                          "Soma serve quando os cenários são o 1º e o 2º voto da "
                          "mesma pergunta e a leitura é o total (~200%).",
                 )
+            if not combinar:
+                st.error("Marque ao menos um cenário para a média.")
+                combinar = list(grupo)
+            idx = combinar[0]
+        else:
+            idx = int(escolha[1:]) if escolha.startswith("c") else 0
+
+        # Cargo, UF, turno e ficha saem do primeiro cenário da média: são iguais
+        # no grupo inteiro, é o que define o grupo.
+        cenario = cenarios[idx] if cenarios else {"itens": []}
 
         # Trocar de cenário (ou de combinação) tem que zerar título, rodapé e
         # texto: o Streamlit preserva o valor do widget pela chave, e sem isso a
         # tela fica com a peça do cenário anterior.
-        combo = (idx, tuple(combinar), modo_comb)
+        combo = (escolha, tuple(combinar), modo_comb)
         if st.session_state.get("alerta_cenario_visto") != combo:
             st.session_state["alerta_cenario_visto"] = combo
             for chave in CHAVES_DERIVADAS:
@@ -512,11 +540,11 @@ with aba_revisao:
                            ". Esses campos não entram no rodapé nem no texto.")
 
         if combinar:
-            itens_base = combinar_cenarios([cenario] + [cenarios[i] for i in combinar],
+            itens_base = combinar_cenarios([cenarios[i] for i in combinar],
                                            modo=modo_comb)
             st.caption(
-                ("Média dos cenários, nome a nome, sobre os cenários em que cada "
-                 "um aparece." if modo_comb == "media" else
+                ("Média nome a nome, dividida só pelos cenários em que cada um "
+                 "aparece." if modo_comb == "media" else
                  "Soma dos cenários, nome a nome.") +
                 " Desmarque para tirar do gráfico e do texto.")
         else:
@@ -525,7 +553,7 @@ with aba_revisao:
 
         # A combinação entra na chave do widget: chave repetida faria o Streamlit
         # manter o número do cenário anterior no campo.
-        cmb = "-".join(str(i) for i in [idx] + list(combinar)) + f"-{modo_comb}"
+        cmb = "-".join([escolha] + [str(i) for i in combinar] + [modo_comb])
         for i, item in enumerate(itens_base):
             c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
             ligado = c_on.checkbox("", True, key=f"alerta_item_on_{cmb}_{i}",
@@ -570,7 +598,7 @@ with aba_revisao:
             if combinar:
                 cenario_final["combinacao"] = {
                     "modo": modo_comb,
-                    "cenarios": [rotulos_cen[i] for i in [idx] + list(combinar)],
+                    "cenarios": [rotulos_cen[i] for i in combinar],
                 }
         else:
             st.error("Nenhum item marcado. Marque ao menos um para gerar o gráfico "
@@ -585,7 +613,9 @@ with aba_grafico:
         col_ctl, col_prev = st.columns([1, 2])
 
         with col_ctl:
-            orientacao = st.radio("Orientação", ["vertical", "horizontal"],
+            # Horizontal por padrão: nome de candidato é longo e cabe deitado
+            # sem girar rótulo nem encolher fonte.
+            orientacao = st.radio("Orientação", ["horizontal", "vertical"],
                                   key="alerta_orientacao")
             incluir_logo = st.checkbox(
                 "Logo da Eixo na prévia", True, key="alerta_logo",

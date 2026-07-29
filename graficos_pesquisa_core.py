@@ -243,7 +243,7 @@ def gerar_grafico_pesquisa(
     itens: list[dict],
     rodape: str = "",
     *,
-    orientacao: str = "vertical",
+    orientacao: str = "horizontal",
     incluir_logo: bool = True,
     caminho_logo: str = "",
     escala_cheia: bool = True,
