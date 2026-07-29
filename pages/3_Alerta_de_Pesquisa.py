@@ -13,8 +13,11 @@ Polling Manual; aqui é só produção de peça de divulgação.
 
 from datetime import datetime, timedelta, timezone
 import inspect
+import io
+import json
 import os
 import sys
+import zipfile
 from pathlib import Path
 
 import streamlit as st
@@ -47,10 +50,13 @@ from alerta_pesquisa_core import (
     encurtar_link,
     gerar_texto_alerta_pesquisa,
     normalizar_link,
+    padronizar_itens_alerta,
+    somar_cenarios,
 )
 from graficos_pesquisa_core import (
     ESCALAS_EXPORT,
     gerar_grafico_pesquisa,
+    periodo_campo_br,
     resolucao,
     montserrat_disponivel,
     rodape_padrao,
@@ -195,17 +201,29 @@ LEITURA_PDF = [
     "Imagem (Gemini visão)",
 ]
 
-CHAVES_PESQUISA = ("alerta_payload", "alerta_texto", "alerta_png", "alerta_cenario_idx")
+CHAVES_PESQUISA = ("alerta_payload", "alerta_texto", "alerta_png",
+                   "alerta_cenario_idx", "alerta_cenario_visto")
+
+# Widgets cujo valor inicial é derivado do cenário escolhido. O Streamlit ignora
+# o valor padrão de um widget que já existe na sessão: sem apagar estas chaves,
+# trocar de cenário mantinha na tela o título, o rodapé e o texto do cenário
+# anterior — era isso que fazia o gráfico sair "de governador" depois de mudar
+# para senador.
+CHAVES_DERIVADAS = ("alerta_titulo", "alerta_rodape", "alerta_titulo_envio",
+                    "alerta_texto", "alerta_texto_edit")
 
 
 def _limpar(limpar_fonte: bool = False):
-    alvos = list(CHAVES_PESQUISA)
+    alvos = list(CHAVES_PESQUISA) + list(CHAVES_DERIVADAS)
     if limpar_fonte:
         alvos += ["alerta_texto_fonte", "alerta_texto_pendente", "alerta_url",
                   "alerta_pdf"]
     for chave in alvos:
         st.session_state.pop(chave, None)
-    for chave in [k for k in st.session_state if k.startswith("alerta_item_")]:
+    # Itens e soma de cenários apontam para a extração anterior: índice guardado
+    # aqui pode nem existir na pesquisa nova.
+    for chave in [k for k in st.session_state
+                  if k.startswith(("alerta_item_", "alerta_soma_"))]:
         st.session_state.pop(chave, None)
 
 
@@ -215,6 +233,31 @@ def _link_curto(url: str) -> str:
     do envio é remontada a cada interação da página, e sem isso cada clique
     viraria uma chamada de rede."""
     return encurtar_link(url)
+
+
+@st.cache_data(show_spinner=False, max_entries=6)
+def _pacote_graficos(assinatura: str) -> bytes:
+    """Zip com o mesmo gráfico em quatro arquivos: PNG e SVG, com e sem logo.
+
+    A entrada é uma string JSON porque o download_button precisa dos bytes
+    prontos a cada rerun, e sem cache seriam quatro desenhos do matplotlib a
+    cada clique da página. Assinatura igual, arquivo servido da memória.
+    """
+    cfg = json.loads(assinatura)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_saida:
+        for sufixo, com_logo in (("com-logo", True), ("sem-logo", False)):
+            for formato in ("png", "svg"):
+                zip_saida.writestr(
+                    cfg["nomes"][f"{sufixo}_{formato}"],
+                    gerar_grafico_pesquisa(
+                        cfg["titulo"], cfg["itens"], cfg["rodape"],
+                        orientacao=cfg["orientacao"], incluir_logo=com_logo,
+                        escala_cheia=cfg["escala_cheia"],
+                        fundo_transparente=cfg["fundo_transparente"],
+                        escala=cfg["escala"], formato=formato),
+                )
+    return buffer.getvalue()
 
 
 def _processar_pdf(pdf_bytes: bytes, modo: str, paginas: list[int]) -> str:
@@ -338,10 +381,13 @@ with aba_dados:
                         escopo={"cargo": foco_cargo, "uf": foco_uf, "turno": foco_turno},
                     )
                     # A matriz tolera o nome como veio; uma peça publicada não.
+                    # Aqui também entra o rótulo padrão dos não válidos
+                    # (NS/NR e Brancos/Nulos), que vale só nesta página.
                     for cen in novo.get("cenarios") or []:
                         for item in cen.get("itens") or []:
                             item["candidato"] = normalizar_nome_candidato(item.get("candidato"))
                             item["partido"] = normalizar_partido(item.get("partido"))
+                        cen["itens"] = padronizar_itens_alerta(cen.get("itens") or [])
                     _limpar()
                     st.session_state["alerta_payload"] = novo
                     st.rerun()
@@ -366,28 +412,69 @@ with aba_revisao:
                    "na mão: nada aqui é preenchido por suposição.")
 
         cenarios = payload.get("cenarios") or []
+        rotulos_cen = [
+            f"{i + 1}. {c.get('scenario_label') or i + 1} "
+            f"({(c.get('cargo') or '').capitalize()} {(c.get('uf') or '')} "
+            f"{(c.get('turno') or '').upper()})"
+            for i, c in enumerate(cenarios)
+        ]
         idx = 0
         if len(cenarios) > 1:
-            rotulos_cen = [
-                f"{i + 1}. {c.get('scenario_label') or i + 1} "
-                f"({(c.get('cargo') or '').capitalize()} {(c.get('uf') or '')} "
-                f"{(c.get('turno') or '').upper()})"
-                for i, c in enumerate(cenarios)
-            ]
             idx = st.selectbox("Cenário", range(len(cenarios)),
                                format_func=lambda i: rotulos_cen[i],
                                key="alerta_cenario_idx")
         cenario = cenarios[idx] if cenarios else {"itens": []}
 
+        # Senado tem duas vagas e o eleitor cita dois nomes. Parte dos institutos
+        # publica isso consolidado numa pergunta só (AtlasIntel: "cada
+        # entrevistado citou o primeiro e o segundo votos"), parte publica o 1º e
+        # o 2º voto em cenários separados (Quaest), e aí a leitura da disputa é a
+        # soma dos dois. Não dá pra decidir por código qual é qual: quem lê a
+        # matéria escolhe aqui.
+        somar = []
+        if len(cenarios) > 1:
+            # Sobra de uma extração anterior com mais cenários derrubaria a
+            # página no cenarios[i] logo abaixo.
+            st.session_state[f"alerta_soma_{idx}"] = [
+                i for i in st.session_state.get(f"alerta_soma_{idx}", [])
+                if isinstance(i, int) and 0 <= i < len(cenarios) and i != idx
+            ]
+            somar = st.multiselect(
+                "Somar com outro cenário (Senado de 2 vagas)",
+                [i for i in range(len(cenarios)) if i != idx],
+                format_func=lambda i: rotulos_cen[i],
+                key=f"alerta_soma_{idx}",
+                help="Use quando a fonte publicar o 1º e o 2º voto em cenários "
+                     "separados, cada um somando ~100%. Some só o que for a mesma "
+                     "pergunta repetida: cenário com lista de candidatos diferente "
+                     "não é 2º voto.",
+            )
+
+        # Trocar de cenário (ou de combinação) tem que zerar título, rodapé e
+        # texto: o Streamlit preserva o valor do widget pela chave, e sem isso a
+        # tela fica com a peça do cenário anterior.
+        combo = (idx, tuple(somar))
+        if st.session_state.get("alerta_cenario_visto") != combo:
+            st.session_state["alerta_cenario_visto"] = combo
+            for chave in CHAVES_DERIVADAS:
+                st.session_state.pop(chave, None)
+
         with st.expander("Ficha técnica", expanded=True):
-            m1, m2, m3, m4 = st.columns(4)
+            m1, m2, m3 = st.columns(3)
             payload["instituto"] = m1.text_input("Instituto", payload.get("instituto") or "")
             payload["registro_tse"] = m2.text_input("Registro TSE",
                                                     payload.get("registro_tse") or "")
-            payload["data_campo"] = m3.text_input("Data final de campo (AAAA-MM-DD)",
-                                                  payload.get("data_campo") or "")
-            payload["amostra"] = m4.number_input("Amostra", 0, 200000,
+            payload["amostra"] = m3.number_input("Amostra", 0, 200000,
                                                  int(payload.get("amostra") or 0), step=50)
+            d1, d2, d3 = st.columns(3)
+            payload["data_campo_inicio"] = d1.text_input(
+                "Início do campo (AAAA-MM-DD)", payload.get("data_campo_inicio") or "")
+            payload["data_campo"] = d2.text_input("Fim do campo (AAAA-MM-DD)",
+                                                  payload.get("data_campo") or "")
+            periodo_txt = periodo_campo_br(payload.get("data_campo_inicio"),
+                                           payload.get("data_campo"))
+            d3.text_input("Como sai no gráfico", f"Campo: {periodo_txt}" if periodo_txt
+                          else "", disabled=True)
             m5, m6, m7 = st.columns(3)
             payload["margem_erro"] = m5.number_input(
                 "Margem de erro (p.p.)", 0.0, 100.0,
@@ -415,24 +502,34 @@ with aba_revisao:
                 st.warning("Falta " + ", ".join(faltando) +
                            ". Esses campos não entram no rodapé nem no texto.")
 
-        st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
-        for i, item in enumerate(cenario.get("itens") or []):
+        if somar:
+            itens_base = somar_cenarios([cenario] + [cenarios[i] for i in somar])
+            st.caption("Itens do cenário somado — desmarque para tirar do gráfico "
+                       "e do texto.")
+        else:
+            itens_base = cenario.get("itens") or []
+            st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
+
+        # A combinação entra na chave do widget: chave repetida faria o Streamlit
+        # manter o número do cenário anterior no campo.
+        cmb = "-".join(str(i) for i in [idx] + list(somar))
+        for i, item in enumerate(itens_base):
             c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
-            ligado = c_on.checkbox("", True, key=f"alerta_item_on_{idx}_{i}",
+            ligado = c_on.checkbox("", True, key=f"alerta_item_on_{cmb}_{i}",
                                    label_visibility="collapsed")
             nome = c_nome.text_input("Candidato", item.get("candidato") or "",
-                                     key=f"alerta_item_nome_{idx}_{i}",
+                                     key=f"alerta_item_nome_{cmb}_{i}",
                                      label_visibility="collapsed")
             partido = c_part.text_input("Partido", item.get("partido") or "",
-                                        key=f"alerta_item_part_{idx}_{i}",
+                                        key=f"alerta_item_part_{cmb}_{i}",
                                         label_visibility="collapsed")
             pct = c_pct.number_input("%", 0.0, 100.0, float(item.get("percentual") or 0.0),
-                                     step=0.1, key=f"alerta_item_pct_{idx}_{i}",
+                                     step=0.1, key=f"alerta_item_pct_{cmb}_{i}",
                                      label_visibility="collapsed")
             tipo_atual = item.get("tipo") or classificar_tipo_resultado_manual(nome)
             tipo = c_tipo.selectbox("Tipo", ["candidato", "nao_valido"],
                                     index=0 if tipo_atual == "candidato" else 1,
-                                    key=f"alerta_item_tipo_{idx}_{i}",
+                                    key=f"alerta_item_tipo_{cmb}_{i}",
                                     label_visibility="collapsed")
             if ligado and normalizar_texto_simples(nome):
                 itens_editados.append({"candidato": nome, "partido": partido,
@@ -441,10 +538,19 @@ with aba_revisao:
         if itens_editados:
             soma = sum(i["percentual"] for i in itens_editados)
             st.caption(f"Soma dos itens marcados: {soma:.1f}%".replace(".", ","))
-            if soma > 105:
+            if somar:
+                # Dois votos por entrevistado: o total esperado é perto de 200%.
+                if not 150 <= soma <= 250:
+                    st.warning("A soma ficou longe dos 200% esperados de dois votos "
+                               "por entrevistado. Confira se os cenários somados são "
+                               "mesmo o 1º e o 2º voto da mesma pergunta.")
+            elif soma > 105:
                 st.warning("Soma acima de 105%. Confira se não entrou mais de um "
                            "cenário na mesma lista.")
             cenario_final = dict(cenario, itens=itens_editados)
+            if somar:
+                cenario_final["soma_cenarios"] = [rotulos_cen[i]
+                                                  for i in [idx] + list(somar)]
         else:
             st.error("Nenhum item marcado. Marque ao menos um para gerar o gráfico "
                      "e o texto.")
@@ -460,7 +566,15 @@ with aba_grafico:
         with col_ctl:
             orientacao = st.radio("Orientação", ["vertical", "horizontal"],
                                   key="alerta_orientacao")
-            incluir_logo = st.checkbox("Logo da Eixo", True, key="alerta_logo")
+            incluir_logo = st.checkbox(
+                "Logo da Eixo na prévia", True, key="alerta_logo",
+                help="Só muda a prévia: o arquivo baixado sai sempre nas duas "
+                     "versões, com e sem logo.")
+            fundo_transparente = st.checkbox(
+                "Fundo transparente", True, key="alerta_fundo",
+                help="Sem o retângulo gelo por baixo, o gráfico assenta em slide "
+                     "ou story de qualquer cor. O texto continua escuro, então "
+                     "pede fundo claro.")
             escala_cheia = st.checkbox(
                 "Escala de 0 a 100%", True, key="alerta_escala",
                 help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam "
@@ -473,38 +587,46 @@ with aba_grafico:
                                           rodape_padrao(payload),
                                           key="alerta_rodape", height=90)
 
-        comum = dict(orientacao=orientacao, incluir_logo=incluir_logo,
-                     escala_cheia=escala_cheia)
         try:
             with col_prev:
-                st.image(gerar_grafico_pesquisa(titulo_grafico, itens_editados,
-                                                rodape_grafico, **comum),
-                         use_container_width=True)
+                st.image(gerar_grafico_pesquisa(
+                    titulo_grafico, itens_editados, rodape_grafico,
+                    orientacao=orientacao, incluir_logo=incluir_logo,
+                    escala_cheia=escala_cheia,
+                    fundo_transparente=fundo_transparente),
+                    use_container_width=True)
 
             st.markdown("---")
-            e1, e2, e3 = st.columns([2, 1, 1])
+            e1, e2 = st.columns([2, 1])
             escala = e1.radio(
                 "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
                 index=list(ESCALAS_EXPORT).index(2), key="alerta_escala_export",
                 format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}",
             )
             larg, alt = resolucao(escala)
-            e1.caption(f"Resolução: {larg} × {alt}px")
+            e1.caption(f"Resolução: {larg} × {alt}px. O SVG é vetor: a escala não "
+                       "muda nada nele.")
+
+            # Quem monta card usa a versão com logo; quem monta slide da casa
+            # usa a sem. Baixar as duas de uma vez evita voltar aqui pra clicar
+            # de novo com a caixinha desmarcada.
+            nomes = {
+                f"{suf}_{fmt}": slug_arquivo(payload, cenario_final, fmt, suf)
+                for suf in ("com-logo", "sem-logo") for fmt in ("png", "svg")
+            }
+            assinatura = json.dumps({
+                "titulo": titulo_grafico, "rodape": rodape_grafico,
+                "itens": itens_editados, "orientacao": orientacao,
+                "escala_cheia": escala_cheia, "escala": escala,
+                "fundo_transparente": fundo_transparente, "nomes": nomes,
+            }, sort_keys=True, ensure_ascii=False)
 
             e2.download_button(
-                f"Baixar PNG ({escala}×)",
-                gerar_grafico_pesquisa(titulo_grafico, itens_editados, rodape_grafico,
-                                       escala=escala, **comum),
-                file_name=slug_arquivo(payload, cenario_final),
-                mime="image/png", use_container_width=True)
-            # SVG é vetor: a escala não muda nada, por isso fica fora do seletor.
-            e3.download_button(
-                "Baixar SVG",
-                gerar_grafico_pesquisa(titulo_grafico, itens_editados, rodape_grafico,
-                                       formato="svg", **comum),
-                file_name=slug_arquivo(payload, cenario_final, "svg"),
-                mime="image/svg+xml", use_container_width=True,
-                help="Vetor, para editar depois no Illustrator ou no Figma")
+                "Baixar tudo (.zip)", _pacote_graficos(assinatura),
+                file_name=slug_arquivo(payload, cenario_final, "zip"),
+                mime="application/zip", use_container_width=True, type="primary",
+                help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
+            e2.caption("PNG e SVG, com e sem logo.")
         except Exception as exc:
             st.error(f"Falha ao gerar o gráfico: {exc}")
 

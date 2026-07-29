@@ -13,8 +13,11 @@ tira do caminho a alucinação de percentual e de registro TSE.
 """
 
 import re
+import unicodedata
 import urllib.request
 from urllib.parse import quote, urlparse
+
+from graficos_pesquisa_core import periodo_campo_br
 
 REGRAS_POLITICOS = (
     "Formatação de políticos (obrigatório):\n"
@@ -52,6 +55,76 @@ CARGO_TEXTO = {"governador": "governador", "senador": "senador",
                "presidente": "presidente"}
 
 
+# ── rótulo dos itens não válidos ─────────────────────────────────────────────
+# Cada instituto escreve à sua maneira ("Não sabe/Não respondeu", "NS/NR",
+# "Branco/Nulo", "Brancos e nulos"). Na peça publicada isso vira sempre o mesmo
+# par, senão dois gráficos da mesma série saem com legenda diferente.
+#
+# Vale SÓ aqui, no Alerta: o Polling Manual continua gravando na matriz o rótulo
+# como o instituto publicou.
+
+ROTULO_NS_NR = "NS/NR"
+ROTULO_BRANCOS_NULOS = "Brancos/Nulos"
+
+_PADROES_NS_NR = (
+    r"\bns\s*/?\s*nr\b", r"^ns$", r"^nr$",
+    r"nao sabe", r"nao sei", r"nao sabem", r"nao souber",
+    r"nao respond", r"nao opin", r"nao inform", r"nao declar", r"nao revel",
+    r"nao quis", r"nao quer responder", r"sem opiniao",
+    r"prefer\w* nao responder", r"prefiro nao responder",
+)
+
+
+def _chave_rotulo(texto: str) -> str:
+    """'Não sabe / Não respondeu' -> 'nao sabe nao respondeu'."""
+    s = unicodedata.normalize("NFKD", str(texto or ""))
+    s = "".join(c for c in s if not unicodedata.combining(c)).lower()
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def padronizar_rotulo_nao_valido(nome: str) -> str:
+    """Devolve o rótulo da casa. Texto que não for de nenhuma das duas famílias
+    volta como veio ('Nenhum', 'Indecisos' e afins seguem intactos)."""
+    chave = _chave_rotulo(nome)
+    if not chave:
+        return str(nome or "").strip()
+    tem_bn = "branco" in chave or "nulo" in chave
+    tem_ns = any(re.search(p, chave) for p in _PADROES_NS_NR)
+    if tem_bn and tem_ns:
+        # Instituto que publica tudo numa linha só ("Branco/Nulo/NS/NR"):
+        # padroniza os dois nomes sem fingir que virou uma categoria só.
+        return f"{ROTULO_BRANCOS_NULOS} e {ROTULO_NS_NR}"
+    if tem_bn:
+        return ROTULO_BRANCOS_NULOS
+    if tem_ns:
+        return ROTULO_NS_NR
+    return str(nome or "").strip()
+
+
+def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
+    """Aplica o rótulo padrão nos itens não válidos do cenário.
+
+    Só mexe em quem já está marcado como nao_valido: "Castelo Branco" é
+    sobrenome de candidato, e renomear isso seria pior que a bagunça.
+
+    Não junta linhas: se a fonte publicou branco e nulo separados, os dois
+    virariam "Brancos/Nulos" e o gráfico sairia com duas barras de mesmo nome —
+    nesse caso o segundo fica com o rótulo original. Somar por conta própria
+    inventaria um número que a fonte não publicou.
+    """
+    vistos, saida = set(), []
+    for item in itens or []:
+        novo = dict(item)
+        nome = str(novo.get("candidato") or "").strip()
+        if novo.get("tipo") == "nao_valido":
+            padrao = padronizar_rotulo_nao_valido(nome)
+            if padrao not in vistos:
+                novo["candidato"] = padrao
+            vistos.add(padrao)
+        saida.append(novo)
+    return saida
+
+
 def _pct_br(valor) -> str:
     """34.0 -> '34%'; 4.5 -> '4,5%'."""
     try:
@@ -63,9 +136,39 @@ def _pct_br(valor) -> str:
     return f"{n:.1f}".replace(".", ",") + "%"
 
 
-def _data_br(iso: str) -> str:
-    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(iso or "").strip())
-    return f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else str(iso or "").strip()
+def somar_cenarios(cenarios: list[dict]) -> list[dict]:
+    """Soma os percentuais de vários cenários num só, casando pelo nome.
+
+    Existe por causa do Senado com DUAS vagas: parte dos institutos publica o 1º
+    e o 2º voto em perguntas separadas (cada uma somando ~100%), e a leitura da
+    disputa é a soma das duas (~200%). Outra parte já publica a pergunta somada.
+    Não dá pra decidir isso por código — a mesma pesquisa aparece dos dois
+    jeitos —, então quem escolhe o que somar é quem está lendo a matéria.
+
+    Nome é casado sem acento e sem caixa; partido e tipo vêm da primeira
+    aparição. Quem só existe em um dos cenários entra com o valor que tem.
+    """
+    combinado: dict[str, dict] = {}
+    for cenario in cenarios or []:
+        for item in (cenario or {}).get("itens") or []:
+            nome = str(item.get("candidato") or "").strip()
+            chave = _chave_rotulo(nome)
+            if not chave:
+                continue
+            atual = combinado.get(chave)
+            if atual is None:
+                combinado[chave] = {
+                    "candidato": nome,
+                    "partido": str(item.get("partido") or "").strip(),
+                    "percentual": item.get("percentual"),
+                    "tipo": item.get("tipo") or "candidato",
+                }
+                continue
+            if item.get("percentual") is not None:
+                atual["percentual"] = (atual.get("percentual") or 0) + item["percentual"]
+            if not atual["partido"]:
+                atual["partido"] = str(item.get("partido") or "").strip()
+    return list(combinado.values())
 
 
 def bloco_dados_pesquisa(payload: dict, cenario: dict) -> str:
@@ -89,8 +192,9 @@ def bloco_dados_pesquisa(payload: dict, cenario: dict) -> str:
         linhas.append(f"Instituto: {str(p['instituto']).strip()}")
     if str(p.get("registro_tse") or "").strip():
         linhas.append(f"Registro TSE: {str(p['registro_tse']).strip()}")
-    if p.get("data_campo"):
-        linhas.append(f"Data final de campo: {_data_br(p['data_campo'])}")
+    periodo = periodo_campo_br(p.get("data_campo_inicio"), p.get("data_campo"))
+    if periodo:
+        linhas.append(f"Período de campo: {periodo}")
     if p.get("amostra"):
         linhas.append(f"Amostra: {p['amostra']} entrevistas")
     if p.get("margem_erro") is not None:
@@ -116,6 +220,16 @@ def bloco_dados_pesquisa(payload: dict, cenario: dict) -> str:
             candidatos.append((float(item["percentual"]), f"- {rotulo}: {pct}"))
 
     candidatos.sort(key=lambda x: x[0], reverse=True)
+    if c.get("soma_cenarios"):
+        # Sem isso o modelo trata soma de ~200% como erro e "corrige" o número.
+        linhas.append(
+            "\nATENÇÃO: os percentuais abaixo somam as respostas de mais de uma "
+            f"pergunta da mesma pesquisa ({', '.join(c['soma_cenarios'])}). "
+            "São duas vagas em disputa e cada entrevistado cita dois nomes, "
+            "então o total passa de 100% — isso está correto, não é erro. "
+            "Diga no texto que o percentual considera os dois votos do "
+            "entrevistado. Nunca reduza, divida ou 'ajuste' os números."
+        )
     if candidatos:
         linhas.append("\nResultado do cenário (do maior para o menor):")
         linhas += [linha for _, linha in candidatos]

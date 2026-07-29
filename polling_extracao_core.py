@@ -12,7 +12,7 @@ API entra por definir_api_key() (a página injeta st.secrets) ou pela env
 GEMINI_API_KEY.
 
 Payload devolvido por extrair_dados_polling_gemini():
-    cargo, turno, uf, instituto, registro_tse, data_campo,
+    cargo, turno, uf, instituto, registro_tse, data_campo, data_campo_inicio,
     amostra, margem_erro, confianca, modo, observacoes, pendencias,
     cenarios: [{scenario_label, cargo, turno, uf,
                 itens: [{candidato, partido, percentual, tipo}]}]
@@ -316,6 +316,9 @@ def normalizar_payload_polling(payload: dict) -> dict:
         "instituto": instituto,
         "registro_tse": normalizar_texto_simples(payload.get("registro_tse")),
         "data_campo": normalizar_texto_simples(payload.get("data_campo")),
+        # Primeiro dia da coleta. Só o Alerta usa (o rodapé do gráfico publica o
+        # período por extenso); a matriz continua guardando só a data final.
+        "data_campo_inicio": normalizar_texto_simples(payload.get("data_campo_inicio")),
         "amostra": normalizar_inteiro_simples(payload.get("amostra")),
         "margem_erro": normalizar_percentual_simples(payload.get("margem_erro")),
         "confianca": normalizar_inteiro_simples(payload.get("confianca")),
@@ -334,6 +337,13 @@ MESES_PT_NUMERO = {
     "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
     "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
 }
+
+
+def _mes_pt_numero(nome: str) -> int | None:
+    """'Março'/'marco' -> 3. None quando não for nome de mês."""
+    chave = unicodedata.normalize("NFKD", str(nome or "").lower())
+    chave = "".join(ch for ch in chave if not unicodedata.combining(ch))
+    return MESES_PT_NUMERO.get(chave)
 
 
 def corrigir_metadados_explicitos_da_fonte(payload: dict, texto_fonte: str) -> dict:
@@ -375,9 +385,12 @@ def corrigir_metadados_explicitos_da_fonte(payload: dict, texto_fonte: str) -> d
     if re.search(r"\bpoderdata\s*/\s*aya(?:\s+bancah)?\b", texto, flags=re.IGNORECASE):
         payload["instituto"] = "PoderData"
 
+    # Grupos: 1 dia inicial, 2 mês inicial (só quando escrito), 3 dia final,
+    # 4 mês final. O dia inicial vira data_campo_inicio, que é o que o rodapé do
+    # Alerta publica por extenso ("15 a 17 de julho").
     intervalo = re.search(
-        r"(?:entre\s+(?:os\s+)?dias?\s+)?\d{1,2}(?:º|o)?"
-        r"(?:\s+de\s+[a-záàâãéêíóôõúç]+)?\s*(?:a|até|e|-)\s*"
+        r"(?:entre\s+(?:os\s+)?dias?\s+)?(\d{1,2})(?:º|o)?"
+        r"(?:\s+de\s+([a-záàâãéêíóôõúç]+))?\s*(?:a|até|e|-)\s*"
         r"(\d{1,2})(?:º|o)?\s+de\s+"
         r"(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)",
         texto,
@@ -390,13 +403,18 @@ def corrigir_metadados_explicitos_da_fonte(payload: dict, texto_fonte: str) -> d
             normalizar_texto_simples(payload.get("data_campo")),
         ]))
         if anos:
-            mes_chave = unicodedata.normalize("NFKD", intervalo.group(2).lower())
-            mes_chave = "".join(ch for ch in mes_chave if not unicodedata.combining(ch))
+            mes_fim = _mes_pt_numero(intervalo.group(4))
+            mes_ini = _mes_pt_numero(intervalo.group(2)) or mes_fim
             try:
-                payload["data_campo"] = datetime(
-                    int(anos[0]), MESES_PT_NUMERO[mes_chave], int(intervalo.group(1))
-                ).strftime("%Y-%m-%d")
-            except (KeyError, ValueError):
+                fim = datetime(int(anos[0]), mes_fim, int(intervalo.group(3)))
+                payload["data_campo"] = fim.strftime("%Y-%m-%d")
+                # Campo que atravessa o réveillon ("28 de dezembro a 2 de
+                # janeiro") começa no ano anterior ao da data final.
+                ano_ini = fim.year - 1 if mes_ini > mes_fim else fim.year
+                inicio = datetime(ano_ini, mes_ini, int(intervalo.group(1)))
+                if inicio < fim:
+                    payload["data_campo_inicio"] = inicio.strftime("%Y-%m-%d")
+            except (TypeError, ValueError):
                 pass
 
     return payload
@@ -476,6 +494,10 @@ Extraia os dados estruturados para inserção em planilha.
   nunca o primeiro. Se a fonte não informar a data final de coleta, use a data
   de divulgação como fallback e registre em observacoes: "data de divulgação
   usada como data_campo; período de coleta não informado".
+- data_campo_inicio é o PRIMEIRO dia da coleta, em YYYY-MM-DD, quando a fonte
+  informar um intervalo (ex.: "15 a 17 de julho" → "2026-07-15"). Mesmas regras
+  de ano do data_campo. Se a fonte der só uma data, ou se o data_campo veio da
+  data de divulgação, use "" — não repita a data final nem chute o começo.
 - O ANO de data_campo vem SEMPRE do período de coleta (ou da data de
   divulgação, no fallback), NUNCA do número de uma norma citada. Ex.:
   "Resolução-TSE n.º 23.600/2019" — o 2019 é o ano da resolução, não da
@@ -589,6 +611,7 @@ FORMATO:
   "instituto": "",
   "registro_tse": "",
   "data_campo": "",
+  "data_campo_inicio": "",
   "amostra": null,
   "margem_erro": null,
   "confianca": null,

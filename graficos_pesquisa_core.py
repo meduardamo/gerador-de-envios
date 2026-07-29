@@ -249,6 +249,7 @@ def gerar_grafico_pesquisa(
     escala_cheia: bool = True,
     escala: int = 2,
     formato: str = "png",
+    fundo_transparente: bool = True,
 ) -> bytes:
     """Devolve o arquivo em bytes, pronto pro st.image e pro st.download_button.
 
@@ -265,6 +266,11 @@ def gerar_grafico_pesquisa(
     deixa dois gráficos comparáveis entre si. False aperta o topo até um pouco
     acima do maior valor, para pesquisa muito fragmentada não sair com metade da
     área vazia. Nos dois casos a base fica no zero: barra com base cortada mente.
+
+    fundo_transparente=True (padrão) sai sem fundo, para o gráfico assentar em
+    slide, story ou peça de fundo escuro sem o retângulo gelo por baixo. O
+    desenho não muda: texto e barra continuam nas cores da casa, que pedem
+    fundo claro.
     """
     familia = _registrar_fonte()
     orientacao = orientacao if orientacao in ORIENTACOES else "vertical"
@@ -297,8 +303,9 @@ def gerar_grafico_pesquisa(
         passo = 10 if topo <= 60 else 25
         marcas = list(range(0, topo + 1, passo))
 
+    fundo = "none" if fundo_transparente else GELO
     fig = plt.figure(figsize=(LARGURA_PX / 100, ALTURA_PX / 100), dpi=100)
-    fig.patch.set_facecolor(GELO)
+    fig.patch.set_facecolor(fundo)
     vertical = orientacao == "vertical"
 
     # Geometria dos dois modos do eixo X. Girado, o rótulo desce e vai PRA
@@ -310,7 +317,7 @@ def gerar_grafico_pesquisa(
     GIRADO = (0.115, 0.32, 0.51)
     esquerda, base, altura = (0.26, 0.17, 0.66) if not vertical else RETO
     ax = fig.add_axes([esquerda, base, 0.955 - esquerda, altura])
-    ax.set_facecolor(GELO)
+    ax.set_facecolor(fundo)
 
     for lado in ("top", "right", "left" if vertical else "bottom"):
         ax.spines[lado].set_visible(False)
@@ -400,7 +407,9 @@ def gerar_grafico_pesquisa(
         _colocar_logo(fig, caminho_logo or LOGO_PADRAO)
 
     buffer = io.BytesIO()
-    fig.savefig(buffer, format=formato, dpi=100 * escala, facecolor=GELO)
+    # transparent=True também zera o fundo dos eixos, não só o da figura.
+    fig.savefig(buffer, format=formato, dpi=100 * escala,
+                facecolor=fundo, transparent=fundo_transparente)
     plt.close(fig)
     return buffer.getvalue()
 
@@ -411,10 +420,45 @@ CARGO_TITULO = {"governador": "Governador", "senador": "Senador",
                 "presidente": "Presidente"}
 
 
-def _data_br(iso: str) -> str:
-    """'2026-03-20' -> '20/03/2026'. Devolve o original se não for ISO."""
+MESES_PT = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
+            "agosto", "setembro", "outubro", "novembro", "dezembro")
+
+
+def _iso_partes(iso: str) -> tuple[int, int, int] | None:
     m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(iso or "").strip())
-    return f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else str(iso or "").strip()
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+def periodo_campo_br(inicio: str, fim: str) -> str:
+    """Período de coleta por extenso: '15 a 17 de julho'.
+
+    Sem ano de propósito: a peça circula no mesmo ano do campo e o ano só ocupa
+    espaço no rodapé, que é a linha mais apertada do gráfico. Mês diferente sai
+    inteiro nos dois lados ('28 de junho a 2 de julho'); ano diferente (campo
+    virando o réveillon) é o único caso em que o ano volta.
+
+    Sem data inicial, devolve só a final ('17 de julho'). Data que não estiver
+    em ISO volta como veio — é o que preserva o período digitado na mão.
+    """
+    p_fim = _iso_partes(fim)
+    if not p_fim:
+        return str(fim or "").strip()
+    ano_f, mes_f, dia_f = p_fim
+
+    p_ini = _iso_partes(inicio)
+    # Início ausente, inválido ou depois do fim: só a data final.
+    if not p_ini or p_ini > p_fim:
+        return f"{dia_f} de {MESES_PT[mes_f - 1]}"
+    ano_i, mes_i, dia_i = p_ini
+
+    if (ano_i, mes_i, dia_i) == p_fim:
+        return f"{dia_f} de {MESES_PT[mes_f - 1]}"
+    if ano_i != ano_f:
+        return (f"{dia_i} de {MESES_PT[mes_i - 1]} de {ano_i} a "
+                f"{dia_f} de {MESES_PT[mes_f - 1]} de {ano_f}")
+    if mes_i != mes_f:
+        return f"{dia_i} de {MESES_PT[mes_i - 1]} a {dia_f} de {MESES_PT[mes_f - 1]}"
+    return f"{dia_i} a {dia_f} de {MESES_PT[mes_f - 1]}"
 
 
 def _num(valor) -> str:
@@ -453,8 +497,9 @@ def rodape_padrao(payload: dict) -> str:
     partes = []
     if str(p.get("instituto") or "").strip():
         partes.append(f"Pesquisa {str(p['instituto']).strip()}")
-    if p.get("data_campo"):
-        partes.append(f"Campo até {_data_br(p['data_campo'])}")
+    periodo = periodo_campo_br(p.get("data_campo_inicio"), p.get("data_campo"))
+    if periodo:
+        partes.append(f"Campo: {periodo}")
     if p.get("amostra"):
         partes.append(f"{_num(p['amostra'])} entrevistas")
     # Zero é campo vazio, não medida: nenhuma pesquisa tem margem de erro de 0
@@ -470,14 +515,19 @@ def rodape_padrao(payload: dict) -> str:
 
 
 def slug_arquivo(payload: dict, cenario: dict | None = None,
-                 extensao: str = "png") -> str:
-    """Nome do arquivo baixado: pesquisa_pe_governador_quaest_2026-03-20.png"""
+                 extensao: str = "png", sufixo: str = "") -> str:
+    """Nome do arquivo baixado: pesquisa_pe_governador_quaest_2026-03-20.png
+
+    sufixo distingue as versões do mesmo gráfico dentro do zip
+    ('com-logo', 'sem-logo').
+    """
     cenario = cenario or {}
     pedacos = [
         (cenario.get("uf") or payload.get("uf") or ""),
         (cenario.get("cargo") or payload.get("cargo") or ""),
         (payload.get("instituto") or ""),
         (payload.get("data_campo") or ""),
+        sufixo,
     ]
     bruto = "_".join(str(x).strip() for x in pedacos if str(x).strip())
     bruto = unicodedata.normalize("NFKD", bruto)
