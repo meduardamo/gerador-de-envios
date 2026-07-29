@@ -27,6 +27,7 @@ from polling_manual_core import (
     carregar_df_da_aba,
     classificar_instituto,
     garantir_aba,
+    casar_disputa_existente,
     gerar_poll_id,
     gerar_scenario_id,
     indices_por_grupo_cenario,
@@ -637,11 +638,34 @@ def carregar_payload_polling_no_state(payload: dict):
     return payload
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_disputas_t2_existentes(sheet_id: str) -> tuple:
+    """Slugs de confronto já gravados na Matriz T2 (coluna 'disputa').
+
+    Serve para o cadastro manual reusar a grafia que já está lá em vez de criar
+    um segundo cenário para o mesmo confronto (ver casar_disputa_existente).
+    Falha em silêncio: sem a lista, o slug sai em ordem alfabética como antes,
+    que é o comportamento anterior e não impede o salvamento.
+    """
+    gc = get_polling_sheets_client()
+    if not gc or not sheet_id:
+        return ()
+    try:
+        aba = gc.open_by_key(sheet_id).worksheet("resultados")
+        cabecalho = [c.strip().lower() for c in aba.row_values(1)]
+        coluna = cabecalho.index("disputa") + 1
+        valores = aba.col_values(coluna)[1:]
+    except Exception:
+        return ()
+    return tuple(sorted({v.strip() for v in valores if v and v.strip()}))
+
+
 def montar_dataframes_polling_manual(
     payload: dict,
     fonte_url: str,
     fonte_url_original: str,
     classificacao_canonica: str = "",
+    disputas_existentes: tuple = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     cargo = normalizar_texto_simples(payload.get("cargo")).lower()
     turno = normalizar_texto_simples(payload.get("turno")).lower()
@@ -775,6 +799,9 @@ def montar_dataframes_polling_manual(
                     f"Cenário {idx_no_grupo} ({cargo_cenario}/{turno_cenario}): informe exatamente "
                     f"dois candidatos válidos para formar a disputa de T2."
                 )
+            # Confronto que já está na matriz mantém a grafia de lá, senão o
+            # mesmo Caiado × Lula vira dois cenários no painel.
+            disputa = casar_disputa_existente(disputa, disputas_existentes)
             scenario_label = "NA"
         else:
             scenario_label = normalizar_scenario_label_t1(cenario.get("scenario_label"), idx_no_grupo)
@@ -1812,6 +1839,8 @@ def render_manual():
                         fonte_url=link_fonte,
                         fonte_url_original=fonte_url_original_atual,
                         classificacao_canonica=classificacao_canonica,
+                        disputas_existentes=carregar_disputas_t2_existentes(
+                            planilha_destino_polling("t2")[0]),
                     )
 
                     # Um material pode trazer T1 e T2 juntos (cenário com turno próprio,

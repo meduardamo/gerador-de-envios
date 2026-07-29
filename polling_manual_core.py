@@ -815,6 +815,36 @@ def normalizar_disputa_t2(valor, itens=None) -> str:
     return ""
 
 
+def par_disputa_t2(valor) -> frozenset:
+    """Os dois nomes de um slug de confronto, sem ordem: 't2_lula-caiado' e
+    't2_caiado-lula' devolvem o mesmo par."""
+    texto = _norm_ws(valor).lower()
+    texto = texto[3:] if texto.startswith("t2_") else texto
+    partes = [p for p in texto.split("-") if p]
+    return frozenset(partes) if len(partes) == 2 else frozenset()
+
+
+def casar_disputa_existente(disputa: str, existentes) -> str:
+    """Reaproveita o slug que a matriz já usa para o mesmo confronto.
+
+    O slug nasce de dois lugares que discordam: o Colar e o scraper tiram da URL
+    do PollingData (`..._t2_lula-caiado.html`), na ordem que o site publicou, e
+    aqui ele é montado em ordem alfabética. Onde as duas ordens coincidem
+    ninguém nota; em Caiado × Lula não coincidem, e o confronto apareceu no
+    painel como dois cenários, um deles com uma pesquisa só.
+
+    Existindo o par na matriz, vale a grafia gravada. Confronto novo continua
+    saindo em ordem alfabética.
+    """
+    par = par_disputa_t2(disputa)
+    if not par:
+        return disputa
+    for existente in existentes or ():
+        if par_disputa_t2(existente) == par:
+            return _norm_ws(existente)
+    return disputa
+
+
 def normalizar_scenario_label_t1(valor, indice: int) -> str:
     """Converte rótulos de T1 (ex.: 'Cenário 01', 'Estimulada', 'Estimulada -
     2º voto', 'Estimulada - 5 candidatos') em chaves numéricas para
