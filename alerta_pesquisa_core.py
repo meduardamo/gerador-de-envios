@@ -68,6 +68,11 @@ ROTULO_BRANCOS_NULOS = "Brancos/Nulos"
 
 _PADROES_NS_NR = (
     r"\bns\s*/?\s*nr\b", r"^ns$", r"^nr$",
+    # "Indecisos" é o mesmo item que "Não sabe" com outro nome: os institutos
+    # publicam um OU outro, nunca os dois (Quaest usa indecisos, AtlasIntel usa
+    # não sei). Se algum publicar separado, a trava de rótulo repetido guarda o
+    # segundo com o nome original.
+    r"indecis",
     r"nao sabe", r"nao sei", r"nao sabem", r"nao souber",
     r"nao respond", r"nao opin", r"nao inform", r"nao declar", r"nao revel",
     r"nao quis", r"nao quer responder", r"sem opiniao",
@@ -107,20 +112,21 @@ def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
     Só mexe em quem já está marcado como nao_valido: "Castelo Branco" é
     sobrenome de candidato, e renomear isso seria pior que a bagunça.
 
-    Não junta linhas: se a fonte publicou branco e nulo separados, os dois
-    virariam "Brancos/Nulos" e o gráfico sairia com duas barras de mesmo nome —
-    nesse caso o segundo fica com o rótulo original. Somar por conta própria
-    inventaria um número que a fonte não publicou.
+    Não junta linhas: se dois itens do mesmo cenário cairem no mesmo rótulo
+    (branco e nulo publicados separados, ou "Indecisos" ao lado de "NS/NR"), os
+    dois ficam com o nome original. Renomear os dois deixaria o gráfico com duas
+    barras de mesmo nome, e somar inventaria um número que a fonte não publicou.
     """
-    vistos, saida = set(), []
-    for item in itens or []:
+    itens = list(itens or [])
+    alvos = [padronizar_rotulo_nao_valido(item.get("candidato"))
+             if item.get("tipo") == "nao_valido" else None for item in itens]
+    repetidos = {alvo for alvo in alvos if alvo and alvos.count(alvo) > 1}
+
+    saida = []
+    for item, alvo in zip(itens, alvos):
         novo = dict(item)
-        nome = str(novo.get("candidato") or "").strip()
-        if novo.get("tipo") == "nao_valido":
-            padrao = padronizar_rotulo_nao_valido(nome)
-            if padrao not in vistos:
-                novo["candidato"] = padrao
-            vistos.add(padrao)
+        if alvo and alvo not in repetidos:
+            novo["candidato"] = alvo
         saida.append(novo)
     return saida
 
