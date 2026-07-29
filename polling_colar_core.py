@@ -114,22 +114,30 @@ def parsear(texto, cargo=""):
     pesquisas = []
 
     def eh_inicio(k):
-        if not (k + 2 < len(linhas) and re.fullmatch(r"\d+", linhas[k])):
+        """Linha do instituto, reconhecida pelo registro TSE logo abaixo.
+
+        A âncora é o registro porque ele aparece nos dois layouts do portal: o
+        antigo trazia uma linha só com o nº de cenários antes do instituto, o
+        atual começa direto no instituto. Esse número solto, quando existe, fica
+        fora do bloco e é descartado (não tem %, então não vira cenário)."""
+        if k + 1 >= len(linhas):
             return False
-        if REG.match(linhas[k + 2]):
+        if REG.match(linhas[k]) or _e_linha_valores(linhas[k]):
+            return False
+        if REG.match(linhas[k + 1]):
             return True
         # pesquisa sem registro TSE ("-"): reconhece pela data logo em seguida,
         # pra ela ser uma FRONTEIRA (não deixa os cenários dela vazarem pra
         # pesquisa anterior). Não é emitida (sem registro não forma poll_id).
-        return (linhas[k + 2] in ("-", "—", "–") and k + 3 < len(linhas)
-                and bool(re.search(r"\d{1,2}/\d{1,2}/\d{4}", linhas[k + 3])))
+        return (linhas[k + 1] in ("-", "—", "–") and k + 2 < len(linhas)
+                and bool(re.search(r"\d{1,2}/\d{1,2}/\d{4}", linhas[k + 2])))
 
     i = 0
     while i < len(linhas):
         if not eh_inicio(i):
             i += 1
             continue
-        inst, reg, j = linhas[i + 1], linhas[i + 2], i + 3
+        inst, reg, j = linhas[i], linhas[i + 1], i + 2
         emitir = bool(REG.match(reg))  # sem registro TSE não vai pra matriz
 
         datas = (re.search(r"(\d{1,2}/\d{1,2}/\d{4})\s+a\s+(\d{1,2}/\d{1,2}/\d{4})", linhas[j])
