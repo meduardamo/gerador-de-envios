@@ -30,24 +30,38 @@ REGRAS_POLITICOS = (
     "- Nunca repita o partido do mesmo político mais de uma vez no texto final.\n"
 )
 
-def _instrucao_pesquisa_eleitoral() -> str:
+def _instrucao_pesquisa_eleitoral(com_selecao_de_cenario: bool = True) -> str:
+    """Formato do envio de pesquisa eleitoral, o mesmo nas duas páginas.
+
+    com_selecao_de_cenario=False no Alerta de Pesquisa: lá o cenário já vem
+    escolhido e revisado por uma pessoa, então as regras de "pegue o cenário 1 e
+    ignore o resto" atrapalhariam (a média dos cenários é um cenário só).
+    """
+    escolha_cenario = (
+        "Foque somente em (1) cenário estimulado 1 e (2) ficha técnica.\n"
+        if com_selecao_de_cenario else "")
+    regra_cenario = (
+        "- Priorize o cenário estimulado 1. Se houver mais de um, ignore os demais.\n"
+        if com_selecao_de_cenario else "")
+    abertura = ("comece pelos percentuais do cenário 1"
+                if com_selecao_de_cenario else "comece pelos percentuais")
     return (
         "Escreva um texto curto para WhatsApp (PT-BR), factual e direto, sobre RESULTADO DE PESQUISA ELEITORAL.\n"
         "Sem opinião, sem especulação, sem bullets e sem emojis.\n"
         "Use 1 parágrafo (no máximo 90–110 palavras).\n"
         "Não comece com 'ALERTA'/'ENVIO' nem títulos.\n"
-        "Foque somente em (1) cenário estimulado 1 e (2) ficha técnica.\n"
+        f"{escolha_cenario}"
         f"\n{REGRAS_POLITICOS}\n"
         "Regras de conteúdo:\n"
-        "1) Priorize o cenário estimulado 1. Se houver mais de um, ignore os demais.\n"
-        "2) Liste candidatos e percentuais. Se líder isolado, comece por ele.\n"
-        "   Se empate técnico, diga 'empatados dentro da margem de erro'.\n"
-        "   Exceção: se indecisos forem o maior percentual, abra com 'Indecisos lideram...'.\n"
-        "3) Brancos/nulos e indecisos no fim, em frase curta.\n"
-        "4) Inclua ficha técnica: registro TSE, margem de erro, confiança, amostra e datas de campo.\n"
-        "5) Preserve nomes, cargos, datas e números exatamente como no texto.\n"
-        "6) Se algum item não estiver no texto, omita — não invente.\n"
-        "\nFormato: comece pelos percentuais do cenário 1; feche com a ficha técnica em texto corrido.\n"
+        f"{regra_cenario}"
+        "- Liste candidatos e percentuais. Se líder isolado, comece por ele.\n"
+        "  Se empate técnico, diga 'empatados dentro da margem de erro'.\n"
+        "  Exceção: se indecisos forem o maior percentual, abra com 'Indecisos lideram...'.\n"
+        "- Brancos/nulos e indecisos no fim, em frase curta.\n"
+        "- Inclua ficha técnica: registro TSE, margem de erro, confiança, amostra e datas de campo.\n"
+        "- Preserve nomes, cargos, datas e números exatamente como no texto.\n"
+        "- Se algum item não estiver no texto, omita — não invente.\n"
+        f"\nFormato: {abertura}; feche com a ficha técnica em texto corrido.\n"
     )
 
 
@@ -284,22 +298,51 @@ def limpar_prefixo_alerta(resumo: str) -> str:
     return s.strip()
 
 
+LIMITE_CONTEXTO = 20000
+
+
 def gerar_texto_alerta_pesquisa(payload: dict, cenario: dict, *, gerar_conteudo,
-                                modelo: str) -> str:
+                                modelo: str, texto_fonte: str = "") -> str:
     """Redige o alerta a partir dos dados já conferidos.
+
+    texto_fonte é a matéria/relatório que originou a extração. Entra como
+    CONTEXTO, não como fonte de número: sem ele o modelo só tem uma tabela e
+    devolve uma lista de percentuais, em vez do texto que a casa publica (o que
+    está em disputa, quantas vagas, quem lidera, quem empata). Os números
+    continuam vindo só do bloco conferido.
 
     gerar_conteudo/modelo entram por parâmetro para este módulo não importar o
     cliente do Gemini nem o Streamlit: quem chama passa o
     polling_extracao_core.gerar_conteudo_gemini.
     """
     dados = bloco_dados_pesquisa(payload, cenario)
+    contexto = (texto_fonte or "").strip()[:LIMITE_CONTEXTO]
     prompt = (
-        f"{_instrucao_pesquisa_eleitoral()}\n"
-        "Os DADOS abaixo já foram conferidos por uma pessoa e são a única fonte.\n"
-        "Não acrescente número, nome, data ou registro que não esteja neles.\n"
-        "Se um item da ficha técnica não aparecer nos dados, apenas omita.\n"
-        f"\nDADOS DA PESQUISA:\n{dados}\n"
+        f"{_instrucao_pesquisa_eleitoral(com_selecao_de_cenario=False)}\n"
+        "Regras que valem sobre as anteriores:\n"
+        "- Os DADOS CONFERIDOS abaixo são UM cenário só, já escolhido e revisado\n"
+        "  por uma pessoa. São a única fonte de número, nome, partido e ficha\n"
+        "  técnica. Não acrescente nada que não esteja neles.\n"
+        "- Abra pela leitura da disputa, nunca pela ficha técnica: quem lidera e\n"
+        "  com quanto, quem vem em seguida, quem está empatado. Dois nomes\n"
+        "  separados por menos que o dobro da margem de erro estão empatados\n"
+        "  dentro da margem de erro, e é assim que isso deve ser dito.\n"
+        "- Feche com brancos, nulos e NS/NR em frase curta e a ficha técnica em\n"
+        "  texto corrido. Item que não estiver nos dados, omita.\n"
     )
+    if contexto:
+        prompt += (
+            "- O MATERIAL DE ORIGEM serve para o enquadramento da disputa (o que\n"
+            "  está em jogo, quantas vagas, o que a pergunta mede, quem\n"
+            "  encomendou) e para o texto não sair como lista de percentuais.\n"
+            "  NUNCA tire número dele: percentual que estiver lá e não estiver nos\n"
+            "  DADOS CONFERIDOS é de outro cenário e deve ser ignorado. Não cite\n"
+            "  outro cenário nem compare com ele.\n"
+        )
+    prompt += f"\nDADOS CONFERIDOS:\n{dados}\n"
+    if contexto:
+        prompt += ("\nMATERIAL DE ORIGEM (contexto, não é fonte de número):\n"
+                   f"{contexto}\n")
     resp = gerar_conteudo(modelo, prompt)
     return limpar_prefixo_alerta(getattr(resp, "text", "") or "")
 

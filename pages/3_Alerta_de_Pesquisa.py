@@ -717,6 +717,9 @@ with aba_alerta:
                     st.session_state["alerta_texto"] = gerar_texto_alerta_pesquisa(
                         payload, cenario_final,
                         gerar_conteudo=gerar_conteudo_gemini, modelo=GEMINI_MODEL,
+                        # A matéria colada volta como contexto da disputa. Os
+                        # números continuam saindo só da revisão.
+                        texto_fonte=st.session_state.get("alerta_texto_fonte", ""),
                     )
                 except Exception as exc:
                     st.error(f"Falha ao gerar o texto: {exc}")
