@@ -51,7 +51,7 @@ from alerta_pesquisa_core import (
     gerar_texto_alerta_pesquisa,
     normalizar_link,
     padronizar_itens_alerta,
-    somar_cenarios,
+    combinar_cenarios,
 )
 from graficos_pesquisa_core import (
     ESCALAS_EXPORT,
@@ -223,7 +223,8 @@ def _limpar(limpar_fonte: bool = False):
     # Itens e soma de cenários apontam para a extração anterior: índice guardado
     # aqui pode nem existir na pesquisa nova.
     for chave in [k for k in st.session_state
-                  if k.startswith(("alerta_item_", "alerta_soma_"))]:
+                  if k.startswith(("alerta_item_", "alerta_soma_",
+                                   "alerta_modo_comb_"))]:
         st.session_state.pop(chave, None)
 
 
@@ -427,11 +428,10 @@ with aba_revisao:
 
         # Senado tem duas vagas e o eleitor cita dois nomes. Parte dos institutos
         # publica isso consolidado numa pergunta só (AtlasIntel: "cada
-        # entrevistado citou o primeiro e o segundo votos"), parte publica o 1º e
-        # o 2º voto em cenários separados (Quaest), e aí a leitura da disputa é a
-        # soma dos dois. Não dá pra decidir por código qual é qual: quem lê a
-        # matéria escolhe aqui.
-        somar = []
+        # entrevistado citou o primeiro e o segundo votos"), parte publica dois
+        # ou três cenários estimulados separados (Quaest). Não dá pra decidir por
+        # código qual é qual: quem lê a matéria escolhe aqui.
+        combinar, modo_comb = [], "media"
         if len(cenarios) > 1:
             # Sobra de uma extração anterior com mais cenários derrubaria a
             # página no cenarios[i] logo abaixo.
@@ -439,21 +439,30 @@ with aba_revisao:
                 i for i in st.session_state.get(f"alerta_soma_{idx}", [])
                 if isinstance(i, int) and 0 <= i < len(cenarios) and i != idx
             ]
-            somar = st.multiselect(
-                "Somar com outro cenário (Senado de 2 vagas)",
+            combinar = st.multiselect(
+                "Combinar com outro cenário",
                 [i for i in range(len(cenarios)) if i != idx],
                 format_func=lambda i: rotulos_cen[i],
                 key=f"alerta_soma_{idx}",
-                help="Use quando a fonte publicar o 1º e o 2º voto em cenários "
-                     "separados, cada um somando ~100%. Some só o que for a mesma "
-                     "pergunta repetida: cenário com lista de candidatos diferente "
-                     "não é 2º voto.",
+                help="Para o Senado de 2 vagas, quando o instituto publica mais "
+                     "de um cenário estimulado em vez do consolidado.",
             )
+            if combinar:
+                modo_comb = st.radio(
+                    "Como combinar", ["media", "soma"], horizontal=True,
+                    format_func=lambda m: ("Média dos disponíveis" if m == "media"
+                                           else "Soma (1º + 2º voto)"),
+                    key=f"alerta_modo_comb_{idx}",
+                    help="Média divide cada nome só pelos cenários em que ele "
+                         "aparece, então quem está em um cenário só não é diluído. "
+                         "Soma serve quando os cenários são o 1º e o 2º voto da "
+                         "mesma pergunta e a leitura é o total (~200%).",
+                )
 
         # Trocar de cenário (ou de combinação) tem que zerar título, rodapé e
         # texto: o Streamlit preserva o valor do widget pela chave, e sem isso a
         # tela fica com a peça do cenário anterior.
-        combo = (idx, tuple(somar))
+        combo = (idx, tuple(combinar), modo_comb)
         if st.session_state.get("alerta_cenario_visto") != combo:
             st.session_state["alerta_cenario_visto"] = combo
             for chave in CHAVES_DERIVADAS:
@@ -502,17 +511,21 @@ with aba_revisao:
                 st.warning("Falta " + ", ".join(faltando) +
                            ". Esses campos não entram no rodapé nem no texto.")
 
-        if somar:
-            itens_base = somar_cenarios([cenario] + [cenarios[i] for i in somar])
-            st.caption("Itens do cenário somado — desmarque para tirar do gráfico "
-                       "e do texto.")
+        if combinar:
+            itens_base = combinar_cenarios([cenario] + [cenarios[i] for i in combinar],
+                                           modo=modo_comb)
+            st.caption(
+                ("Média dos cenários, nome a nome, sobre os cenários em que cada "
+                 "um aparece." if modo_comb == "media" else
+                 "Soma dos cenários, nome a nome.") +
+                " Desmarque para tirar do gráfico e do texto.")
         else:
             itens_base = cenario.get("itens") or []
             st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
 
         # A combinação entra na chave do widget: chave repetida faria o Streamlit
         # manter o número do cenário anterior no campo.
-        cmb = "-".join(str(i) for i in [idx] + list(somar))
+        cmb = "-".join(str(i) for i in [idx] + list(combinar)) + f"-{modo_comb}"
         for i, item in enumerate(itens_base):
             c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
             ligado = c_on.checkbox("", True, key=f"alerta_item_on_{cmb}_{i}",
@@ -538,19 +551,27 @@ with aba_revisao:
         if itens_editados:
             soma = sum(i["percentual"] for i in itens_editados)
             st.caption(f"Soma dos itens marcados: {soma:.1f}%".replace(".", ","))
-            if somar:
+            if combinar and modo_comb == "soma":
                 # Dois votos por entrevistado: o total esperado é perto de 200%.
                 if not 150 <= soma <= 250:
                     st.warning("A soma ficou longe dos 200% esperados de dois votos "
                                "por entrevistado. Confira se os cenários somados são "
                                "mesmo o 1º e o 2º voto da mesma pergunta.")
+            elif combinar:
+                # Média passa um pouco de 100% quando alguém aparece em um
+                # cenário só, mas muito acima disso é cenário que não combina.
+                if soma > 120:
+                    st.warning("A média passou de 120%. Confira se os cenários "
+                               "combinados são mesmo variações da mesma pergunta.")
             elif soma > 105:
                 st.warning("Soma acima de 105%. Confira se não entrou mais de um "
                            "cenário na mesma lista.")
             cenario_final = dict(cenario, itens=itens_editados)
-            if somar:
-                cenario_final["soma_cenarios"] = [rotulos_cen[i]
-                                                  for i in [idx] + list(somar)]
+            if combinar:
+                cenario_final["combinacao"] = {
+                    "modo": modo_comb,
+                    "cenarios": [rotulos_cen[i] for i in [idx] + list(combinar)],
+                }
         else:
             st.error("Nenhum item marcado. Marque ao menos um para gerar o gráfico "
                      "e o texto.")
@@ -583,9 +604,17 @@ with aba_grafico:
             titulo_grafico = st.text_input("Título do gráfico",
                                            titulo_padrao(payload, cenario_final),
                                            key="alerta_titulo")
-            rodape_grafico = st.text_area("Ficha técnica (rodapé)",
-                                          rodape_padrao(payload),
-                                          key="alerta_rodape", height=90)
+            # Gráfico de cenários combinados tem que dizer isso na ficha: quem
+            # lê a peça precisa saber que o número não é um cenário publicado.
+            COMBINACAO_RODAPE = {"media": "Média dos cenários estimulados",
+                                 "soma": "1º + 2º voto somados"}
+            nota_comb = COMBINACAO_RODAPE.get(
+                (cenario_final.get("combinacao") or {}).get("modo"), "")
+            rodape_base = rodape_padrao(payload)
+            rodape_grafico = st.text_area(
+                "Ficha técnica (rodapé)",
+                f"{rodape_base} | {nota_comb}" if nota_comb else rodape_base,
+                key="alerta_rodape", height=90)
 
         try:
             with col_prev:

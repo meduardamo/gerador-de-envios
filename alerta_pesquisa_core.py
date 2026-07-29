@@ -136,18 +136,28 @@ def _pct_br(valor) -> str:
     return f"{n:.1f}".replace(".", ",") + "%"
 
 
-def somar_cenarios(cenarios: list[dict]) -> list[dict]:
-    """Soma os percentuais de vários cenários num só, casando pelo nome.
+MODOS_COMBINACAO = ("media", "soma")
 
-    Existe por causa do Senado com DUAS vagas: parte dos institutos publica o 1º
-    e o 2º voto em perguntas separadas (cada uma somando ~100%), e a leitura da
-    disputa é a soma das duas (~200%). Outra parte já publica a pergunta somada.
-    Não dá pra decidir isso por código — a mesma pesquisa aparece dos dois
-    jeitos —, então quem escolhe o que somar é quem está lendo a matéria.
+
+def combinar_cenarios(cenarios: list[dict], modo: str = "media") -> list[dict]:
+    """Junta vários cenários num só, casando pelo nome.
+
+    Existe por causa do Senado com DUAS vagas, em que a mesma pesquisa aparece
+    publicada de jeitos diferentes: parte dos institutos já entrega o resultado
+    consolidado numa pergunta só (AtlasIntel), parte publica dois ou três
+    cenários estimulados separados (Quaest). Não dá pra decidir por código qual
+    é qual, então quem lê a matéria escolhe o que combinar.
+
+    modo "media" (padrão): média DOS DISPONÍVEIS, ou seja, cada nome é dividido
+    só pelos cenários em que ele aparece. Quem está em um cenário só mantém o
+    valor que tem, em vez de ser diluído por uma ausência que não é zero.
+    modo "soma": soma direta, para quando os cenários forem o 1º e o 2º voto da
+    mesma pergunta e a leitura da disputa for o total (~200%).
 
     Nome é casado sem acento e sem caixa; partido e tipo vêm da primeira
-    aparição. Quem só existe em um dos cenários entra com o valor que tem.
+    aparição, e o percentual sai com uma casa decimal.
     """
+    modo = modo if modo in MODOS_COMBINACAO else "media"
     combinado: dict[str, dict] = {}
     for cenario in cenarios or []:
         for item in (cenario or {}).get("itens") or []:
@@ -155,20 +165,28 @@ def somar_cenarios(cenarios: list[dict]) -> list[dict]:
             chave = _chave_rotulo(nome)
             if not chave:
                 continue
-            atual = combinado.get(chave)
-            if atual is None:
-                combinado[chave] = {
-                    "candidato": nome,
-                    "partido": str(item.get("partido") or "").strip(),
-                    "percentual": item.get("percentual"),
-                    "tipo": item.get("tipo") or "candidato",
-                }
-                continue
-            if item.get("percentual") is not None:
-                atual["percentual"] = (atual.get("percentual") or 0) + item["percentual"]
+            atual = combinado.setdefault(chave, {
+                "candidato": nome,
+                "partido": "",
+                "percentual": None,
+                "tipo": item.get("tipo") or "candidato",
+                "_total": 0.0,
+                "_vezes": 0,
+            })
             if not atual["partido"]:
                 atual["partido"] = str(item.get("partido") or "").strip()
-    return list(combinado.values())
+            if item.get("percentual") is not None:
+                atual["_total"] += float(item["percentual"])
+                atual["_vezes"] += 1
+
+    saida = []
+    for item in combinado.values():
+        vezes = item.pop("_vezes")
+        total = item.pop("_total")
+        if vezes:
+            item["percentual"] = round(total / vezes if modo == "media" else total, 1)
+        saida.append(item)
+    return saida
 
 
 def bloco_dados_pesquisa(payload: dict, cenario: dict) -> str:
@@ -220,15 +238,26 @@ def bloco_dados_pesquisa(payload: dict, cenario: dict) -> str:
             candidatos.append((float(item["percentual"]), f"- {rotulo}: {pct}"))
 
     candidatos.sort(key=lambda x: x[0], reverse=True)
-    if c.get("soma_cenarios"):
+    combinacao = c.get("combinacao") or {}
+    rotulos_comb = ", ".join(combinacao.get("cenarios") or [])
+    if combinacao.get("modo") == "media":
+        linhas.append(
+            f"\nATENÇÃO: os percentuais abaixo são a MÉDIA dos cenários "
+            f"estimulados da mesma pesquisa ({rotulos_comb}), calculada nome a "
+            "nome sobre os cenários em que cada um aparece. Diga isso no texto, "
+            "uma vez, com naturalidade (ex.: 'na média dos cenários "
+            "estimulados'). Não descreva como se fosse um cenário publicado "
+            "pelo instituto e não recalcule nada."
+        )
+    elif combinacao.get("modo") == "soma":
         # Sem isso o modelo trata soma de ~200% como erro e "corrige" o número.
         linhas.append(
             "\nATENÇÃO: os percentuais abaixo somam as respostas de mais de uma "
-            f"pergunta da mesma pesquisa ({', '.join(c['soma_cenarios'])}). "
-            "São duas vagas em disputa e cada entrevistado cita dois nomes, "
-            "então o total passa de 100% — isso está correto, não é erro. "
-            "Diga no texto que o percentual considera os dois votos do "
-            "entrevistado. Nunca reduza, divida ou 'ajuste' os números."
+            f"pergunta da mesma pesquisa ({rotulos_comb}). São duas vagas em "
+            "disputa e cada entrevistado cita dois nomes, então o total passa "
+            "de 100% — isso está correto, não é erro. Diga no texto que o "
+            "percentual considera os dois votos do entrevistado. Nunca reduza, "
+            "divida ou 'ajuste' os números."
         )
     if candidatos:
         linhas.append("\nResultado do cenário (do maior para o menor):")
