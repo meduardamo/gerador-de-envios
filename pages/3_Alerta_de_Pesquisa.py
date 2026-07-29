@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import zipfile
+import zlib
 from pathlib import Path
 
 import streamlit as st
@@ -409,9 +410,6 @@ with aba_revisao:
     if not payload:
         st.info(AVISO_SEM_DADOS)
     else:
-        st.caption("O que o Gemini não achou fica em branco de propósito. Complete "
-                   "na mão: nada aqui é preenchido por suposição.")
-
         cenarios = payload.get("cenarios") or []
         rotulos_cen = [
             f"{i + 1}. {c.get('scenario_label') or i + 1} "
@@ -444,7 +442,9 @@ with aba_revisao:
                     f"({(c0.get('cargo') or '').capitalize()} {(c0.get('uf') or '')} "
                     f"{(c0.get('turno') or '').upper()})")
 
-        opcoes = [f"c{i}" for i in range(len(cenarios))] + list(medias)
+        # Média primeiro: quando ela existe, é a leitura da disputa, e o cenário
+        # avulso vira a exceção que se escolhe de propósito.
+        opcoes = list(medias) + [f"c{i}" for i in range(len(cenarios))]
         escolha = opcoes[0] if opcoes else "c0"
         if len(opcoes) > 1:
             escolha = st.selectbox("Cenário", opcoes, format_func=_rotulo_opcao,
@@ -540,20 +540,29 @@ with aba_revisao:
                            ". Esses campos não entram no rodapé nem no texto.")
 
         if combinar:
-            itens_base = combinar_cenarios([cenarios[i] for i in combinar],
-                                           modo=modo_comb)
+            fonte = [cenarios[i] for i in combinar]
+            itens_base = combinar_cenarios(fonte, modo=modo_comb)
             st.caption(
                 ("Média nome a nome, dividida só pelos cenários em que cada um "
                  "aparece." if modo_comb == "media" else
                  "Soma dos cenários, nome a nome.") +
-                " Desmarque para tirar do gráfico e do texto.")
+                " Corrigir um número dentro de um cenário refaz a conta aqui. "
+                "Desmarque para tirar do gráfico e do texto.")
+            # Número corrigido no cenário avulso muda a origem da conta, e o
+            # Streamlit devolveria o valor velho pela chave do widget. Com a
+            # origem na chave, a média volta recalculada.
+            origem = json.dumps([c.get("itens") for c in fonte], sort_keys=True,
+                                ensure_ascii=False, default=str)
+            marca = f"-{zlib.crc32(origem.encode('utf-8')):x}"
         else:
             itens_base = cenario.get("itens") or []
-            st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto.")
+            marca = ""
+            st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto. "
+                       "O que você corrigir aqui entra na média dos cenários.")
 
         # A combinação entra na chave do widget: chave repetida faria o Streamlit
         # manter o número do cenário anterior no campo.
-        cmb = "-".join([escolha] + [str(i) for i in combinar] + [modo_comb])
+        cmb = "-".join([escolha] + [str(i) for i in combinar] + [modo_comb]) + marca
         for i, item in enumerate(itens_base):
             c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
             ligado = c_on.checkbox("", True, key=f"alerta_item_on_{cmb}_{i}",
@@ -572,6 +581,13 @@ with aba_revisao:
                                     index=0 if tipo_atual == "candidato" else 1,
                                     key=f"alerta_item_tipo_{cmb}_{i}",
                                     label_visibility="collapsed")
+            # Correção feita no cenário avulso volta pro payload, senão a média
+            # continuaria sendo calculada em cima do número errado. Na média não
+            # há volta: ela é resultado, não fonte.
+            if not combinar:
+                item.update({"candidato": nome, "partido": partido,
+                             "percentual": pct, "tipo": tipo})
+
             if ligado and normalizar_texto_simples(nome):
                 itens_editados.append({"candidato": nome, "partido": partido,
                                        "percentual": pct, "tipo": tipo})
