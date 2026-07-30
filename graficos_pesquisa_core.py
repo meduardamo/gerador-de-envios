@@ -39,7 +39,8 @@ LOGO_PADRAO = os.path.join(RAIZ, "Marca_eixo_vetor_Logo horizontal magenta.png")
 # Paleta Eixo (mesma do app, ver Gerador_de_Envios.py).
 MARINHO = "#192D4E"      # candidato e título
 MARINHO_CLARO = "#485B7B"  # branco/nulo/indeciso: mesmo matiz, passo mais claro
-GELO = "#F4F3EF"        # fundo
+GELO = "#F4F3EF"        # fundo do app
+BRANCO = "#FFFFFF"      # fundo do gráfico exportado
 TINTA = "#111111"       # rótulo de valor e nome no eixo
 SUBTEXTO = "#767672"    # eixo, grade e rodapé
 
@@ -249,7 +250,7 @@ def gerar_grafico_pesquisa(
     escala_cheia: bool = True,
     escala: int = 2,
     formato: str = "png",
-    fundo_transparente: bool = True,
+    fundo_transparente: bool = False,
 ) -> bytes:
     """Devolve o arquivo em bytes, pronto pro st.image e pro st.download_button.
 
@@ -267,10 +268,11 @@ def gerar_grafico_pesquisa(
     acima do maior valor, para pesquisa muito fragmentada não sair com metade da
     área vazia. Nos dois casos a base fica no zero: barra com base cortada mente.
 
-    fundo_transparente=True (padrão) sai sem fundo, para o gráfico assentar em
-    slide, story ou peça de fundo escuro sem o retângulo gelo por baixo. O
-    desenho não muda: texto e barra continuam nas cores da casa, que pedem
-    fundo claro.
+    fundo_transparente=False (padrão) sai com fundo branco, que é como a peça
+    costuma ser postada e o que evita a barra escura brigando com fundo de cor
+    quando alguém joga o PNG em qualquer lugar. True sai sem fundo, para o
+    gráfico assentar direto em slide ou story; o desenho não muda, e texto e
+    barra continuam nas cores da casa, que pedem fundo claro.
     """
     familia = _registrar_fonte()
     orientacao = orientacao if orientacao in ORIENTACOES else "vertical"
@@ -303,7 +305,7 @@ def gerar_grafico_pesquisa(
         passo = 10 if topo <= 60 else 25
         marcas = list(range(0, topo + 1, passo))
 
-    fundo = "none" if fundo_transparente else GELO
+    fundo = "none" if fundo_transparente else BRANCO
     fig = plt.figure(figsize=(LARGURA_PX / 100, ALTURA_PX / 100), dpi=100)
     fig.patch.set_facecolor(fundo)
     vertical = orientacao == "vertical"

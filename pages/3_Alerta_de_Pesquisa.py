@@ -662,10 +662,11 @@ with aba_grafico:
                 help="Só muda a prévia: o arquivo baixado sai sempre nas duas "
                      "versões, com e sem logo.")
             fundo_transparente = st.checkbox(
-                "Fundo transparente", True, key="alerta_fundo",
-                help="Sem o retângulo gelo por baixo, o gráfico assenta em slide "
-                     "ou story de qualquer cor. O texto continua escuro, então "
-                     "pede fundo claro.")
+                "Fundo transparente", False, key="alerta_fundo",
+                help="Desligado (padrão), o gráfico sai com fundo branco. Ligado, "
+                     "sai sem fundo e assenta direto em slide ou story de "
+                     "qualquer cor — mas o texto continua escuro, então pede "
+                     "fundo claro.")
             escala_cheia = st.checkbox(
                 "Escala de 0 a 100%", True, key="alerta_escala",
                 help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam "
