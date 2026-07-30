@@ -47,11 +47,13 @@ from polling_extracao_core import (
 )
 from polling_manual_core import normalizar_nome_candidato, normalizar_partido
 from alerta_pesquisa_core import (
+    abreviar_titulo_urna,
     compilar_alerta_pesquisa,
     encurtar_link,
     gerar_texto_alerta_pesquisa,
     normalizar_link,
     padronizar_itens_alerta,
+    rotulo_partido_alerta,
     combinar_cenarios,
 )
 from graficos_pesquisa_core import (
@@ -608,8 +610,13 @@ with aba_revisao:
                              "percentual": pct, "tipo": tipo})
 
             if ligado and normalizar_texto_simples(nome):
-                itens_editados.append({"candidato": nome, "partido": partido,
-                                       "percentual": pct, "tipo": tipo})
+                # O que ela digita aqui também sai na forma da peça: partido em
+                # nome próprio e título de urna abreviado.
+                itens_editados.append({
+                    "candidato": nome if tipo == "nao_valido"
+                                 else abreviar_titulo_urna(nome),
+                    "partido": rotulo_partido_alerta(partido),
+                    "percentual": pct, "tipo": tipo})
 
         if itens_editados:
             soma = sum(i["percentual"] for i in itens_editados)

@@ -45,13 +45,21 @@ def _instrucao_pesquisa_eleitoral(com_selecao_de_cenario: bool = True) -> str:
         if com_selecao_de_cenario else "")
     abertura = ("comece pelos percentuais do cenário 1"
                 if com_selecao_de_cenario else "comece pelos percentuais")
+    # No Alerta o partido chega já na forma que a peça publica ("União",
+    # "Cidadania"), então a regra geral de caixa alta abriria exceção sozinha.
+    # No Gerador o partido vem do texto colado e a regra continua valendo.
+    regra_caixa_partido = "" if com_selecao_de_cenario else (
+        "- Exceção à caixa alta: escreva cada partido exatamente como está no "
+        "bloco de dados (União, Cidadania, Republicanos ficam assim; PT, PL, "
+        "PSOL seguem em caixa alta). A UF continua sempre em caixa alta.\n")
     return (
         "Escreva um texto curto para WhatsApp (PT-BR), factual e direto, sobre RESULTADO DE PESQUISA ELEITORAL.\n"
         "Sem opinião, sem especulação, sem bullets e sem emojis.\n"
         "Use 1 parágrafo (no máximo 90–110 palavras).\n"
         "Não comece com 'ALERTA'/'ENVIO' nem títulos.\n"
         f"{escolha_cenario}"
-        f"\n{REGRAS_POLITICOS}\n"
+        f"\n{REGRAS_POLITICOS}"
+        f"{regra_caixa_partido}\n"
         "Regras de conteúdo:\n"
         f"{regra_cenario}"
         "- Liste candidatos e percentuais. Se líder isolado, comece por ele.\n"
@@ -120,10 +128,79 @@ def padronizar_rotulo_nao_valido(nome: str) -> str:
     return str(nome or "").strip()
 
 
-def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
-    """Aplica o rótulo padrão nos itens não válidos do cenário.
+# ── partido e título de urna na peça ─────────────────────────────────────────
+# A peça publica o partido como ele se escreve, não como a matriz arquiva:
+# "União", não "UNIAO"; "Cidadania", não "CID". Partido que só existe como sigla
+# (PT, PL, PP, PSOL) continua em caixa alta.
+#
+# Vale SÓ aqui, no Alerta, pelo mesmo motivo do rótulo NS/NR: o Polling Manual
+# grava em T1/T2 a sigla canônica, que é o que casa com a raspagem do
+# PollingData.
+#
+# O mapa é por chave sem acento e sem caixa, com sigla e nome por extenso, porque
+# o partido chega dos dois jeitos (extraído do PDF ou digitado na revisão).
 
-    Só mexe em quem já está marcado como nao_valido: "Castelo Branco" é
+_PARTIDO_NA_PECA = {
+    "agir": "Agir",
+    "avante": "Avante",
+    "cid": "Cidadania", "cidadania": "Cidadania",
+    "dem": "Democrata", "democrata": "Democrata", "democratas": "Democrata",
+    "missao": "Missão",
+    "mob": "Mobiliza", "mobiliza": "Mobiliza",
+    "novo": "Novo", "partido novo": "Novo",
+    "pode": "Podemos", "podemos": "Podemos",
+    "rede": "Rede", "rede sustentabilidade": "Rede",
+    "rep": "Republicanos", "republicanos": "Republicanos",
+    "sd": "Solidariedade", "solidariedade": "Solidariedade",
+    "uniao": "União", "uniao brasil": "União",
+    # Os dois que a fonte costuma escrever por extenso ou com caixa própria e
+    # que a peça publica como sigla.
+    "pp": "PP", "progressista": "PP", "progressistas": "PP",
+    "psol": "PSOL", "partido socialismo e liberdade": "PSOL",
+}
+
+# Título de urna: a peça abrevia ("Professor Ivan" -> "Prof. Ivan"), inclusive
+# quando a fonte já abreviou sem ponto. Feminino tem forma própria.
+_TITULO_URNA = {
+    "professor": "Prof.", "prof": "Prof.",
+    "professora": "Profa.", "profa": "Profa.",
+    "doutor": "Dr.", "dr": "Dr.",
+    "doutora": "Dra.", "dra": "Dra.",
+    "delegado": "Del.", "del": "Del.",
+    "delegada": "Dela.", "dela": "Dela.",
+    "coronel": "Cel.", "cel": "Cel.", "coronela": "Cel.",
+}
+
+
+def rotulo_partido_alerta(valor) -> str:
+    """Partido como a peça publica. Fora do mapa, volta como veio: sigla que a
+    extração já normalizou não tem por que ser mexida aqui."""
+    bruto = re.sub(r"\s+", " ", str(valor or "")).strip()
+    if not bruto:
+        return ""
+    return _PARTIDO_NA_PECA.get(_chave_rotulo(bruto), bruto)
+
+
+def abreviar_titulo_urna(nome) -> str:
+    """'Professor Ivan' -> 'Prof. Ivan'; 'DELEGADA PAULA' -> 'Dela. Paula'.
+
+    Só a primeira palavra, e só quando tem nome depois dela: "Delegado" sozinho
+    é o nome de urna inteiro de alguém, não um título a abreviar. Fora dessa
+    posição a palavra pode ser sobrenome ("Zé Professor"), então não se mexe.
+    """
+    texto = re.sub(r"\s+", " ", str(nome or "")).strip()
+    if " " not in texto:
+        return texto
+    primeira, resto = texto.split(" ", 1)
+    abreviado = _TITULO_URNA.get(_chave_rotulo(primeira))
+    return f"{abreviado} {resto}" if abreviado else texto
+
+
+def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
+    """Deixa os itens do cenário na forma que a peça publica: rótulo padrão nos
+    não válidos, título de urna abreviado e partido em nome próprio.
+
+    O rótulo só mexe em quem já está marcado como nao_valido: "Castelo Branco" é
     sobrenome de candidato, e renomear isso seria pior que a bagunça.
 
     Não junta linhas: se dois itens do mesmo cenário cairem no mesmo rótulo
@@ -141,6 +218,9 @@ def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
         novo = dict(item)
         if alvo and alvo not in repetidos:
             novo["candidato"] = alvo
+        elif item.get("tipo") != "nao_valido":
+            novo["candidato"] = abreviar_titulo_urna(item.get("candidato"))
+        novo["partido"] = rotulo_partido_alerta(item.get("partido"))
         saida.append(novo)
     return saida
 
