@@ -553,7 +553,10 @@ with aba_revisao:
                     "Publicar assim mesmo, com a ficha incompleta",
                     key=CHAVE_FORCAR_FICHA,
                     help="Marque só quando o próprio relatório do instituto não "
-                         "traz o campo. Confira o PDF antes.")
+                         "traz o campo. Confira o PDF antes. Amostra, margem, "
+                         "confiança e datas de campo também estão na ficha "
+                         "registrada no [PesqEle](https://pesqele.tse.jus.br), "
+                         "buscando pelo registro TSE.")
 
         if combinar:
             fonte = [cenarios[i] for i in combinar]
