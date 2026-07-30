@@ -490,6 +490,26 @@ def titulo_padrao(payload: dict, cenario: dict | None = None) -> str:
     return f"{titulo} - {uf}" if uf and uf != "BR" else titulo
 
 
+# Ficha técnica publicável: são estes seis campos que o rodapé mostra, e a peça
+# circula fora da casa. Faltar um é publicar pesquisa sem metodologia, então a
+# página trava em cima desta lista.
+CAMPOS_FICHA = (
+    ("instituto", "instituto"),
+    ("registro_tse", "registro TSE"),
+    ("data_campo", "data de campo"),
+    ("amostra", "amostra"),
+    ("margem_erro", "margem de erro"),
+    ("confianca", "nível de confiança"),
+)
+
+
+def ficha_incompleta(payload: dict) -> list[str]:
+    """Rótulos dos campos que o rodapé não teria como publicar. Lista vazia
+    quando a ficha está completa."""
+    p = payload or {}
+    return [rotulo for chave, rotulo in CAMPOS_FICHA if not p.get(chave)]
+
+
 def rodape_padrao(payload: dict) -> str:
     """Ficha técnica em linha, pulando o que a fonte não trouxe. Nada é
     inventado: campo vazio simplesmente não aparece."""
@@ -497,9 +517,12 @@ def rodape_padrao(payload: dict) -> str:
     partes = []
     if str(p.get("instituto") or "").strip():
         partes.append(f"Pesquisa {str(p['instituto']).strip()}")
+    # Só o período, sem rótulo: numa linha lida em sequência com o instituto e a
+    # amostra, "21 a 25 de julho" já se lê como data de campo, e "Campo:" só
+    # gasta espaço na linha mais apertada do gráfico.
     periodo = periodo_campo_br(p.get("data_campo_inicio"), p.get("data_campo"))
     if periodo:
-        partes.append(f"Campo: {periodo}")
+        partes.append(periodo)
     if p.get("amostra"):
         partes.append(f"{_num(p['amostra'])} entrevistas")
     # Zero é campo vazio, não medida: nenhuma pesquisa tem margem de erro de 0

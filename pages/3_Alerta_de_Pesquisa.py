@@ -56,6 +56,7 @@ from alerta_pesquisa_core import (
 )
 from graficos_pesquisa_core import (
     ESCALAS_EXPORT,
+    ficha_incompleta,
     gerar_grafico_pesquisa,
     periodo_campo_br,
     resolucao,
@@ -213,9 +214,22 @@ CHAVES_PESQUISA = ("alerta_payload", "alerta_texto", "alerta_png",
 CHAVES_DERIVADAS = ("alerta_titulo", "alerta_rodape", "alerta_titulo_envio",
                     "alerta_texto", "alerta_texto_edit")
 
+# Liberação manual de ficha incompleta. Vale para uma pesquisa só: pesquisa nova
+# entra travada de novo, senão o "publicar assim mesmo" de ontem soltaria a
+# ficha da extração de hoje sem ninguém olhar.
+CHAVE_FORCAR_FICHA = "alerta_ficha_forcar"
+
+
+def _travar_por_ficha(payload: dict) -> list[str]:
+    """Campos da ficha que estão barrando o download e o texto. Vazio quando a
+    ficha está completa ou quando ela liberou na mão."""
+    if st.session_state.get(CHAVE_FORCAR_FICHA):
+        return []
+    return ficha_incompleta(payload)
+
 
 def _limpar(limpar_fonte: bool = False):
-    alvos = list(CHAVES_PESQUISA) + list(CHAVES_DERIVADAS)
+    alvos = list(CHAVES_PESQUISA) + list(CHAVES_DERIVADAS) + [CHAVE_FORCAR_FICHA]
     if limpar_fonte:
         alvos += ["alerta_texto_fonte", "alerta_texto_pendente", "alerta_url",
                   "alerta_pdf"]
@@ -510,8 +524,7 @@ with aba_revisao:
                                                   payload.get("data_campo") or "")
             periodo_txt = periodo_campo_br(payload.get("data_campo_inicio"),
                                            payload.get("data_campo"))
-            d3.text_input("Como sai no gráfico", f"Campo: {periodo_txt}" if periodo_txt
-                          else "", disabled=True)
+            d3.text_input("Como sai no gráfico", periodo_txt, disabled=True)
             m5, m6, m7 = st.columns(3)
             payload["margem_erro"] = m5.number_input(
                 "Margem de erro (p.p.)", 0.0, 100.0,
@@ -531,13 +544,16 @@ with aba_revisao:
             if not payload.get("margem_erro"):
                 payload["margem_erro"] = None
 
-            FICHA = [("instituto", "instituto"), ("registro_tse", "registro TSE"),
-                     ("data_campo", "data de campo"), ("amostra", "amostra"),
-                     ("margem_erro", "margem de erro"), ("confianca", "nível de confiança")]
-            faltando = [rot for chave, rot in FICHA if not payload.get(chave)]
+            faltando = ficha_incompleta(payload)
             if faltando:
-                st.warning("Falta " + ", ".join(faltando) +
-                           ". Esses campos não entram no rodapé nem no texto.")
+                st.error("Ficha incompleta: falta " + ", ".join(faltando) +
+                         ". O rodapé sairia sem esses campos, então o download do "
+                         "gráfico e o texto do alerta ficam travados.")
+                st.checkbox(
+                    "Publicar assim mesmo, com a ficha incompleta",
+                    key=CHAVE_FORCAR_FICHA,
+                    help="Marque só quando o próprio relatório do instituto não "
+                         "traz o campo. Confira o PDF antes.")
 
         if combinar:
             fonte = [cenarios[i] for i in combinar]
@@ -626,6 +642,11 @@ with aba_grafico:
         st.info(AVISO_SEM_DADOS if not payload else
                 "Marque ao menos um item na aba **2. Revisão**.")
     else:
+        travando = _travar_por_ficha(payload)
+        if travando:
+            st.error("Ficha incompleta: falta " + ", ".join(travando) +
+                     ". Complete na aba **2. Revisão** para liberar o download.")
+
         col_ctl, col_prev = st.columns([1, 2])
 
         with col_ctl:
@@ -696,12 +717,20 @@ with aba_grafico:
                 "fundo_transparente": fundo_transparente, "nomes": nomes,
             }, sort_keys=True, ensure_ascii=False)
 
-            e2.download_button(
-                "Baixar tudo (.zip)", _pacote_graficos(assinatura),
-                file_name=slug_arquivo(payload, cenario_final, "zip"),
-                mime="application/zip", use_container_width=True, type="primary",
-                help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
-            e2.caption("PNG e SVG, com e sem logo.")
+            # Travado, o zip nem é montado: são quatro desenhos do matplotlib
+            # para um botão que ninguém pode clicar.
+            if travando:
+                e2.button("Baixar tudo (.zip)", disabled=True,
+                          use_container_width=True, type="primary",
+                          help="Falta " + ", ".join(travando) + " na ficha técnica")
+                e2.caption("Complete a ficha na aba 2. Revisão.")
+            else:
+                e2.download_button(
+                    "Baixar tudo (.zip)", _pacote_graficos(assinatura),
+                    file_name=slug_arquivo(payload, cenario_final, "zip"),
+                    mime="application/zip", use_container_width=True, type="primary",
+                    help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
+                e2.caption("PNG e SVG, com e sem logo.")
         except Exception as exc:
             st.error(f"Falha ao gerar o gráfico: {exc}")
 
@@ -711,7 +740,13 @@ with aba_alerta:
         st.info(AVISO_SEM_DADOS if not payload else
                 "Marque ao menos um item na aba **2. Revisão**.")
     else:
-        if st.button("Gerar texto do alerta", type="primary"):
+        travando = _travar_por_ficha(payload)
+        if travando:
+            st.error("Ficha incompleta: falta " + ", ".join(travando) +
+                     ". O texto do alerta cita a ficha técnica, então complete na "
+                     "aba **2. Revisão** antes de gerar.")
+
+        if st.button("Gerar texto do alerta", type="primary", disabled=bool(travando)):
             with st.spinner("Redigindo…"):
                 try:
                     st.session_state["alerta_texto"] = gerar_texto_alerta_pesquisa(
