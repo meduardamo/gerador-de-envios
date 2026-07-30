@@ -25,6 +25,7 @@ from alerta_pesquisa_core import (
     _instrucao_pesquisa_eleitoral,
     encurtar_link,
     normalizar_link,
+    padronizar_politicos_no_texto,
 )
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -547,7 +548,10 @@ TEXTO:
 {texto}""".strip()
 
     resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-    return gerar_resumo_seguro(resp)
+    # Partido por extenso e título de urna abreviado valem em todo texto que a
+    # casa publica. O prompt pede; isto garante, porque modelo esquece regra de
+    # formatação no meio de texto longo.
+    return padronizar_politicos_no_texto(gerar_resumo_seguro(resp))
 
 
 def compilar_envio(is_alerta, area, abrangencia, ufs, titulo, resumo, analise_eixo, link):

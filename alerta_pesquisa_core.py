@@ -22,7 +22,16 @@ from graficos_pesquisa_core import periodo_campo_br
 REGRAS_POLITICOS = (
     "Formatação de políticos (obrigatório):\n"
     "- Formato: 'Nome (PARTIDO/UF)'. Use barra, nunca hífen entre PARTIDO e UF.\n"
-    "- Use PARTIDO e UF em caixa alta.\n"
+    "- UF sempre em caixa alta. Partido em caixa alta quando for sigla "
+    "(PT, PL, PP, PSOL, MDB, PSDB).\n"
+    "- Estes partidos se escrevem por extenso, em caixa mista: União, Missão, "
+    "Republicanos, Democrata, Solidariedade, Rede, Avante, Podemos, Novo, "
+    "Mobiliza, Agir, Cidadania.\n"
+    "- Título dentro do nome de urna vai abreviado: Prof., Profa., Dr., Dra., "
+    "Del., Dela., Cel. ('Professor Ivan' vira 'Prof. Ivan'). Única exceção à "
+    "regra de preservar o nome como está na fonte. Não abrevie quando a palavra "
+    "for profissão fora do nome ('o delegado que conduz o caso') nem quando fizer "
+    "parte de nome de cidade ('Coronel Fabriciano').\n"
     "- Se partido/UF não estiverem no texto, não invente.\n"
     "- Se o texto trouxer '(PARTIDO-UF)', padronize para '(PARTIDO/UF)'.\n"
     "- PRIMEIRA menção de um político: use 'Nome (PARTIDO/UF)'.\n"
@@ -45,21 +54,13 @@ def _instrucao_pesquisa_eleitoral(com_selecao_de_cenario: bool = True) -> str:
         if com_selecao_de_cenario else "")
     abertura = ("comece pelos percentuais do cenário 1"
                 if com_selecao_de_cenario else "comece pelos percentuais")
-    # No Alerta o partido chega já na forma que a peça publica ("União",
-    # "Cidadania"), então a regra geral de caixa alta abriria exceção sozinha.
-    # No Gerador o partido vem do texto colado e a regra continua valendo.
-    regra_caixa_partido = "" if com_selecao_de_cenario else (
-        "- Exceção à caixa alta: escreva cada partido exatamente como está no "
-        "bloco de dados (União, Cidadania, Republicanos ficam assim; PT, PL, "
-        "PSOL seguem em caixa alta). A UF continua sempre em caixa alta.\n")
     return (
         "Escreva um texto curto para WhatsApp (PT-BR), factual e direto, sobre RESULTADO DE PESQUISA ELEITORAL.\n"
         "Sem opinião, sem especulação, sem bullets e sem emojis.\n"
         "Use 1 parágrafo (no máximo 90–110 palavras).\n"
         "Não comece com 'ALERTA'/'ENVIO' nem títulos.\n"
         f"{escolha_cenario}"
-        f"\n{REGRAS_POLITICOS}"
-        f"{regra_caixa_partido}\n"
+        f"\n{REGRAS_POLITICOS}\n"
         "Regras de conteúdo:\n"
         f"{regra_cenario}"
         "- Liste candidatos e percentuais. Se líder isolado, comece por ele.\n"
@@ -194,6 +195,72 @@ def abreviar_titulo_urna(nome) -> str:
     primeira, resto = texto.split(" ", 1)
     abreviado = _TITULO_URNA.get(_chave_rotulo(primeira))
     return f"{abreviado} {resto}" if abreviado else texto
+
+
+# ── as mesmas duas regras aplicadas a texto corrido ──────────────────────────
+# O gráfico recebe item por item, mas o envio e o resumo saem como texto do
+# Gemini. O prompt já pede a forma certa; isto aqui é a garantia, porque modelo
+# esquece regra de formatação no meio de um texto longo.
+
+UFS = {"AC", "AL", "AP", "AM", "BA", "BR", "CE", "DF", "ES", "GO", "MA", "MT",
+       "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR",
+       "SC", "SP", "SE", "TO"}
+
+# '(UNIAO/PR)', '(União Brasil - PR)', '(PSol/RJ)'. Hífen e travessão entram
+# porque a fonte escreve dos dois jeitos e a saída padroniza na barra.
+_RE_PARTIDO_UF = re.compile(
+    r"\(\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ.\s]{1,38}?)\s*[/\-–—]\s*([A-Za-z]{2})\s*\)")
+
+# Título de urna no meio da frase. Sem re.IGNORECASE de propósito: "o delegado
+# que assina o inquérito" é profissão, não nome, e só a forma capitalizada
+# seguida de nome próprio é candidato.
+_RE_TITULO_TEXTO = re.compile(
+    r"(?<![\wÀ-ÿ])(Professora|Professor|Doutora|Doutor|Delegada|Delegado|"
+    r"Coronela|Coronel|Profa|Prof|Dra|Dr|Dela|Del|Cel)\.?\s+(?=[A-ZÀ-Þ])")
+
+# Cidade que começa com título não é candidato. Lista curta e extensível: só
+# entram os topônimos que aparecem em texto político com alguma frequência.
+_TOPONIMOS_COM_TITULO = {
+    "coronel fabriciano", "coronel vivida", "coronel sapucaia",
+    "coronel freitas", "coronel bicaco", "coronel ezequiel", "coronel murta",
+    "coronel jose dias", "coronel joao pessoa", "coronel xavier chaves",
+    "doutor ricardo", "doutor camargo", "doutor ulysses", "doutor severiano",
+    "doutor pedrinho", "doutor mauricio cardoso",
+}
+
+
+def padronizar_partidos_no_texto(texto: str) -> str:
+    """'(UNIAO/PR)' -> '(União/PR)'; '(Progressistas-BA)' -> '(PP/BA)'.
+
+    Só mexe no que estiver no formato '(algo/UF)' com UF de verdade: fora daí
+    não dá pra saber se o parêntese é partido.
+    """
+    def troca(m):
+        uf = m.group(2).upper()
+        if uf not in UFS:
+            return m.group(0)
+        return f"({rotulo_partido_alerta(m.group(1))}/{uf})"
+
+    return _RE_PARTIDO_UF.sub(troca, str(texto or ""))
+
+
+def padronizar_titulos_no_texto(texto: str) -> str:
+    """'Professor Ivan' -> 'Prof. Ivan', dentro do texto corrido."""
+    def troca(m):
+        depois = m.string[m.end():]
+        proxima = re.split(r"[\s,;:.]", depois, maxsplit=1)[0]
+        chave = _chave_rotulo(f"{m.group(1)} {proxima}")
+        if chave in _TOPONIMOS_COM_TITULO:
+            return m.group(0)
+        return f"{_TITULO_URNA[_chave_rotulo(m.group(1))]} "
+
+    return _RE_TITULO_TEXTO.sub(troca, str(texto or ""))
+
+
+def padronizar_politicos_no_texto(texto: str) -> str:
+    """Partido por extenso e título abreviado no texto pronto do Gemini. Vale
+    para envio, alerta e resumo: é a mesma casa publicando."""
+    return padronizar_titulos_no_texto(padronizar_partidos_no_texto(texto))
 
 
 def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
@@ -424,7 +491,8 @@ def gerar_texto_alerta_pesquisa(payload: dict, cenario: dict, *, gerar_conteudo,
         prompt += ("\nMATERIAL DE ORIGEM (contexto, não é fonte de número):\n"
                    f"{contexto}\n")
     resp = gerar_conteudo(modelo, prompt)
-    return limpar_prefixo_alerta(getattr(resp, "text", "") or "")
+    return padronizar_politicos_no_texto(
+        limpar_prefixo_alerta(getattr(resp, "text", "") or ""))
 
 
 def compilar_alerta_pesquisa(texto: str, titulo: str, uf: str = "",

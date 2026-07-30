@@ -871,13 +871,9 @@ Não invente informações.
 
 # ── geração do resumo ─────────────────────────────────────────────────────────
 
-REGRAS_POLITICOS = (
-    "Formatação de políticos (obrigatório):\n"
-    "- Formato: 'Nome (PARTIDO/UF)'. Use barra, nunca hífen entre PARTIDO e UF.\n"
-    "- Use PARTIDO e UF em caixa alta.\n"
-    "- Se partido/UF não estiverem no texto, não invente.\n"
-    "- PRIMEIRA menção: use 'Nome (PARTIDO/UF)'. Menções seguintes: use apenas o nome.\n"
-)
+# Regra de formatação de político é uma só para o app inteiro: envio, alerta e
+# resumo. Aqui havia uma cópia que já tinha começado a divergir da original.
+from alerta_pesquisa_core import REGRAS_POLITICOS, padronizar_politicos_no_texto
 
 REGRAS_GERAIS = (
     "Regras gerais de escrita (obrigatório):\n"
@@ -971,7 +967,9 @@ Máximo: 180 palavras no total.
 """.strip()
 
     resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-    return (resp.text or "").strip()
+    # Partido por extenso e título de urna abreviado valem em tudo que a casa
+    # publica, não só no Alerta de Pesquisa. O prompt pede; isto garante.
+    return padronizar_politicos_no_texto((resp.text or "").strip())
 
 
 
