@@ -28,7 +28,8 @@ REGRAS_POLITICOS = (
     "Republicanos, Democrata, Solidariedade, Rede, Avante, Podemos, Novo, "
     "Mobiliza, Agir, Cidadania.\n"
     "- Título dentro do nome de urna vai abreviado: Prof., Profa., Dr., Dra., "
-    "Del., Dela., Cel. ('Professor Ivan' vira 'Prof. Ivan'). Única exceção à "
+    "Del., Dela., Cel., Pr., Pra. ('Professor Ivan' vira 'Prof. Ivan', "
+    "'Pastor Marco' vira 'Pr. Marco'). Única exceção à "
     "regra de preservar o nome como está na fonte. Não abrevie quando a palavra "
     "for profissão fora do nome ('o delegado que conduz o caso') nem quando fizer "
     "parte de nome de cidade ('Coronel Fabriciano').\n"
@@ -170,6 +171,8 @@ _TITULO_URNA = {
     "delegado": "Del.", "del": "Del.",
     "delegada": "Dela.", "dela": "Dela.",
     "coronel": "Cel.", "cel": "Cel.", "coronela": "Cel.",
+    "pastor": "Pr.", "pr": "Pr.",
+    "pastora": "Pra.", "pra": "Pra.",
 }
 
 
@@ -214,9 +217,13 @@ _RE_PARTIDO_UF = re.compile(
 # Título de urna no meio da frase. Sem re.IGNORECASE de propósito: "o delegado
 # que assina o inquérito" é profissão, não nome, e só a forma capitalizada
 # seguida de nome próprio é candidato.
+#
+# 'Pra.' e 'Pr.' só entram com o ponto: sem ele, 'Pra Marina' (o 'para' falado)
+# viraria título. As outras formas abreviadas seguem com ponto opcional.
 _RE_TITULO_TEXTO = re.compile(
     r"(?<![\wÀ-ÿ])(Professora|Professor|Doutora|Doutor|Delegada|Delegado|"
-    r"Coronela|Coronel|Profa|Prof|Dra|Dr|Dela|Del|Cel)\.?\s+(?=[A-ZÀ-Þ])")
+    r"Coronela|Coronel|Pastora|Pastor|Profa|Prof|Dra|Dr|Dela|Del|Cel|"
+    r"Pra\.|Pr\.)\.?\s+(?=[A-ZÀ-Þ])")
 
 # Cidade que começa com título não é candidato. Lista curta e extensível: só
 # entram os topônimos que aparecem em texto político com alguma frequência.
