@@ -2065,10 +2065,18 @@ def render_colar():
                        f"Nada gravado na produção.")
             st.session_state.pop("colar_resultado", None)
         else:
+            df_p_colar = pd.DataFrame(res["linhas_p"])
             with st.spinner("Gravando nas abas pesquisas / resultados..."):
-                salvar_tudo(gc, sheet_id, pd.DataFrame(res["linhas_p"]), pd.DataFrame(res["linhas_r"]))
+                salvar_tudo(gc, sheet_id, df_p_colar, pd.DataFrame(res["linhas_r"]))
+                # Fecha a linha da fila na hora, igual ao Polling Manual: sem isso a
+                # planilha `relatorios` só ficava "sim" no próximo sync (a cada 6h).
+                linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_colar)
             st.success(f"Gravado: {len(res['linhas_p'])} pesquisa(s) e {len(res['linhas_r'])} "
                        f"resultado(s) na {nome_destino}. A média móvel é reconstruída de 4 em 4 horas.")
+            if linhas_fila:
+                st.caption(f"Também marquei {linhas_fila} linha(s) como cadastrada na fila de relatórios.")
+            for aviso in avisos_fila:
+                st.caption(f"⚠️ Fila de relatórios: {aviso}")
             st.session_state.pop("colar_resultado", None)
 
 
