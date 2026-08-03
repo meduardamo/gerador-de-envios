@@ -213,6 +213,25 @@ def _rotulos_x_colidem(fig, ax, respiro_px: float = 6.0) -> bool:
     return any(a.x1 + respiro_px > b.x0 for a, b in zip(caixas, caixas[1:]))
 
 
+def _margem_esquerda_para_rotulos(fig, ax, minimo: float, teto: float = 0.46,
+                                  respiro_px: float = 12.0) -> float:
+    """Fração da figura que os nomes do eixo Y precisam à esquerda.
+
+    A margem era fixa em 0.26, que não cobre nome longo com partido junto:
+    "Cel. André David (Republicanos)" saía cortado na borda da imagem, virando
+    "el. André David (Republicanos)". Aqui a largura é MEDIDA, como já era feito
+    para decidir a rotação no modo vertical.
+    """
+    fig.canvas.draw()
+    larguras = [t.get_window_extent().width
+                for t in ax.get_yticklabels() if t.get_text()]
+    if not larguras:
+        return minimo
+    largura_fig_px = fig.get_size_inches()[0] * fig.dpi
+    necessario = (max(larguras) + respiro_px) / largura_fig_px
+    return min(teto, max(minimo, necessario))
+
+
 def _px_em_dados(ax, px: float) -> tuple[float, float]:
     """Converte px de tela em unidades de dado nos dois eixos, pra ponta
     arredondada sair redonda de verdade e não oval."""
@@ -317,7 +336,10 @@ def gerar_grafico_pesquisa(
     # do título.
     RETO = (0.07, 0.17, 0.66)
     GIRADO = (0.115, 0.32, 0.51)
-    esquerda, base, altura = (0.26, 0.17, 0.66) if not vertical else RETO
+    # Piso da margem no modo horizontal. É o valor que sempre valeu; agora ele
+    # só cresce, quando o nome mais longo não cabe nele.
+    MARGEM_H = 0.26
+    esquerda, base, altura = (MARGEM_H, 0.17, 0.66) if not vertical else RETO
     ax = fig.add_axes([esquerda, base, 0.955 - esquerda, altura])
     ax.set_facecolor(fundo)
 
@@ -359,6 +381,17 @@ def gerar_grafico_pesquisa(
         rotulo.set_fontfamily(familia)
     for rotulo in (ax.get_xticklabels() if vertical else ax.get_yticklabels()):
         rotulo.set_color(TINTA)
+
+    # Horizontal: abre a margem esquerda até o nome mais longo caber. Se nem no
+    # teto couber, encolhe a fonte, porque cortar o nome de um candidato é pior
+    # que uma linha um ponto menor.
+    if not vertical:
+        for tamanho in (10, 9.2, 8.4, 7.6):
+            ax.tick_params(axis="y", labelsize=tamanho)
+            esquerda = _margem_esquerda_para_rotulos(fig, ax, MARGEM_H)
+            ax.set_position([esquerda, base, 0.955 - esquerda, altura])
+            if esquerda < 0.46:
+                break
 
     # Girar ou não é decidido MEDINDO, não contando candidato. Quem causa
     # colisão é o comprimento do nome: "Coronel Busnello (MISSAO)" encosta no
