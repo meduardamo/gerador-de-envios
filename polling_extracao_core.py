@@ -233,6 +233,25 @@ def classificar_tipo_resultado_manual(nome: str, tipo_informado: str = "") -> st
     return "candidato"
 
 
+_CARGO_NO_ROTULO = (
+    ("senador", ("senador", "senadora", "senado")),
+    ("governador", ("governador", "governadora", "governo do estado")),
+    ("presidente", ("presidente", "presidencial", "presidência")),
+)
+
+
+def _cargo_do_rotulo(rotulo: str) -> str:
+    """Cargo citado no rótulo do cenário, ou "" quando não dá para afirmar.
+
+    Senador vem primeiro: "Senador (2ª vaga)" e "Governador" costumam aparecer
+    no mesmo material, e rótulo que cita os dois é ambíguo demais para chutar.
+    """
+    texto = normalizar_texto_simples(rotulo).lower()
+    achados = [cargo for cargo, termos in _CARGO_NO_ROTULO
+               if any(t in texto for t in termos)]
+    return achados[0] if len(achados) == 1 else ""
+
+
 def normalizar_payload_polling(payload: dict) -> dict:
     payload = payload or {}
     cenarios = payload.get("cenarios") or []
@@ -276,7 +295,12 @@ def normalizar_payload_polling(payload: dict) -> dict:
         # quando o cenário não especificar o dele.
         cargo_cenario = normalizar_texto_simples(cenario.get("cargo")).lower()
         if cargo_cenario not in POLLING_MANUAL_CARGOS:
-            cargo_cenario = cargo
+            # Antes de cair no cargo do payload, tenta ler o cargo no rótulo do
+            # próprio cenário. Num material com governador e senador juntos, o
+            # payload traz um cargo só, e o cenário sem "cargo" preenchido pelo
+            # modelo herdava o errado: lista do Senado saía titulada
+            # "Intenção de voto para Governador".
+            cargo_cenario = _cargo_do_rotulo(label) or cargo
 
         # SENADOR NUNCA TEM SEGUNDO TURNO (regra também no prompt, mas o modelo
         # às vezes desobedece - visto ao vivo com "2º voto" de senador virando
