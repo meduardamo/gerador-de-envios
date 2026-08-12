@@ -242,15 +242,36 @@ def _px_em_dados(ax, px: float) -> tuple[float, float]:
 
 def _colocar_logo(fig, caminho: str) -> None:
     """Canto superior direito, na altura do título. Embaixo ela disputava espaço
-    com a ficha técnica, que é a linha mais larga do gráfico."""
+    com a ficha técnica, que é a linha mais larga do gráfico.
+
+    Recorta a margem transparente/branca antes de dimensionar. A marca Eleições
+    2026 vive no canto de um canvas grande e, sem esse recorte, seus 10% viravam
+    cerca de 3% visíveis na figura.
+    """
     if not caminho or not os.path.exists(caminho):
         return
     try:
         imagem = plt.imread(caminho)
     except Exception:
         return
+
+    # PNG negativo: os elementos brancos somem no fundo branco do gráfico; o
+    # selo escuro é a parte visível. Para logos coloridas, a mesma máscara apenas
+    # elimina as margens. Se a arte for toda branca, mantém o alpha como fallback.
+    if imagem.ndim == 3:
+        alpha = imagem[:, :, 3] > 0.02 if imagem.shape[2] >= 4 else True
+        rgb = imagem[:, :, :3]
+        limite_branco = 0.92 if rgb.max() <= 1.0 else 235
+        visivel = alpha & (rgb.min(axis=2) < limite_branco)
+        if visivel.any():
+            ys, xs = visivel.nonzero()
+            margem = max(4, round(max(xs.max() - xs.min(), ys.max() - ys.min()) * 0.04))
+            x0, x1 = max(0, xs.min() - margem), min(imagem.shape[1], xs.max() + margem + 1)
+            y0, y1 = max(0, ys.min() - margem), min(imagem.shape[0], ys.max() + margem + 1)
+            imagem = imagem[y0:y1, x0:x1]
+
     altura, largura = imagem.shape[0], imagem.shape[1]
-    larg_fig = 0.10                        # fração da largura da figura
+    larg_fig = 0.10                        # largura VISÍVEL na figura
     alt_fig = larg_fig * (altura / largura) * (LARGURA_PX / ALTURA_PX)
     eixo = fig.add_axes([0.955 - larg_fig, 0.945 - alt_fig, larg_fig, alt_fig],
                         zorder=5)
