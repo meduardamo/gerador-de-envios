@@ -199,6 +199,10 @@ definir_api_key(GEMINI_API_KEY)
 
 BRT = timezone(timedelta(hours=-3))
 LOGO_PATH = str(ROOT_DIR / "Marca_eixo_vetor_Logo horizontal magenta.png")
+# Entra na assinatura do ZIP para invalidar pacotes montados antes da troca da
+# marca. Sem isso, o cache do Streamlit pode servir os quatro arquivos antigos
+# mesmo quando a prévia já usa o gerador atualizado.
+PACOTE_GRAFICOS_VERSAO = "eleicoes-2026-logo-v2"
 LEITURA_PDF = [
     "Auto (texto se tiver; imagem se for scan)",
     "Texto (PyMuPDF)",
@@ -722,6 +726,7 @@ with aba_grafico:
                 for suf in ("com-logo", "sem-logo") for fmt in ("png", "svg")
             }
             assinatura = json.dumps({
+                "versao_pacote": PACOTE_GRAFICOS_VERSAO,
                 "titulo": titulo_grafico, "rodape": rodape_grafico,
                 "itens": itens_editados, "orientacao": orientacao,
                 "escala_cheia": escala_cheia, "escala": escala,
