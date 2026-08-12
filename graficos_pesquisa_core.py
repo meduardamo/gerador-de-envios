@@ -34,7 +34,7 @@ from matplotlib.path import Path
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 DIR_FONTES = os.path.join(RAIZ, "fontes")
-LOGO_PADRAO = os.path.join(RAIZ, "Marca_eixo_vetor_Logo horizontal magenta.png")
+LOGO_PADRAO = os.path.join(RAIZ, "Logo eleições_Negativa.png")
 
 # Paleta Eixo (mesma do app, ver Gerador_de_Envios.py).
 MARINHO = "#192D4E"      # candidato e título
