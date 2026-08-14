@@ -118,7 +118,7 @@ if authentication_status is None:
 # ── configurações ─────────────────────────────────────────────────────────────
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL   = "gemini-2.5-flash"
+GEMINI_MODEL   = "gemini-3.6-flash"   # 2.5-flash dá 404 para a chave do projeto novo
 
 LOGO_PATH = "Marca_eixo_vetor_Logo horizontal magenta.png"
 

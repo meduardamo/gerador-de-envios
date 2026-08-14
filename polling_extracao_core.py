@@ -34,7 +34,9 @@ from polling_manual_core import (
     normalizar_partido,
 )
 
-GEMINI_MODEL = "gemini-2.5-flash"
+# Era 2.5-flash. A chave nova nasceu em projeto GCP novo depois da suspensão do
+# antigo, e para ela o 2.5-flash responde 404 "no longer available to new users".
+GEMINI_MODEL = "gemini-3.6-flash"
 
 UFS = [
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
