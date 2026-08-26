@@ -102,6 +102,11 @@ authenticator = stauth.Authenticate(
     _auth_cfg["cookie"]["expiry_days"],
 )
 
+# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
+# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
+from ui_login import CSS_LOGIN
+st.markdown(CSS_LOGIN, unsafe_allow_html=True)
+
 try:
     authenticator.login(location="main")
 except TypeError:
