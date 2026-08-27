@@ -33,6 +33,10 @@ REGRAS_POLITICOS = (
     "regra de preservar o nome como está na fonte. Não abrevie quando a palavra "
     "for profissão fora do nome ('o delegado que conduz o caso') nem quando fizer "
     "parte de nome de cidade ('Coronel Fabriciano').\n"
+    "- Profissão ou cargo que a fonte cola na frente do nome não entra: "
+    "'Escritor Augusto Cury' vira 'Augusto Cury', 'Ex-senador Fulano' vira "
+    "'Fulano'. Patente e profissão que fazem parte do nome de urna ficam "
+    "('Capitão Wagner', 'Delegado Palumbo', 'Pastor Sena').\n"
     "- Se partido/UF não estiverem no texto, não invente.\n"
     "- Se o texto trouxer '(PARTIDO-UF)', padronize para '(PARTIDO/UF)'.\n"
     "- PRIMEIRA menção de um político: use 'Nome (PARTIDO/UF)'.\n"
@@ -176,6 +180,58 @@ _TITULO_URNA = {
 }
 
 
+# Descritor que a fonte cola na frente do nome e que não é nome de urna:
+# profissão usada como apresentação ("Escritor Augusto Cury" é "Augusto Cury"
+# na urna) e cargo eletivo, que a Justiça Eleitoral não registra como nome de
+# urna ("Senador Fulano" nunca é o nome registrado).
+#
+# Diferente de _TITULO_URNA: lá a palavra faz parte do nome e só encurta
+# ("Professor Ivan" -> "Prof. Ivan"). Aqui ela sai inteira.
+#
+# A lista de profissão é curta e extensível de propósito: patente e profissão
+# VALEM como nome de urna, e as matrizes T1/T2 estão cheias delas (Capitão
+# Wagner, Coronel Rocha, Sargento Laudicério, Delegado Palumbo, Pastor Sena,
+# Padre Fabrício, Missionário Evandro, Cabo Daciolo, Brigadeiro Atila Maia,
+# Juíza Joenilda). Só entra palavra que a fonte usa como descrição, nunca como
+# nome. Se aparecer candidato registrado com alguma delas, tire daqui.
+_DESCRITOR_FORA_DO_NOME = {
+    # cargo eletivo/mandato
+    "presidente", "senador", "senadora", "deputado", "deputada",
+    "governador", "governadora", "prefeito", "prefeita",
+    "vereador", "vereadora", "ministro", "ministra",
+    # profissão usada como apresentação
+    "escritor", "escritora", "jornalista", "apresentador", "apresentadora",
+    "empresario", "empresaria", "economista",
+}
+
+# Palavra que completa o cargo e só cai depois que o cargo caiu ("Deputado
+# Federal Fulano"). Sozinha não quer dizer nada: "Federal" pode ser apelido.
+_QUALIFICADOR_DE_CARGO = {"federal", "estadual", "distrital", "geral"}
+
+# 'Ex-senador', 'Vice-governador', 'Ex-vice-prefeito' são o mesmo cargo com
+# prefixo, e saem pelo mesmo motivo.
+_RE_PREFIXO_CARGO = re.compile(r"^(?:(?:ex|vice)\s+)+")
+
+
+def remover_descritor_fora_do_nome(nome) -> str:
+    """'Escritor Augusto Cury' -> 'Augusto Cury'; 'Ex-senador Fulano' -> 'Fulano'.
+
+    Só a(s) primeira(s) palavra(s), e só quando sobra nome depois: descritor
+    sozinho é o rótulo inteiro de alguém, e no meio do nome a palavra pode ser
+    sobrenome ('Ângelo Coronel', 'Marcelo Brigadeiro').
+    """
+    texto = re.sub(r"\s+", " ", str(nome or "")).strip()
+    caiu = False
+    while " " in texto:
+        primeira, resto = texto.split(" ", 1)
+        chave = _RE_PREFIXO_CARGO.sub("", _chave_rotulo(primeira))
+        if chave in _DESCRITOR_FORA_DO_NOME or (caiu and chave in _QUALIFICADOR_DE_CARGO):
+            texto, caiu = resto.strip(), True
+            continue
+        break
+    return texto
+
+
 def rotulo_partido_alerta(valor) -> str:
     """Partido como a peça publica. Fora do mapa, volta como veio: sigla que a
     extração já normalizou não tem por que ser mexida aqui."""
@@ -198,6 +254,12 @@ def abreviar_titulo_urna(nome) -> str:
     primeira, resto = texto.split(" ", 1)
     abreviado = _TITULO_URNA.get(_chave_rotulo(primeira))
     return f"{abreviado} {resto}" if abreviado else texto
+
+
+def nome_de_urna_alerta(nome) -> str:
+    """Nome do candidato como a peça publica: sem o descritor que a fonte
+    colou na frente e com título de urna abreviado."""
+    return abreviar_titulo_urna(remover_descritor_fora_do_nome(nome))
 
 
 # ── as mesmas duas regras aplicadas a texto corrido ──────────────────────────
@@ -236,6 +298,25 @@ _TOPONIMOS_COM_TITULO = {
 }
 
 
+# Descritor de profissão em texto corrido. Sem re.IGNORECASE, pelo mesmo motivo
+# do título: "o escritor que se candidatou" é profissão dentro da frase, e tirar
+# a palavra ali quebraria o português. Só a forma capitalizada seguida de nome
+# próprio é apresentação de candidato.
+#
+# Cargo NÃO entra aqui de propósito, embora saia do rótulo do item: este passo
+# vale também para o envio e o resumo de notícia, e lá "Ministro Alexandre de
+# Moraes" ou "Senador Renan Calheiros" é informação da matéria, não descritor
+# sobrando no nome. No rótulo do gráfico o partido e a UF já dizem quem é.
+_RE_DESCRITOR_TEXTO = re.compile(
+    r"(?<![\wÀ-ÿ])(Escritora|Escritor|Jornalista|Apresentadora|Apresentador|"
+    r"Empresária|Empresário|Economista)\s+(?=[A-ZÀ-Þ])")
+
+
+def remover_descritores_no_texto(texto: str) -> str:
+    """'Escritor Augusto Cury lidera' -> 'Augusto Cury lidera'."""
+    return _RE_DESCRITOR_TEXTO.sub("", str(texto or ""))
+
+
 def padronizar_partidos_no_texto(texto: str) -> str:
     """'(UNIAO/PR)' -> '(União/PR)'; '(Progressistas-BA)' -> '(PP/BA)'.
 
@@ -267,7 +348,8 @@ def padronizar_titulos_no_texto(texto: str) -> str:
 def padronizar_politicos_no_texto(texto: str) -> str:
     """Partido por extenso e título abreviado no texto pronto do Gemini. Vale
     para envio, alerta e resumo: é a mesma casa publicando."""
-    return padronizar_titulos_no_texto(padronizar_partidos_no_texto(texto))
+    return padronizar_titulos_no_texto(
+        padronizar_partidos_no_texto(remover_descritores_no_texto(texto)))
 
 
 def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
@@ -293,7 +375,7 @@ def padronizar_itens_alerta(itens: list[dict]) -> list[dict]:
         if alvo and alvo not in repetidos:
             novo["candidato"] = alvo
         elif item.get("tipo") != "nao_valido":
-            novo["candidato"] = abreviar_titulo_urna(item.get("candidato"))
+            novo["candidato"] = nome_de_urna_alerta(item.get("candidato"))
         novo["partido"] = rotulo_partido_alerta(item.get("partido"))
         saida.append(novo)
     return saida

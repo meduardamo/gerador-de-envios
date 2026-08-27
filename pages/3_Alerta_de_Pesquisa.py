@@ -47,7 +47,7 @@ from polling_extracao_core import (
 )
 from polling_manual_core import normalizar_nome_candidato, normalizar_partido
 from alerta_pesquisa_core import (
-    abreviar_titulo_urna,
+    nome_de_urna_alerta,
     compilar_alerta_pesquisa,
     encurtar_link,
     gerar_texto_alerta_pesquisa,
@@ -620,10 +620,11 @@ with aba_revisao:
 
             if ligado and normalizar_texto_simples(nome):
                 # O que ela digita aqui também sai na forma da peça: partido em
-                # nome próprio e título de urna abreviado.
+                # nome próprio, título de urna abreviado e sem descritor de
+                # profissão ou cargo na frente do nome.
                 itens_editados.append({
                     "candidato": nome if tipo == "nao_valido"
-                                 else abreviar_titulo_urna(nome),
+                                 else nome_de_urna_alerta(nome),
                     "partido": rotulo_partido_alerta(partido),
                     "percentual": pct, "tipo": tipo})
 
