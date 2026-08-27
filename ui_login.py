@@ -21,6 +21,12 @@ BORDA = "#DADAD4"
 TINTA = "#111111"
 
 CSS_LOGIN = f"""<style>
+/* O olho do campo de senha é um <span> do Material Symbols, e fica fora do
+   form. Quando a folha da página força Montserrat em todo span, o ícone perde
+   a fonte e imprime o nome dele ("visibility") no lugar do desenho. */
+[data-testid="stIconMaterial"] {{
+    font-family: 'Material Symbols Rounded' !important;
+}}
 [data-testid="stForm"] [data-testid="stTextInput"] input,
 [data-testid="stForm"] [data-baseweb="base-input"] {{
     background: #FFFFFF !important;
