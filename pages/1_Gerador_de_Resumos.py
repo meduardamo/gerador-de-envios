@@ -116,7 +116,6 @@ if authentication_status is False:
     st.error("Usuário ou senha inválidos.")
     st.stop()
 if authentication_status is None:
-    st.info("Faça login para continuar.")
     st.stop()
 
 

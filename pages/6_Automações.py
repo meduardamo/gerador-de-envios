@@ -160,7 +160,6 @@ if st.session_state.get("authentication_status") is False:
     st.error("Usuário ou senha inválidos.")
     st.stop()
 if not st.session_state.get("authentication_status"):
-    st.info("Faça login para continuar.")
     st.stop()
 
 

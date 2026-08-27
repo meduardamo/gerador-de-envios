@@ -121,7 +121,6 @@ if authentication_status is False:
     st.stop()
 
 if authentication_status is None:
-    st.info("Faça login para continuar.")
     st.stop()
 
 
