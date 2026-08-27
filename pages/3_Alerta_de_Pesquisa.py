@@ -58,6 +58,7 @@ from alerta_pesquisa_core import (
 )
 from graficos_pesquisa_core import (
     ESCALAS_EXPORT,
+    LOGO_PADRAO,
     ficha_incompleta,
     gerar_grafico_pesquisa,
     periodo_campo_br,
@@ -204,10 +205,6 @@ definir_api_key(GEMINI_API_KEY)
 
 BRT = timezone(timedelta(hours=-3))
 LOGO_PATH = str(ROOT_DIR / "Marca_eixo_vetor_Logo horizontal magenta.png")
-# Entra na assinatura do ZIP para invalidar pacotes montados antes da troca da
-# marca. Sem isso, o cache do Streamlit pode servir os quatro arquivos antigos
-# mesmo quando a prévia já usa o gerador atualizado.
-PACOTE_GRAFICOS_VERSAO = "eleicoes-2026-logo-v2"
 LEITURA_PDF = [
     "Auto (texto se tiver; imagem se for scan)",
     "Texto (PyMuPDF)",
@@ -260,6 +257,15 @@ def _link_curto(url: str) -> str:
     do envio é remontada a cada interação da página, e sem isso cada clique
     viraria uma chamada de rede."""
     return encurtar_link(url)
+
+
+def _marca_da_logo() -> list:
+    """Tamanho e data do arquivo da logo, para entrar na assinatura do zip."""
+    try:
+        info = os.stat(LOGO_PADRAO)
+        return [info.st_size, int(info.st_mtime)]
+    except OSError:
+        return []
 
 
 @st.cache_data(show_spinner=False, max_entries=6)
@@ -732,7 +738,12 @@ with aba_grafico:
                 for suf in ("com-logo", "sem-logo") for fmt in ("png", "svg")
             }
             assinatura = json.dumps({
-                "versao_pacote": PACOTE_GRAFICOS_VERSAO,
+                # A logo não é argumento do desenho, é arquivo no disco, e o
+                # cache do zip vive no processo: trocar a marca sem reiniciar
+                # devolvia o pacote antigo. Marcar o arquivo na assinatura faz
+                # a troca invalidar sozinha, sem depender de alguém lembrar de
+                # mexer num número de versão na mão.
+                "logo": _marca_da_logo(),
                 "titulo": titulo_grafico, "rodape": rodape_grafico,
                 "itens": itens_editados, "orientacao": orientacao,
                 "escala_cheia": escala_cheia, "escala": escala,
