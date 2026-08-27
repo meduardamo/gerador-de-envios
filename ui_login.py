@@ -29,6 +29,17 @@ CSS_LOGIN = f"""<style>
     font-family: 'Material Symbols Rounded' !important;
 }}
 
+/* A caixa do login fica na cor da página: branco é só onde se digita. O
+   Gerador de Envios pinta todo `stForm` de branco, o que serve para a ficha de
+   trabalho apoiada sobre o fundo e deixa o login parecendo um cartão dentro de
+   outro. O `:has()` prende a regra ao form que tem campo de senha, ou seja, ao
+   login, e deixa os formulários de trabalho de cada página como estão. */
+[data-testid="stForm"]:has(input[type="password"]) {{
+    background: transparent !important;
+    border: 1px solid {BORDA} !important;
+    border-radius: 8px !important;
+}}
+
 /* Rótulo do campo: frase, não etiqueta. A folha do Gerador de Envios põe todo
    label em caixa alta com espaçamento, o que serve para a ficha de trabalho e
    deixa o login com cara de formulário de sistema. */
