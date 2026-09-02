@@ -2663,15 +2663,26 @@ def migrar_origem_e_remover_conferida(aba_pesquisas, aba_resultados):
 
 
 def normalizar_institutos_retroativo(aba_pesquisas, aba_resultados):
-    """Aplica ALIASES_INSTITUTO em entradas já gravadas. Idempotente: se a
-    planilha já está normalizada, não toca em nada.
+    """Realinha instituto e nota nas entradas já gravadas. Idempotente: se a
+    planilha já está em dia, não toca em nada.
 
-    Para pesquisas: também recomputa classificacao_instituto e metodologia
-    quando o instituto canônico tem entrada nos dicts estáticos.
+    Duas passadas independentes:
+
+    1. Nome: aplica ALIASES_INSTITUTO. A metodologia é reescrita junto, e só
+       nas linhas cujo nome mudou, porque para o resto o texto pode ser livre,
+       digitado no polling manual.
+
+    2. Nota: recalcula classificacao_instituto em TODAS as linhas, não só nas
+       que trocaram de nome. A troca do ranking do PollsterGraph pelo do
+       Pindograma (01/09/2026) mudou a nota de instituto cujo nome não mudou, e
+       a versão anterior desta rotina só olhava para o nome. O resultado é que a
+       matriz guardava as duas escalas ao mesmo tempo: linha nova com B+ e linha
+       antiga do mesmo instituto com A+, e os filtros dos painéis liam as duas
+       como se fossem a mesma régua.
     """
-    def _aplicar(df: pd.DataFrame, recomputar_classif_e_metod: bool) -> tuple[pd.DataFrame, int]:
+    def _aplicar(df: pd.DataFrame, recomputar_classif_e_metod: bool) -> tuple[pd.DataFrame, int, int]:
         if df.empty or "instituto" not in df.columns:
-            return df, 0
+            return df, 0, 0
         df = df.copy()
         original = df["instituto"].astype(str)
         novo = original.apply(normalizar_instituto)
@@ -2682,13 +2693,13 @@ def normalizar_institutos_retroativo(aba_pesquisas, aba_resultados):
             preservar = df["registro_tse"].astype(str).str.strip().eq("RN-06422/2026")
             novo.loc[preservar] = original.loc[preservar]
         mudou = (original != novo)
-        if not mudou.any():
-            return df, 0
-        df["instituto"] = novo
+        n_nome = int(mudou.sum())
+        if n_nome:
+            df["instituto"] = novo
+
+        n_nota = 0
         if recomputar_classif_e_metod:
-            if "classificacao_instituto" in df.columns:
-                df.loc[mudou, "classificacao_instituto"] = df.loc[mudou, "instituto"].apply(classificar_instituto)
-            if "metodologia" in df.columns:
+            if mudou.any() and "metodologia" in df.columns:
                 # só sobrescreve quando o canônico tem metodologia conhecida;
                 # caso contrário mantém o texto anterior (pode ser texto livre do polling manual)
                 def _metod_se_conhecida(inst):
@@ -2697,19 +2708,29 @@ def normalizar_institutos_retroativo(aba_pesquisas, aba_resultados):
                 metod_nova = df.loc[mudou, "instituto"].apply(_metod_se_conhecida)
                 idx_validos = metod_nova.dropna().index
                 df.loc[idx_validos, "metodologia"] = metod_nova.loc[idx_validos]
-        return df, int(mudou.sum())
 
-    df_p_existente = carregar_df_da_aba(aba_pesquisas)
-    df_p_norm, n_p = _aplicar(df_p_existente, recomputar_classif_e_metod=True)
-    if n_p > 0:
-        sobrescrever_aba(aba_pesquisas, df_p_norm)
-        print(f"[normalizacao] aba 'pesquisas': {n_p} linha(s) com instituto normalizado")
+            if "classificacao_instituto" in df.columns:
+                # classificar_instituto é determinística: passar a coluna
+                # inteira devolve exatamente o que já está lá quando a linha
+                # está em dia, o que mantém a rotina idempotente.
+                nota_atual = df["classificacao_instituto"].astype(str).map(_norm_ws)
+                nota_nova = df["instituto"].apply(classificar_instituto)
+                nota_mudou = (nota_atual != nota_nova)
+                n_nota = int(nota_mudou.sum())
+                if n_nota:
+                    df.loc[nota_mudou, "classificacao_instituto"] = nota_nova.loc[nota_mudou]
 
-    df_r_existente = carregar_df_da_aba(aba_resultados)
-    df_r_norm, n_r = _aplicar(df_r_existente, recomputar_classif_e_metod=True)
-    if n_r > 0:
-        sobrescrever_aba(aba_resultados, df_r_norm)
-        print(f"[normalizacao] aba 'resultados': {n_r} linha(s) com instituto normalizado")
+        return df, n_nome, n_nota
+
+    for nome_aba, aba in (("pesquisas", aba_pesquisas), ("resultados", aba_resultados)):
+        df_existente = carregar_df_da_aba(aba)
+        df_norm, n_nome, n_nota = _aplicar(df_existente, recomputar_classif_e_metod=True)
+        if n_nome or n_nota:
+            sobrescrever_aba(aba, df_norm)
+            print(
+                f"[normalizacao] aba '{nome_aba}': {n_nome} linha(s) com instituto "
+                f"normalizado, {n_nota} com nota realinhada"
+            )
 
 
 def salvar_tudo(gc, spreadsheet_id: str, df_p: pd.DataFrame, df_r: pd.DataFrame):
