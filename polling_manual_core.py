@@ -568,8 +568,18 @@ def score_instituto(classificacao) -> float:
     return SCORE_INSTITUTO.get(_norm_ws(classificacao), 0.25)
 
 
+# METODOLOGIA_INSTITUTOS foi escrito com a grafia que cada texto tinha na época,
+# e parte dela é a grafia longa ("Instituto Amostragem", "Ipec (antigo Ibope)").
+# Como essas grafias viraram alias, procurar direto pela chave normalizada
+# deixava 15 textos inalcançáveis. O índice abaixo resolve cada chave uma vez, na
+# importação, e é por ele que a busca passa.
+_METODOLOGIA_POR_CANONICO: dict[str, str] = {}
+for _nome_metod, _texto_metod in METODOLOGIA_INSTITUTOS.items():
+    _METODOLOGIA_POR_CANONICO.setdefault(normalizar_instituto(_nome_metod), _texto_metod)
+
+
 def obter_metodologia(nome):
-    return METODOLOGIA_INSTITUTOS.get(normalizar_instituto(nome), "")
+    return _METODOLOGIA_POR_CANONICO.get(normalizar_instituto(nome), "")
 
 
 def env_bool(name: str, default: bool = False) -> bool:
