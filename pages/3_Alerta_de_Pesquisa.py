@@ -203,7 +203,7 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY",
 definir_api_key(GEMINI_API_KEY)
 
 BRT = timezone(timedelta(hours=-3))
-LOGO_PATH = str(ROOT_DIR / "Marca_eixo_vetor_Logo horizontal magenta.png")
+LOGO_PATH = str(ROOT_DIR / "logo_eixo_gov_magenta.png")
 LEITURA_PDF = [
     "Auto (texto se tiver; imagem se for scan)",
     "Texto (PyMuPDF)",

@@ -223,7 +223,7 @@ SPREADSHEET_ID_RELATORIOS = (
     st.secrets.get("SPREADSHEET_ID_RELATORIOS")
     or os.getenv("SPREADSHEET_ID_RELATORIOS", "")
 ).strip()
-LOGO_PATH = str(ROOT_DIR / "Marca_eixo_vetor_Logo horizontal magenta.png")
+LOGO_PATH = str(ROOT_DIR / "logo_eixo_gov_magenta.png")
 
 # Streamlit Cloud roda o servidor em UTC - datetime.now() sem timezone grava hora
 # errada (3h a mais) em qualquer timestamp mostrado pra ela. Mesmo fuso usado no

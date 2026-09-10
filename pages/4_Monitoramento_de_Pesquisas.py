@@ -135,7 +135,7 @@ EIXO = {
     "vermelho":      "#B84349",
 }
 
-LOGO_PATH = "Marca_eixo_vetor_Logo horizontal magenta.png"
+LOGO_PATH = "logo_eixo_gov_magenta.png"
 
 # estilos já injetados no bloco único acima
 

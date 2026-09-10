@@ -41,7 +41,7 @@ EIXO = {
     "marinho":  "#192D4E",
 }
 
-LOGO_PATH        = "Marca_eixo_vetor_Logo horizontal magenta.png"
+LOGO_PATH        = "logo_eixo_gov_magenta.png"
 LOGO_BRANCA_PATH = "Marca_eixo_vetor_Logo horizontal branca.png"
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────

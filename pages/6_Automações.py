@@ -427,7 +427,7 @@ def _parse_datas(serie: pd.Series) -> pd.Series:
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     try:
-        st.image("Marca_eixo_vetor_Logo horizontal magenta.png", use_container_width=True)
+        st.image("logo_eixo_gov_magenta.png", use_container_width=True)
     except Exception:
         st.caption("Logo não encontrada.")
     st.markdown(
