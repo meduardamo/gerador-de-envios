@@ -2462,13 +2462,13 @@ def deduplicar_resultados_bi_preferindo_cenario_media(df: pd.DataFrame) -> pd.Da
 
 def agregar_resultados_bi_diario(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Agrega a base de BI no grão diário antes do cálculo da média móvel.
+    Agrega a base de BI no grão diário antes do cálculo da média ponderada.
 
     A média diária por candidato é **ponderada pelo score do instituto**
     (ver SCORE_INSTITUTO). Cada pesquisa contribui com uma observação
     (já consolidada por cenário em adicionar_metricas_media_cenarios)
     multiplicada pelo seu peso. Também devolve peso_total_dia
-    (Σ w_i no dia), usado depois pela média móvel ponderada.
+    (Σ w_i no dia), usado depois pela média ponderada com meia-vida.
     """
     if df.empty:
         return df
