@@ -967,6 +967,105 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
     return len(encontrados), avisos
 
 
+def atualizar_status_rastreamento_equipe(gc, df_p: pd.DataFrame) -> list[str]:
+    """Atualiza a coluna 'Atualização pela equipe' nas abas de acompanhamento
+    ('Eduarda' e 'Giovana') para a disputa (Cargo, UF, Turno) recém-gravada."""
+    mensagens: list[str] = []
+    if not SPREADSHEET_ID_RELATORIOS or df_p is None or df_p.empty or not gc:
+        return mensagens
+
+    try:
+        sh = gc.open_by_key(SPREADSHEET_ID_RELATORIOS)
+    except Exception as exc:
+        mensagens.append(f"Acompanhamento: não consegui abrir a planilha: {exc}")
+        return mensagens
+
+    disputas_salvas = set()
+    for _, r in df_p.iterrows():
+        cargo_raw = str(r.get("cargo", "")).strip()
+        uf_raw = str(r.get("uf", "")).strip().upper()
+        turno_raw = str(r.get("turno", "")).strip()
+        if cargo_raw and uf_raw:
+            c_norm = normalizar_texto_simples(cargo_raw).capitalize()
+            t_norm = "1º Turno" if "1" in turno_raw else ("2º Turno" if "2" in turno_raw else turno_raw)
+            disputas_salvas.add((c_norm, t_norm, uf_raw))
+
+    if not disputas_salvas:
+        return mensagens
+
+    agora_str = datetime.now(BRT).strftime("%d/%m/%Y %H:%M")
+
+    # Procura nas abas de acompanhamento da equipe
+    abas_disponiveis = [w for w in sh.worksheets() if w.title in ["Eduarda", "Giovana"]]
+
+    CINZA_BORDA = {"red": 0.88, "green": 0.88, "blue": 0.88}
+    borda = {"style": "SOLID", "width": 1, "color": CINZA_BORDA}
+    borders_all = {"top": borda, "bottom": borda, "left": borda, "right": borda}
+
+    for ws in abas_disponiveis:
+        try:
+            valores = ws.get_all_values()
+            if len(valores) < 2:
+                continue
+            header = valores[0]
+            if not all(col in header for col in ["Cargo", "Turno", "UF", "Atualização pela equipe"]):
+                continue
+            i_cargo = header.index("Cargo")
+            i_turno = header.index("Turno")
+            i_uf = header.index("UF")
+            i_att = header.index("Atualização pela equipe")
+
+            requests = []
+            linhas_atualizadas = []
+
+            for row_idx, row in enumerate(valores[1:], start=2):
+                if len(row) <= max(i_cargo, i_turno, i_uf, i_att):
+                    continue
+                row_cargo = normalizar_texto_simples(row[i_cargo]).capitalize()
+                row_turno = "1º Turno" if "1" in row[i_turno] else ("2º Turno" if "2" in row[i_turno] else row[i_turno])
+                row_uf = row[i_uf].strip().upper()
+
+                if (row_cargo, row_turno, row_uf) in disputas_salvas:
+                    requests.append({
+                        "updateCells": {
+                            "range": {
+                                "sheetId": ws.id,
+                                "startRowIndex": row_idx - 1,
+                                "endRowIndex": row_idx,
+                                "startColumnIndex": i_att,
+                                "endColumnIndex": i_att + 1
+                            },
+                            "rows": [{
+                                "values": [{
+                                    "userEnteredValue": {"stringValue": agora_str},
+                                    "userEnteredFormat": {
+                                        "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0},
+                                        "borders": borders_all,
+                                        "horizontalAlignment": "CENTER",
+                                        "verticalAlignment": "MIDDLE",
+                                        "textFormat": {
+                                            "fontFamily": "Montserrat",
+                                            "fontSize": 10,
+                                            "bold": False,
+                                            "foregroundColor": {"red": 0.15, "green": 0.15, "blue": 0.15}
+                                        }
+                                    }
+                                }]
+                            }],
+                            "fields": "userEnteredValue,userEnteredFormat"
+                        }
+                    })
+                    linhas_atualizadas.append(f"{row_cargo} {row_uf} ({row_turno})")
+
+            if requests:
+                sh.batch_update({"requests": requests})
+                mensagens.append(f"Aba '{ws.title}': {', '.join(linhas_atualizadas)} atualizada para {agora_str}")
+        except Exception as exc:
+            mensagens.append(f"Erro ao atualizar status na aba '{ws.title}': {exc}")
+
+    return mensagens
+
+
 def buscar_duplicatas_polling_manual(gc, spreadsheet_id: str, df_p: pd.DataFrame) -> pd.DataFrame:
     if df_p is None or df_p.empty:
         return pd.DataFrame()
@@ -1893,6 +1992,7 @@ def render_manual():
                         with st.spinner("Salvando na planilha..."):
                             total_pesquisas = total_resultados = total_fila = 0
                             avisos_fila_total: list[str] = []
+                            msgs_equipe_total: list[str] = []
                             destinos_salvos: list[str] = []
                             for turno_grupo, spreadsheet_destino, nome_destino, df_p_g, df_r_g in grupos:
                                 salvar_tudo(gc, spreadsheet_destino, df_p_g, df_r_g)
@@ -1900,6 +2000,8 @@ def render_manual():
                                     linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_g)
                                     total_fila += linhas_fila
                                     avisos_fila_total.extend(avisos_fila)
+                                msgs_eq = atualizar_status_rastreamento_equipe(gc, df_p_g)
+                                msgs_equipe_total.extend(msgs_eq)
                                 total_pesquisas += len(df_p_g)
                                 total_resultados += len(df_r_g)
                                 destinos_salvos.append(f"{nome_destino} ({len(df_p_g)} cenário(s))")
@@ -1920,6 +2022,8 @@ def render_manual():
                             )
                             if total_fila:
                                 st.caption(f"Também marquei {total_fila} linha(s) como concluída na fila de relatórios.")
+                            for msg in msgs_equipe_total:
+                                st.caption(f"📋 {msg}")
                             for aviso in avisos_fila_total:
                                 st.caption(f"⚠️ Fila de relatórios: {aviso}")
 
@@ -2075,10 +2179,13 @@ def render_colar():
                 # Fecha a linha da fila na hora, igual ao Polling Manual: sem isso a
                 # planilha `relatorios` só ficava "sim" no próximo sync (a cada 6h).
                 linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_colar)
+                msgs_equipe = atualizar_status_rastreamento_equipe(gc, df_p_colar)
             st.success(f"Gravado: {len(res['linhas_p'])} pesquisa(s) e {len(res['linhas_r'])} "
                        f"resultado(s) na {nome_destino}. A média móvel é reconstruída de 4 em 4 horas.")
             if linhas_fila:
                 st.caption(f"Também marquei {linhas_fila} linha(s) como cadastrada na fila de relatórios.")
+            for msg in msgs_equipe:
+                st.caption(f"📋 {msg}")
             for aviso in avisos_fila:
                 st.caption(f"⚠️ Fila de relatórios: {aviso}")
             st.session_state.pop("colar_resultado", None)
