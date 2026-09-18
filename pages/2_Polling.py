@@ -2077,6 +2077,31 @@ def _colar_registros_existentes(gc, sheet_id):
             for r in valores[1:] if len(r) > max(ir, ic) and r[ir].strip()}
 
 
+def _colar_chave(linha):
+    return (str(linha.get("registro_tse", "")).strip().upper(),
+            str(linha.get("cargo", "")).strip().lower())
+
+
+def _colar_tirar_ja_na_base(linhas_p, linhas_r, existentes):
+    """Tira do colar tudo que vem de registro que já está na matriz.
+
+    O dedup do salvar_tudo é por scenario_id, então ele só barrava o cenário
+    idêntico: cenário com outra numeração, outra grafia de candidato ou vindo de
+    uma página diferente do PollingData passava e era colado por cima de uma
+    pesquisa que já estava certa. A partir daqui o corte é por registro e cargo,
+    antes de gravar: registro que já está na base não entra de novo, nem em
+    parte. Recolar depois de conferir exige tirar o registro da matriz na mão.
+    """
+    bloqueados = sorted({_colar_chave(p) for p in linhas_p
+                         if _colar_chave(p) in existentes})
+    if not bloqueados:
+        return linhas_p, linhas_r, []
+    barrado = set(bloqueados)
+    return ([p for p in linhas_p if _colar_chave(p) not in barrado],
+            [r for r in linhas_r if _colar_chave(r) not in barrado],
+            bloqueados)
+
+
 def render_colar():
     st.markdown('<div class="ge-hero"><div class="ge-hero-title">Colar Pesquisa</div></div>',
                 unsafe_allow_html=True)
@@ -2147,18 +2172,22 @@ def render_colar():
         st.error(f"ID da {nome_destino} não configurado nos Secrets.")
         return
     gc = get_polling_sheets_client()
+    linhas_p, linhas_r, bloqueados = res["linhas_p"], res["linhas_r"], []
     if gc:
         existentes = _colar_registros_existentes(gc, sheet_id)
-        repetidos = sorted({(p["registro_tse"], p["cargo"]) for p in res["linhas_p"]
-                            if (p["registro_tse"].upper(), p["cargo"].lower()) in existentes})
-        if repetidos:
-            lista_rep = ", ".join(f"{r} ({c})" for r, c in repetidos)
-            msg_rep = (
-                "<div class=\"ge-alerta-cenario\">Já existe(m) na matriz (registro + cargo): "
-                + lista_rep
-                + ". Cenário idêntico não duplica; cenário novo do mesmo registro é adicionado.</div>"
+        linhas_p, linhas_r, bloqueados = _colar_tirar_ja_na_base(
+            res["linhas_p"], res["linhas_r"], existentes)
+        if bloqueados:
+            lista_rep = ", ".join(f"{r} ({c})" for r, c in bloqueados)
+            st.markdown(
+                "<div class=\"ge-alerta-cenario\">Já está na matriz, não vou gravar nada "
+                "deste colar: " + lista_rep + ". Para regravar, tire o registro da matriz "
+                "antes.</div>",
+                unsafe_allow_html=True,
             )
-            st.markdown(msg_rep, unsafe_allow_html=True)
+        if not linhas_p:
+            st.info("Todo o texto colado é de registro que já está na matriz. Nada a gravar.")
+            return
     rotulo_botao = (f"[TESTE] Gravar nas abas _novas da {nome_destino}"
                     if MODO_TESTE_COLAR else f"Gravar na {nome_destino}")
     if st.button(rotulo_botao, use_container_width=True, key="colar_gravar"):
@@ -2166,21 +2195,21 @@ def render_colar():
             st.error("Credenciais do Google Sheets não encontradas.")
         elif MODO_TESTE_COLAR:
             with st.spinner(f"[TESTE] Gravando em {ABA_TESTE_PESQUISAS} / {ABA_TESTE_RESULTADOS}..."):
-                _colar_gravar_teste(gc, sheet_id, pd.DataFrame(res["linhas_p"]),
-                                    pd.DataFrame(res["linhas_r"]))
-            st.success(f"[MODO TESTE] {len(res['linhas_p'])} cenário(s) e "
-                       f"{len(res['linhas_r'])} resultado(s) nas abas _novas da {nome_destino}. "
+                _colar_gravar_teste(gc, sheet_id, pd.DataFrame(linhas_p),
+                                    pd.DataFrame(linhas_r))
+            st.success(f"[MODO TESTE] {len(linhas_p)} cenário(s) e "
+                       f"{len(linhas_r)} resultado(s) nas abas _novas da {nome_destino}. "
                        f"Nada gravado na produção.")
             st.session_state.pop("colar_resultado", None)
         else:
-            df_p_colar = pd.DataFrame(res["linhas_p"])
+            df_p_colar = pd.DataFrame(linhas_p)
             with st.spinner("Gravando nas abas pesquisas / resultados..."):
-                salvar_tudo(gc, sheet_id, df_p_colar, pd.DataFrame(res["linhas_r"]))
+                salvar_tudo(gc, sheet_id, df_p_colar, pd.DataFrame(linhas_r))
                 # Fecha a linha da fila na hora, igual ao Polling Manual: sem isso a
                 # planilha `relatorios` só ficava "sim" no próximo sync (a cada 6h).
                 linhas_fila, avisos_fila = marcar_topline_extraida_manual(gc, df_p_colar)
                 msgs_equipe = atualizar_status_rastreamento_equipe(gc, df_p_colar)
-            st.success(f"Gravado: {len(res['linhas_p'])} pesquisa(s) e {len(res['linhas_r'])} "
+            st.success(f"Gravado: {len(linhas_p)} pesquisa(s) e {len(linhas_r)} "
                        f"resultado(s) na {nome_destino}. A média móvel é reconstruída de 4 em 4 horas.")
             if linhas_fila:
                 st.caption(f"Também marquei {linhas_fila} linha(s) como cadastrada na fila de relatórios.")
