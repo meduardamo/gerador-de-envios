@@ -2179,15 +2179,20 @@ def render_colar():
             res["linhas_p"], res["linhas_r"], existentes)
         if bloqueados:
             lista_rep = ", ".join(f"{r} ({c})" for r, c in bloqueados)
-            st.markdown(
-                "<div class=\"ge-alerta-cenario\">Já está na matriz, não vou gravar nada "
-                "deste colar: " + lista_rep + ". Para regravar, tire o registro da matriz "
-                "antes.</div>",
-                unsafe_allow_html=True,
-            )
+            novos = sorted({_colar_chave(p) for p in linhas_p})
+            lista_novos = ", ".join(f"{r} ({c})" for r, c in novos)
+            aviso = ("<div class=\"ge-alerta-cenario\">Já está na matriz e fica de fora: "
+                     + lista_rep + ".")
+            if novos:
+                aviso += (" Vou gravar só o que é novo: " + lista_novos + ".")
+            aviso += " Para regravar um registro que já está lá, tire ele da matriz antes.</div>"
+            st.markdown(aviso, unsafe_allow_html=True)
         if not linhas_p:
             st.info("Todo o texto colado é de registro que já está na matriz. Nada a gravar.")
             return
+        n_p_grava = len({p.get("poll_id") for p in linhas_p})
+        st.write(f"Vai gravar **{n_p_grava} pesquisa(s)** · **{len(linhas_p)} cenário(s)** · "
+                 f"**{len(linhas_r)} resultado(s)**.")
     rotulo_botao = (f"[TESTE] Gravar nas abas _novas da {nome_destino}"
                     if MODO_TESTE_COLAR else f"Gravar na {nome_destino}")
     if st.button(rotulo_botao, use_container_width=True, key="colar_gravar"):
