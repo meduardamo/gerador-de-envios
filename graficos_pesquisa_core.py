@@ -58,8 +58,11 @@ LOGO_TOPO = 0.945
 LOGO_ESQUERDA = LOGO_DIREITA - LOGO_LARGURA_FIG
 
 TITULO_Y = 0.93         # uma linha: a altura que sempre valeu
-TITULO_TOPO = 0.962     # duas linhas: o bloco desce a partir daqui
-TITULO_CORPOS = (17, 16, 15, 14)
+TITULO_TOPO = 0.962     # duas linhas ou mais: o bloco desce a partir daqui
+TITULO_PISO = 0.838     # onde o bloco tem que parar, antes da área do gráfico
+TITULO_CORPOS = (17, 16, 15, 14, 13, 12, 11, 10, 9, 8)
+TITULO_MAX_LINHAS = 4
+TITULO_ENTRELINHA = 1.25
 TITULO_RESPIRO = 0.015  # folga entre o fim do título e a logo
 
 # Multiplicador sobre 850x600. O 2x é o padrão: 1700x1200 é nítido no WhatsApp
@@ -320,31 +323,101 @@ def _tokens_titulo(texto: str) -> list[str]:
     return tokens
 
 
-def _linhas_titulo(fig, texto: str, familia: str, corpo: float,
-                   largura_max: float) -> tuple[list[str], bool]:
-    """Quebra o título em no máximo duas linhas e diz se coube na largura.
+def _partir_palavra(fig, palavra: str, familia: str, corpo: float,
+                    largura_max: float) -> list[str]:
+    """Corta com hífen a palavra que sozinha é mais larga que a linha.
 
-    Uma linha quando cabe. Quando não cabe, a quebra é a mais EQUILIBRADA das
-    possíveis (a que deixa a linha mais larga o mais estreita possível), não a
-    primeira que encher: greedy deixaria "Intenção de voto para Governador
-    (votos" em cima e "válidos) - PE" pendurado embaixo.
+    Não acontece com título de pesquisa escrito à mão, mas acontece com texto
+    colado sem espaço. Sem isto ela sairia inteira por cima da logo, que é
+    exatamente o que este arquivo passou a evitar.
+    """
+    pedacos, atual = [], ""
+    for letra in palavra:
+        if atual and _largura_texto(fig, f"{atual}{letra}-", familia,
+                                    corpo) > largura_max:
+            pedacos.append(f"{atual}-")
+            atual = letra
+        else:
+            atual += letra
+    if atual:
+        pedacos.append(atual)
+    return pedacos or [palavra]
+
+
+def _quebrar_corrido(fig, tokens: list[str], familia: str, corpo: float,
+                     largura_max: float) -> list[str]:
+    """Quebra palavra a palavra, enchendo cada linha até a largura permitida.
+    Toda linha que sai daqui cabe na faixa livre, custe quantas linhas custar."""
+    linhas, atual = [], ""
+    for token in tokens:
+        if _largura_texto(fig, token, familia, corpo) > largura_max:
+            if atual:
+                linhas.append(atual)
+                atual = ""
+            pedacos = _partir_palavra(fig, token, familia, corpo, largura_max)
+            linhas.extend(pedacos[:-1])
+            atual = pedacos[-1]
+            continue
+        teste = f"{atual} {token}".strip()
+        if not atual or _largura_texto(fig, teste, familia, corpo) <= largura_max:
+            atual = teste
+        else:
+            linhas.append(atual)
+            atual = token
+    if atual:
+        linhas.append(atual)
+    return linhas
+
+
+def _linhas_titulo(fig, texto: str, familia: str, corpo: float,
+                   largura_max: float,
+                   max_linhas: int = TITULO_MAX_LINHAS) -> list[str] | None:
+    """Quebra o título naquele corpo, ou None se não couber no limite de linhas.
+
+    Uma linha quando cabe. Em duas, a quebra é a mais EQUILIBRADA das possíveis
+    (a que deixa a linha mais larga o mais estreita possível), não a primeira
+    que encher: corrido, sairia "Intenção de voto para Governador (votos" em
+    cima e "válidos) - PE" pendurado embaixo.
     """
     tokens = _tokens_titulo(texto)
     if not tokens:
-        return [""], True
+        return [""]
     inteiro = " ".join(tokens)
     if _largura_texto(fig, inteiro, familia, corpo) <= largura_max:
-        return [inteiro], True
-    if len(tokens) < 2:
-        return [inteiro], False
+        return [inteiro]
 
-    melhor = None
-    for corte in range(1, len(tokens)):
-        linhas = [" ".join(tokens[:corte]), " ".join(tokens[corte:])]
-        pior = max(_largura_texto(fig, linha, familia, corpo) for linha in linhas)
-        if melhor is None or pior < melhor[0]:
-            melhor = (pior, linhas)
-    return melhor[1], melhor[0] <= largura_max
+    if max_linhas >= 2 and len(tokens) >= 2:
+        melhor = None
+        for corte in range(1, len(tokens)):
+            duas = [" ".join(tokens[:corte]), " ".join(tokens[corte:])]
+            pior = max(_largura_texto(fig, linha, familia, corpo) for linha in duas)
+            if melhor is None or pior < melhor[0]:
+                melhor = (pior, duas)
+        if melhor[0] <= largura_max:
+            return melhor[1]
+
+    linhas = _quebrar_corrido(fig, tokens, familia, corpo, largura_max)
+    return linhas if len(linhas) <= max_linhas else None
+
+
+def _bloco_cabe(fig, linhas: list[str], familia: str, corpo: float) -> bool:
+    """O bloco de título tem que parar antes da área do gráfico: mais de uma
+    linha em corpo grande passa por cima da primeira barra e do 100% do eixo.
+
+    A altura é medida, não calculada a partir do corpo: acento, parêntese e
+    entrelinha somam mais que o tamanho nominal da fonte, e a conta estimada
+    deixava três linhas descerem para dentro do gráfico.
+    """
+    alvo = fig.text(0, 0, "\n".join(linhas), fontfamily=familia, fontsize=corpo,
+                    fontweight="bold", linespacing=TITULO_ENTRELINHA)
+    try:
+        altura = alvo.get_window_extent(fig.canvas.get_renderer()).height
+        altura /= fig.bbox.height
+    except Exception:
+        altura = len(linhas) * TITULO_ENTRELINHA * (corpo / 72) / (ALTURA_PX / 100)
+    finally:
+        alvo.remove()
+    return TITULO_TOPO - altura >= TITULO_PISO
 
 
 def _desenhar_titulo(fig, texto: str, familia: str) -> None:
@@ -355,6 +428,11 @@ def _desenhar_titulo(fig, texto: str, familia: str) -> None:
     de caracteres ocupa larguras diferentes. "Intenção de voto para Governador
     (votos válidos) - PE" passava por baixo da logo; agora sai em duas linhas.
 
+    A busca desce por corpo e sobe por linha: primeiro tenta caber grande em
+    poucas linhas, depois aceita menor e mais linhas, e a última tentativa
+    quebra até dentro da palavra. Título nunca sai cortado nem escondido; o que
+    cede é o tamanho da letra.
+
     A conta vale também na versão sem logo, para as duas peças (com e sem, que
     saem no mesmo .zip) terem a mesma quebra e a mesma altura de título.
     """
@@ -364,13 +442,18 @@ def _desenhar_titulo(fig, texto: str, familia: str) -> None:
     # Texto centrado em 0.5: a largura útil é o dobro da distância até a logo.
     largura_max = 2 * (LOGO_ESQUERDA - TITULO_RESPIRO - 0.5)
 
-    linhas, corpo = [texto], TITULO_CORPOS[0]
+    linhas, corpo = None, TITULO_CORPOS[-1]
     for corpo in TITULO_CORPOS:
-        linhas, coube = _linhas_titulo(fig, texto, familia, corpo, largura_max)
-        if coube:
+        tentativa = _linhas_titulo(fig, texto, familia, corpo, largura_max)
+        if tentativa and (len(tentativa) == 1
+                          or _bloco_cabe(fig, tentativa, familia, corpo)):
+            linhas = tentativa
             break
-    # Não coube nem no menor corpo: sai na melhor quebra mesmo assim. Encolher
-    # mais, ou cortar o título, é pior que chegar perto da logo.
+    if not linhas:
+        # Título descomunal: sai no menor corpo, quebrado até onde precisar.
+        # Passar do piso é melhor que sumir por baixo da logo ou cortar texto.
+        linhas = _quebrar_corrido(fig, _tokens_titulo(texto), familia, corpo,
+                                  largura_max)
 
     if len(linhas) == 1:
         fig.text(0.5, TITULO_Y, linhas[0], ha="center", va="center",
@@ -379,7 +462,7 @@ def _desenhar_titulo(fig, texto: str, familia: str) -> None:
     else:
         fig.text(0.5, TITULO_TOPO, "\n".join(linhas), ha="center", va="top",
                  fontfamily=familia, fontsize=corpo, fontweight="bold",
-                 color=MARINHO, linespacing=1.25)
+                 color=MARINHO, linespacing=TITULO_ENTRELINHA)
 
 
 def gerar_grafico_pesquisa(
