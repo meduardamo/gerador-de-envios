@@ -227,6 +227,19 @@ CHAVES_DERIVADAS = ("alerta_titulo", "alerta_rodape", "alerta_titulo_envio",
 CHAVE_FORCAR_FICHA = "alerta_ficha_forcar"
 
 
+def _parece_votos_validos(itens: list[dict]) -> bool:
+    """Marcação inicial da caixa "votos válidos".
+
+    É palpite de partida, não medida: sem branco, nulo ou indeciso na lista e
+    com a soma fechando em 100%, a peça costuma estar na base de válidos. Não
+    prova nada — o instituto pode ter publicado o total e simplesmente não ter
+    divulgado os não válidos — e por isso a caixa continua sendo de quem monta.
+    """
+    if not itens or any(i.get("tipo") == "nao_valido" for i in itens):
+        return False
+    return sum(float(i.get("percentual") or 0) for i in itens) >= 97
+
+
 def _travar_por_ficha(payload: dict) -> list[str]:
     """Campos da ficha que estão barrando o download e o texto. Vazio quando a
     ficha está completa ou quando ela liberou na mão."""
@@ -246,7 +259,7 @@ def _limpar(limpar_fonte: bool = False):
     # aqui pode nem existir na pesquisa nova.
     for chave in [k for k in st.session_state
                   if k.startswith(("alerta_item_", "alerta_comb_",
-                                   "alerta_modo_comb_"))]:
+                                   "alerta_modo_comb_", "alerta_validos"))]:
         st.session_state.pop(chave, None)
 
 
@@ -433,6 +446,7 @@ with aba_dados:
 payload = st.session_state.get("alerta_payload")
 itens_editados: list[dict] = []
 cenario_final: dict = {}
+votos_validos = False
 AVISO_SEM_DADOS = "Extraia os dados na aba **1. Dados** para liberar esta etapa."
 
 
@@ -694,9 +708,30 @@ with aba_grafico:
                 help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam "
                      "comparáveis. Desligado, o topo aperta até um pouco acima do "
                      "maior valor. A base fica no zero nos dois casos.")
-            titulo_grafico = st.text_input("Título do gráfico",
-                                           titulo_padrao(payload, cenario_final),
-                                           key="alerta_titulo")
+            # Base do número, no título. A peça de válidos e a de total
+            # mostram o mesmo candidato com percentuais diferentes: sem dizer a
+            # base, quem recebe as duas não tem como saber qual é qual.
+            validos_padrao = _parece_votos_validos(itens_editados)
+            votos_validos = st.checkbox(
+                "Votos válidos no título", validos_padrao,
+                # A composição da lista muda o padrão; chave fixa deixaria a
+                # caixa presa no que valia para o cenário anterior.
+                key=f"alerta_validos_{int(validos_padrao)}",
+                help='Escreve "(votos válidos)" no título do gráfico e do '
+                     "alerta. Vem marcada quando a lista não tem branco, nulo "
+                     "nem indeciso e a soma fecha em 100%. Confira no "
+                     "relatório: a extração não registra em que base o "
+                     "instituto publicou.")
+            # Trocar a base muda o título padrão, e o Streamlit devolveria o
+            # texto anterior pela chave do widget.
+            if st.session_state.get("alerta_validos_visto") != votos_validos:
+                st.session_state["alerta_validos_visto"] = votos_validos
+                for chave in ("alerta_titulo", "alerta_titulo_envio"):
+                    st.session_state.pop(chave, None)
+            titulo_grafico = st.text_input(
+                "Título do gráfico",
+                titulo_padrao(payload, cenario_final, votos_validos),
+                key="alerta_titulo")
             # Gráfico de cenários combinados tem que dizer isso na ficha: quem
             # lê a peça precisa saber que o número não é um cenário publicado.
             COMBINACAO_RODAPE = {"media": "Média dos cenários estimulados",
@@ -798,7 +833,8 @@ with aba_alerta:
                                      st.session_state["alerta_texto"], height=260,
                                      key="alerta_texto_edit")
                 titulo_alerta = st.text_input(
-                    "Título do alerta", titulo_padrao(payload, cenario_final),
+                    "Título do alerta",
+                    titulo_padrao(payload, cenario_final, votos_validos),
                     key="alerta_titulo_envio")
                 link_alerta = st.text_input("Link",
                                             st.session_state.get("alerta_url") or "",

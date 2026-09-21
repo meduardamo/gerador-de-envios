@@ -50,6 +50,18 @@ RAIO_PONTA_PX = 4
 ORIENTACOES = ("vertical", "horizontal")
 FORMATOS = ("png", "svg")
 
+# Geometria da logo, no canto superior direito. Sai daqui, e não de dentro de
+# _colocar_logo, porque o título mede a largura livre contra esta borda.
+LOGO_LARGURA_FIG = 0.10
+LOGO_DIREITA = 0.955
+LOGO_TOPO = 0.945
+LOGO_ESQUERDA = LOGO_DIREITA - LOGO_LARGURA_FIG
+
+TITULO_Y = 0.93         # uma linha: a altura que sempre valeu
+TITULO_TOPO = 0.962     # duas linhas: o bloco desce a partir daqui
+TITULO_CORPOS = (17, 16, 15, 14)
+TITULO_RESPIRO = 0.015  # folga entre o fim do título e a logo
+
 # Multiplicador sobre 850x600. O 2x é o padrão: 1700x1200 é nítido no WhatsApp
 # sem virar arquivo pesado.
 ESCALAS_EXPORT = {
@@ -271,12 +283,103 @@ def _colocar_logo(fig, caminho: str) -> None:
             imagem = imagem[y0:y1, x0:x1]
 
     altura, largura = imagem.shape[0], imagem.shape[1]
-    larg_fig = 0.10                        # largura VISÍVEL na figura
+    larg_fig = LOGO_LARGURA_FIG            # largura VISÍVEL na figura
     alt_fig = larg_fig * (altura / largura) * (LARGURA_PX / ALTURA_PX)
-    eixo = fig.add_axes([0.955 - larg_fig, 0.945 - alt_fig, larg_fig, alt_fig],
+    eixo = fig.add_axes([LOGO_ESQUERDA, LOGO_TOPO - alt_fig, larg_fig, alt_fig],
                         zorder=5)
     eixo.imshow(imagem)
     eixo.axis("off")
+
+
+def _largura_texto(fig, texto: str, familia: str, corpo: float) -> float:
+    """Largura do texto em fração da figura, medida no corpo em que vai sair.
+
+    Mede pelo renderer em vez de redesenhar a figura: o título testa várias
+    quebras e vários corpos, e um draw() inteiro por teste travaria a prévia.
+    """
+    alvo = fig.text(0, 0, texto, fontfamily=familia, fontsize=corpo,
+                    fontweight="bold")
+    try:
+        largura = alvo.get_window_extent(fig.canvas.get_renderer()).width
+    except Exception:
+        largura = len(texto) * corpo * 0.62   # sem renderer: estimativa
+    finally:
+        alvo.remove()
+    return largura / fig.bbox.width
+
+
+def _tokens_titulo(texto: str) -> list[str]:
+    """Palavras do título, com o hífen da UF colado no que vem depois: quebrar
+    entre "-" e "PE" deixaria a primeira linha terminando em traço solto."""
+    tokens: list[str] = []
+    for palavra in str(texto or "").split():
+        if tokens and tokens[-1] in ("-", "–", "—"):
+            tokens[-1] = f"{tokens[-1]} {palavra}"
+        else:
+            tokens.append(palavra)
+    return tokens
+
+
+def _linhas_titulo(fig, texto: str, familia: str, corpo: float,
+                   largura_max: float) -> tuple[list[str], bool]:
+    """Quebra o título em no máximo duas linhas e diz se coube na largura.
+
+    Uma linha quando cabe. Quando não cabe, a quebra é a mais EQUILIBRADA das
+    possíveis (a que deixa a linha mais larga o mais estreita possível), não a
+    primeira que encher: greedy deixaria "Intenção de voto para Governador
+    (votos" em cima e "válidos) - PE" pendurado embaixo.
+    """
+    tokens = _tokens_titulo(texto)
+    if not tokens:
+        return [""], True
+    inteiro = " ".join(tokens)
+    if _largura_texto(fig, inteiro, familia, corpo) <= largura_max:
+        return [inteiro], True
+    if len(tokens) < 2:
+        return [inteiro], False
+
+    melhor = None
+    for corte in range(1, len(tokens)):
+        linhas = [" ".join(tokens[:corte]), " ".join(tokens[corte:])]
+        pior = max(_largura_texto(fig, linha, familia, corpo) for linha in linhas)
+        if melhor is None or pior < melhor[0]:
+            melhor = (pior, linhas)
+    return melhor[1], melhor[0] <= largura_max
+
+
+def _desenhar_titulo(fig, texto: str, familia: str) -> None:
+    """Título centrado, quebrado antes de encostar na logo.
+
+    O limite é MEDIDO contra a borda da logo, não contado em caracteres: o que
+    esconde o título por baixo do selo é a largura do texto, e a mesma contagem
+    de caracteres ocupa larguras diferentes. "Intenção de voto para Governador
+    (votos válidos) - PE" passava por baixo da logo; agora sai em duas linhas.
+
+    A conta vale também na versão sem logo, para as duas peças (com e sem, que
+    saem no mesmo .zip) terem a mesma quebra e a mesma altura de título.
+    """
+    texto = str(texto or "").strip()
+    if not texto:
+        return
+    # Texto centrado em 0.5: a largura útil é o dobro da distância até a logo.
+    largura_max = 2 * (LOGO_ESQUERDA - TITULO_RESPIRO - 0.5)
+
+    linhas, corpo = [texto], TITULO_CORPOS[0]
+    for corpo in TITULO_CORPOS:
+        linhas, coube = _linhas_titulo(fig, texto, familia, corpo, largura_max)
+        if coube:
+            break
+    # Não coube nem no menor corpo: sai na melhor quebra mesmo assim. Encolher
+    # mais, ou cortar o título, é pior que chegar perto da logo.
+
+    if len(linhas) == 1:
+        fig.text(0.5, TITULO_Y, linhas[0], ha="center", va="center",
+                 fontfamily=familia, fontsize=corpo, fontweight="bold",
+                 color=MARINHO)
+    else:
+        fig.text(0.5, TITULO_TOPO, "\n".join(linhas), ha="center", va="top",
+                 fontfamily=familia, fontsize=corpo, fontweight="bold",
+                 color=MARINHO, linespacing=1.25)
 
 
 def gerar_grafico_pesquisa(
@@ -449,8 +552,7 @@ def gerar_grafico_pesquisa(
                     fontfamily=familia, fontsize=12.5, fontweight="bold",
                     color=TINTA, zorder=4)
 
-    fig.text(0.5, 0.93, titulo, ha="center", va="center", fontfamily=familia,
-             fontsize=17, fontweight="bold", color=MARINHO)
+    _desenhar_titulo(fig, titulo, familia)
 
     # Sem legenda de propósito. A cor mais clara distingue branco/nulo/indeciso,
     # mas quem diz o que a barra é já é o rótulo do eixo ("Brancos e nulos",
@@ -530,8 +632,15 @@ def _num(valor) -> str:
     return f"{n:.1f}".replace(".", ",")
 
 
-def titulo_padrao(payload: dict, cenario: dict | None = None) -> str:
-    """'Intenção de voto para Governador - PE'. Hífen, não travessão."""
+def titulo_padrao(payload: dict, cenario: dict | None = None,
+                  votos_validos: bool = False) -> str:
+    """'Intenção de voto para Governador (votos válidos) - PE'. Hífen, não travessão.
+
+    votos_validos diz a base no título. O alerta passou a sair na base de votos
+    válidos, e sem essa marca o mesmo candidato aparece com dois números
+    diferentes em duas peças sem nada explicando a diferença. Quem liga é a
+    página: nada no JSON da extração diz em que base o instituto publicou.
+    """
     cenario = cenario or {}
     cargo = (cenario.get("cargo") or payload.get("cargo") or "").lower()
     uf = (cenario.get("uf") or payload.get("uf") or "").upper()
@@ -542,6 +651,8 @@ def titulo_padrao(payload: dict, cenario: dict | None = None) -> str:
         partes.append(f"para {CARGO_TITULO[cargo]}")
     if turno == "t2":
         partes.append("no 2º turno")
+    if votos_validos:
+        partes.append("(votos válidos)")
     titulo = " ".join(partes)
     return f"{titulo} - {uf}" if uf and uf != "BR" else titulo
 
