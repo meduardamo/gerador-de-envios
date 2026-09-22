@@ -409,10 +409,10 @@ def montar_header(is_alerta: bool, area: str, abrangencia: str, ufs: list[str] |
     prefixo = "Alerta" if is_alerta else "Envio"
     if ufs:
         ufs_str = ", ".join(ufs)
-        return f"{prefixo} | Eixo | {area} | Subnacional | {ufs_str}"
+        return f"{prefixo} | EixoGov | {area} | Subnacional | {ufs_str}"
     if not (abrangencia or "").strip() or abrangencia == "Não especificar":
-        return f"{prefixo} | Eixo | {area}"
-    return f"{prefixo} | Eixo | {area} | {abrangencia}"
+        return f"{prefixo} | EixoGov | {area}"
+    return f"{prefixo} | EixoGov | {area} | {abrangencia}"
 
 def limpar_prefixo_alerta_envio(resumo: str) -> str:
     s = (resumo or "").strip()
