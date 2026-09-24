@@ -3186,6 +3186,80 @@ def normalizar_institutos_retroativo(aba_pesquisas, aba_resultados):
             )
 
 
+# Palavras que não distinguem uma pessoa de outra na comparação de grafias.
+_PALAVRAS_NEUTRAS_NOME = PARTICULAS_NOME_MINUSCULAS | {
+    "jr", "junior", "filho", "neto", "dr", "dra", "prof", "professor", "professora",
+}
+
+
+def _chave_grafia(nome: str) -> str:
+    """Nome sem acento, pontuação, espaço e caixa: 'Dr. Rosinha' e 'Dr Rosinha' dão a mesma chave."""
+    return re.sub(r"[^a-z0-9]", "", _chave_candidato(nome))
+
+
+def _palavras_do_nome(nome: str) -> list:
+    return [p for p in re.findall(r"[a-z0-9]+", _chave_candidato(nome))
+            if len(p) > 2 and p not in _PALAVRAS_NEUTRAS_NOME]
+
+
+def _mesma_grafia_de_pessoa(novo: str, existente: str) -> bool:
+    """Mesma pessoa escrita diferente (Alysson/Allyson, Rodrigo Bolsonaro/Rodrigo de Bolsonaro).
+
+    Cada palavra do nome mais curto precisa bater (grafia quase igual) com uma do mais longo, e
+    o mais curto precisa ter pelo menos duas palavras: um sobrenome só é pouco para afirmar.
+    """
+    import difflib
+    a, b = _palavras_do_nome(novo), _palavras_do_nome(existente)
+    curto, longo = (a, b) if len(a) <= len(b) else (b, a)
+    if curto and curto == longo:
+        return True  # só muda o que não distingue: "Duarte Jr." e "Duarte Júnior"
+    if len(curto) < 2:
+        return False
+    return all(any(difflib.SequenceMatcher(None, x, y).ratio() >= 0.8 for y in longo) for x in curto)
+
+
+def harmonizar_nomes_com_matriz(df_r: pd.DataFrame, df_existente: pd.DataFrame) -> pd.DataFrame:
+    """Troca o nome do candidato que chega pela grafia que a matriz já usa para a mesma pessoa.
+
+    Sem isso, cada fonte (PollingData, matéria, relatório) grava a sua grafia e a mesma pessoa
+    vira duas séries no resultados_bi; numa colagem repetida, a linha nova não casa com a antiga
+    na _dedup_key e o cenário fica com a pessoa duas vezes. Só compara dentro da mesma UF, cargo e
+    partido, e só troca quando há um único nome existente compatível.
+    """
+    if df_r is None or df_r.empty or df_existente is None or df_existente.empty:
+        return df_r
+    colunas = {"uf", "cargo", "tipo", "candidato", "partido", "candidato_partido"}
+    if not colunas <= set(df_r.columns) or not colunas <= set(df_existente.columns):
+        return df_r
+    ex = df_existente[df_existente["tipo"].astype(str).eq("candidato")]
+    contagem = ex.groupby(["uf", "cargo", "partido", "candidato_partido"]).size()
+    grafia_candidato = ex.drop_duplicates("candidato_partido").set_index("candidato_partido")["candidato"]
+
+    df_r = df_r.copy()
+    trocas = {}
+    for idx, r in df_r[df_r["tipo"].astype(str).eq("candidato")].iterrows():
+        chave_grupo = (r["uf"], r["cargo"], r["partido"])
+        rotulo = r["candidato_partido"]
+        if chave_grupo + (rotulo,) in contagem.index:
+            continue
+        try:
+            existentes = contagem.loc[chave_grupo]
+        except KeyError:
+            continue
+        mesmos = [e for e in existentes.index if _chave_grafia(e) == _chave_grafia(rotulo)]
+        if not mesmos:
+            mesmos = [e for e in existentes.index if _mesma_grafia_de_pessoa(r["candidato"], grafia_candidato.get(e, e))]
+        if len(set(mesmos)) != 1:
+            continue
+        alvo = mesmos[0]
+        df_r.at[idx, "candidato_partido"] = alvo
+        df_r.at[idx, "candidato"] = grafia_candidato.get(alvo, r["candidato"])
+        trocas[(r["uf"], r["cargo"], rotulo)] = alvo
+    for (uf, cargo, de), para in trocas.items():
+        print(f"  [nomes] {uf} {cargo}: '{de}' gravado como '{para}', grafia que a matriz já usa")
+    return df_r
+
+
 def salvar_tudo(gc, spreadsheet_id: str, df_p: pd.DataFrame, df_r: pd.DataFrame):
     sem_novidades = (df_p is None or df_p.empty) and (df_r is None or df_r.empty)
     sh = gc.open_by_key(spreadsheet_id)
@@ -3248,6 +3322,7 @@ def salvar_tudo(gc, spreadsheet_id: str, df_p: pd.DataFrame, df_r: pd.DataFrame)
     if df_r is not None and not df_r.empty:
         df_r = df_r.copy()
 
+        df_r = harmonizar_nomes_com_matriz(df_r, carregar_df_da_aba(aba_resultados))
         df_r = adicionar_posicao_pesquisa(df_r)
 
         df_r["_dedup_key"] = (
