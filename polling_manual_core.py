@@ -616,9 +616,12 @@ ALIASES_INSTITUTO = {
     "gerp": "GERP",
     "Grupo GERP": "GERP",
     "Grupo Gerp": "GERP",
-    # Nome legal usado em alguns registros do PesqEle; corresponde à marca Ideia.
-    "Mídia Inteligência em Pesquisa": "Ideia Inteligência",
-    "Midia Inteligencia em Pesquisa": "Ideia Inteligência",
+    # MEDIA - Inteligência em Pesquisa (RN, parceria com O Potengi) é outra empresa, não a
+    # Ideia: as pesquisas "Ideia Inteligência" do PesqEle são da Boas Ideias.
+    "Mídia Inteligência em Pesquisa": "Media Inteligência",
+    "Midia Inteligencia em Pesquisa": "Media Inteligência",
+    "MEDIA - Inteligência em Pesquisa": "Media Inteligência",
+    "MEDIA - INTELIGENCIA EM PESQUISA": "Media Inteligência",
     "MDA Pesquisas": "MDA",
     # 100 Cidades é um projeto da Futura, não um instituto distinto.
     "100 Cidades": "Futura",
