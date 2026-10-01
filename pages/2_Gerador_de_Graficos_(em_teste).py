@@ -60,7 +60,7 @@ from gerador_graficos_extracao import (
 )
 from polling_extracao_core import definir_api_key
 
-st.set_page_config(page_title="Gerador de Gráficos", layout="wide")
+st.set_page_config(page_title="Gerador de Gráficos (em teste)", layout="wide")
 
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
@@ -128,6 +128,9 @@ footer { display: none !important; }
 [data-testid="stButtonGroup"] button[data-variant="segmented_control"][data-selected="true"] * { color: #fff !important; }
 .gg-passo { font-size: 13px; color: #767672; margin: -8px 0 14px; }
 .gg-grupo { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #192D4E; margin: 18px 0 6px; padding-bottom: 5px; border-bottom: 1px solid #DADAD4; }
+/* Selo ao lado do título enquanto a página está em teste. Tirar daqui, do
+   hero e do nome do arquivo quando ela for liberada. */
+.ge-hero-selo { margin-left: 18px; padding: 6px 12px; border: 1.5px solid #fff; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .ge-rule { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #962E4D; border-top: 2px solid #962E4D; padding-top: 10px; margin: 24px 0 16px; }
 </style>""", unsafe_allow_html=True)
 
@@ -460,8 +463,11 @@ def _marca_da_logo(identidade: str) -> list:
 
 # ── página ───────────────────────────────────────────────────────────────────
 
-st.markdown('<div class="ge-hero"><div class="ge-hero-title">Gerador de Gráficos</div></div>',
+st.markdown('<div class="ge-hero"><div class="ge-hero-title">Gerador de Gráficos</div>'
+            '<div class="ge-hero-selo">Em teste</div></div>',
             unsafe_allow_html=True)
+st.caption("Página em teste: o desenho das peças ainda está sendo ajustado. "
+           "Confira a peça antes de usar em material de cliente.")
 
 if not montserrat_disponivel():
     st.warning("A fonte Montserrat não foi encontrada em fontes/. A peça vai sair "
