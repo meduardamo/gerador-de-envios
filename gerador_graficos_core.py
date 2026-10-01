@@ -27,6 +27,7 @@ import io
 import math
 import os
 import re
+import threading
 import unicodedata
 
 import matplotlib
@@ -34,6 +35,8 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 from matplotlib import patheffects
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from matplotlib.patches import PathPatch, Rectangle
 from matplotlib.ticker import MaxNLocator
 
@@ -247,7 +250,14 @@ class _Peca:
     def __init__(self, largura: int, altura: int, fundo: str, familia: str):
         self.L, self.A = largura, altura
         self.fundo, self.familia = fundo, familia
-        self.fig = plt.figure(figsize=(largura / 100, altura / 100), dpi=100)
+        # Figure direto, sem pyplot. O pyplot guarda as figuras num registro
+        # global numerado, e o Streamlit desenha em várias threads (a prévia
+        # de um rerun começa com o download do rerun anterior ainda rodando):
+        # duas threads pegavam o mesmo número e desenhavam na MESMA figura. A
+        # prévia saía embaralhada e, quando uma delas salvava em SVG, a outra
+        # perdia o canvas no meio da medida (AttributeError em get_renderer).
+        self.fig = Figure(figsize=(largura / 100, altura / 100), dpi=100)
+        FigureCanvasAgg(self.fig)
         self.fig.patch.set_facecolor(fundo)
 
     def texto(self, x, y, conteudo, **estilo):
@@ -753,7 +763,26 @@ def _desenhar_tabela(peca, topo, medidas, celulas, destaque):
 
 # ── entrada única ────────────────────────────────────────────────────────────
 
-def gerar_peca(
+# Uma peça por vez. A figura já não é compartilhada, mas o rc_context (fonte,
+# svg.fonttype) é estado global do matplotlib: dois desenhos ao mesmo tempo
+# trocariam a configuração um do outro.
+_TRAVA = threading.Lock()
+
+
+def gerar_peca(*args, **kwargs) -> bytes:
+    """Devolve o arquivo em bytes, pronto pro st.image e pro st.download_button.
+
+    series: [{nome, valores, marcas, pct, indice}], como sai de
+    series_da_tabela(). Série com pct=True só é aceita na tabela.
+
+    Na tabela a altura da peça acompanha o número de linhas; o tamanho escolhido
+    manda só na largura.
+    """
+    with _TRAVA:
+        return _gerar_peca(*args, **kwargs)
+
+
+def _gerar_peca(
     tipo: str,
     categorias: list[str],
     series: list[dict],
@@ -774,14 +803,6 @@ def gerar_peca(
     formato: str = "png",
     fundo_transparente: bool = False,
 ) -> bytes:
-    """Devolve o arquivo em bytes, pronto pro st.image e pro st.download_button.
-
-    series: [{nome, valores, marcas, pct, indice}], como sai de
-    series_da_tabela(). Série com pct=True só é aceita na tabela.
-
-    Na tabela a altura da peça acompanha o número de linhas; o tamanho escolhido
-    manda só na largura.
-    """
     if tipo not in TIPOS:
         raise ValueError(f"Tipo desconhecido: {tipo}")
     if not categorias or not series:
@@ -818,7 +839,6 @@ def gerar_peca(
             topo, base = _moldura(rascunho, *moldura)
             medidas = _tabela_medidas(rascunho, cabecalho, celulas, largura - 2 * MARGEM)
             alt_tabela = _desenhar_tabela(rascunho, topo, medidas, celulas, ident["destaque"])
-            plt.close(rascunho.fig)
             altura = math.ceil(topo + alt_tabela + RESPIRO + (600 - base))
             peca = _Peca(largura, altura, fundo, familia)
             topo, _ = _moldura(peca, *moldura)
@@ -842,7 +862,6 @@ def gerar_peca(
         buffer = io.BytesIO()
         peca.fig.savefig(buffer, format=formato, dpi=100 * escala,
                          facecolor=fundo, transparent=fundo_transparente)
-        plt.close(peca.fig)
     return buffer.getvalue()
 
 
