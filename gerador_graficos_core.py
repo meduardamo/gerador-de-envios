@@ -1,0 +1,834 @@
+"""
+Gerador de gráficos: linha, barras, barras empilhadas e tabela a partir de uma
+tabela qualquer (primeira coluna = categoria, demais = séries).
+
+Segue a peça do Alerta de Pesquisa (graficos_pesquisa_core) e reaproveita o que
+é dela: Montserrat, título centrado que quebra antes da logo, grade pontilhada,
+barra com a ponta do valor arredondada, rodapé cinza. O que muda é que aqui o
+dado é livre, então a geometria inteira é MEDIDA: cabeçalho, legenda e rodapé
+dizem quanto ocupam e a área do gráfico fica com o que sobra.
+
+Decisões que valem explicação:
+
+- Um eixo de valor só. Duas medidas de escala diferente no mesmo gráfico (R$ e
+  %) não entram: a série de percentual só existe na tabela.
+- Barra sempre parte do zero. Linha pode ter o eixo apertado, por opção.
+- A cor segue a série, não a posição na seleção: tirar uma série do gráfico não
+  repinta as que ficaram. Série única usa a cor da marca.
+- Série de dado usa a paleta de gráficos da casa, não marinho/vinho. A ordem foi
+  conferida em teste de paleta (vizinhas separadas também em deuteranopia).
+  Mostarda, verde e salmão ficam abaixo de 3:1 contra o branco, e por isso a
+  legenda está sempre presente e o rótulo de valor vem ligado por padrão.
+
+Sem Streamlit: dá pra gerar por script e conferir sem subir o app.
+"""
+
+import io
+import math
+import os
+import re
+import unicodedata
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+from matplotlib import patheffects
+from matplotlib.patches import PathPatch, Rectangle
+from matplotlib.ticker import MaxNLocator
+
+import graficos_pesquisa_core as gp
+from graficos_pesquisa_core import (BRANCO, ESCALAS_EXPORT, GELO, MARINHO,
+                                    SUBTEXTO, TINTA)
+
+RAIZ = os.path.dirname(os.path.abspath(__file__))
+
+VINHO = "#962E4D"
+FILETE = "#E1E1E1"
+
+# Paleta de gráficos (arquivo de cores da casa), na ordem validada.
+PALETA = ("#6091D8", "#D8445D", "#C9A63F", "#4FA882", "#A96FAB", "#E8876A")
+MAX_SERIES = len(PALETA)
+
+TIPOS = {
+    "linha": "Linha",
+    "barras": "Barras",
+    "empilhadas": "Barras empilhadas",
+    "tabela": "Tabela",
+}
+
+# Rótulos de valor que cada tipo aceita; o primeiro é o padrão.
+ROTULOS = {
+    "linha": {"ultimo": "Só o último ponto", "todos": "Todos os pontos",
+              "nenhum": "Nenhum"},
+    "barras": {"todos": "Em toda barra", "nenhum": "Nenhum"},
+    "empilhadas": {"todos": "Partes e total", "total": "Só o total",
+                   "nenhum": "Nenhum"},
+    "tabela": {},
+}
+
+IDENTIDADES = {
+    "EixoGov": {"logo": os.path.join(RAIZ, "logo_eixo_gov_magenta.png"),
+                "destaque": VINHO},
+    "Eleições 2026": {"logo": gp.LOGO_PADRAO, "destaque": MARINHO},
+}
+
+# (prefixo, sufixo) do eixo e da célula de tabela.
+UNIDADES = {
+    "R$ milhões": ("R$ ", " mi"),
+    "R$ bilhões": ("R$ ", " bi"),
+    "R$": ("R$ ", ""),
+    "%": ("", "%"),
+    "Número": ("", ""),
+}
+
+TAMANHOS = {
+    "Paisagem (850 × 600)": (850, 600),
+    "Slide 16:9 (960 × 540)": (960, 540),
+    "Quadrado (800 × 800)": (800, 800),
+}
+
+FORMATOS = gp.FORMATOS
+
+# Geometria em px da peça a 1× (dpi 100, então 1 unidade de tela = 1 px).
+MARGEM = 38
+LOGO_LARGURA = 85
+LOGO_TOPO = 33
+TITULO_TOPO = 30
+TITULO_CORPOS = (17, 16, 15, 14, 13, 12)
+RESPIRO = 16
+
+# Contorno na cor do fundo em volta do rótulo de valor: o número continua
+# legível quando uma linha passa por trás dele.
+def _halo(peca):
+    cor = BRANCO if peca.fundo == "none" else peca.fundo
+    return [patheffects.withStroke(linewidth=3, foreground=cor)]
+
+
+# ── leitura dos números ──────────────────────────────────────────────────────
+
+_VAZIOS = {"", "-", "–", "—", "nan", "none", "n/d", "nd"}
+
+
+def ler_numero(valor) -> tuple[float | None, bool, bool]:
+    """(número, tem asterisco, entendi).
+
+    'R$ 1.308,8 mi*' -> (1308.8, True, True); '-' -> (None, False, True);
+    'abc' -> (None, False, False).
+
+    Formato brasileiro: vírgula é decimal e ponto é milhar. Ponto sozinho só é
+    milhar quando separa grupos de três dígitos ('1.234'); '308.8' é decimal.
+    """
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return (None, False, True) if math.isnan(valor) else (float(valor), False, True)
+    texto = str(valor if valor is not None else "").strip()
+    if texto.lower() in _VAZIOS:
+        return None, False, True
+    marca = "*" in texto
+    limpo = texto.replace("−", "-")
+    negativo = limpo.lstrip("R$ ").startswith("-") or (
+        limpo.startswith("(") and limpo.rstrip("* ").endswith(")"))
+    limpo = re.sub(r"[^0-9.,]", "", limpo)
+    if not re.search(r"\d", limpo):
+        return None, marca, False
+    if "," in limpo and "." in limpo:
+        if limpo.rfind(",") > limpo.rfind("."):
+            limpo = limpo.replace(".", "").replace(",", ".")
+        else:
+            limpo = limpo.replace(",", "")
+    elif "," in limpo:
+        limpo = limpo.replace(",", ".") if limpo.count(",") == 1 else limpo.replace(",", "")
+    elif re.fullmatch(r"\d{1,3}(\.\d{3})+", limpo):
+        limpo = limpo.replace(".", "")
+    try:
+        numero = float(limpo)
+    except ValueError:
+        return None, marca, False
+    return (-numero if negativo else numero), marca, True
+
+
+def series_da_tabela(cabecalho: list[str], linhas: list[list]) -> tuple[list[str], list[dict], list[str]]:
+    """Tabela de texto -> (categorias, séries, avisos).
+
+    A primeira coluna é a categoria (ano, órgão, UF...). Linha sem categoria e
+    sem valor é descartada. Célula que não é número nem vazio vira aviso, com
+    linha e coluna, e entra como vazia: nada é adivinhado.
+    """
+    categorias, avisos = [], []
+    nomes = [str(c).strip() for c in cabecalho[1:]]
+    colunas = [{"nome": n, "valores": [], "marcas": [], "pct": False, "indice": i}
+               for i, n in enumerate(nomes)]
+    for linha in linhas:
+        celulas = ["" if c is None else str(c).strip() for c in linha]
+        celulas += [""] * (len(cabecalho) - len(celulas))
+        if not any(c and c.lower() not in _VAZIOS for c in celulas):
+            continue
+        categorias.append(celulas[0])
+        for coluna, celula in zip(colunas, celulas[1:]):
+            numero, marca, ok = ler_numero(celula)
+            if not ok:
+                avisos.append(f'"{celula}" em {coluna["nome"]} / {celulas[0] or "sem categoria"}')
+            coluna["valores"].append(numero)
+            coluna["marcas"].append(marca)
+    return categorias, colunas, avisos
+
+
+def serie_percentual(nome: str, numerador: dict, denominador: dict) -> dict:
+    """Série numerador/denominador em %, só onde os dois existem. O asterisco
+    de qualquer um dos dois acompanha o resultado."""
+    valores, marcas = [], []
+    for n, d, mn, md in zip(numerador["valores"], denominador["valores"],
+                            numerador["marcas"], denominador["marcas"]):
+        ok = n is not None and d not in (None, 0)
+        valores.append(n / d * 100 if ok else None)
+        marcas.append(bool(ok and (mn or md)))
+    return {"nome": nome, "valores": valores, "marcas": marcas, "pct": True,
+            "indice": -1}
+
+
+# ── formatação ───────────────────────────────────────────────────────────────
+
+def fmt_num(valor: float, casas: int = 1) -> str:
+    """1308.8 -> '1.308,8' (ponto de milhar e vírgula decimal)."""
+    texto = f"{valor:,.{casas}f}"
+    return texto.replace(",", "§").replace(".", ",").replace("§", ".")
+
+
+def _fmt_rotulo(valor: float, unidade: str, casas: int) -> str:
+    """Rótulo sobre a marca: só o número, porque a unidade já está no eixo.
+    Percentual é a exceção, o % faz parte do número."""
+    return fmt_num(valor, casas) + ("%" if unidade == "%" else "")
+
+
+def _fmt_celula(valor, marca: bool, pct: bool, unidade: str, casas: int) -> str:
+    if valor is None:
+        return "–"
+    if pct:
+        texto = fmt_num(valor, 1) + "%"
+    else:
+        prefixo, sufixo = UNIDADES.get(unidade, ("", ""))
+        texto = f"{prefixo}{fmt_num(valor, casas)}{sufixo}"
+    return texto + ("*" if marca else "")
+
+
+def _casas_das_marcas(marcas) -> int:
+    for casas in (0, 1, 2):
+        if all(abs(m - round(m, casas)) < 1e-9 for m in marcas):
+            return casas
+    return 2
+
+
+# ── peça: figura medida em px ────────────────────────────────────────────────
+
+class _Peca:
+    """Figura a dpi 100, endereçada em px a partir do canto superior esquerdo."""
+
+    def __init__(self, largura: int, altura: int, fundo: str, familia: str):
+        self.L, self.A = largura, altura
+        self.fundo, self.familia = fundo, familia
+        self.fig = plt.figure(figsize=(largura / 100, altura / 100), dpi=100)
+        self.fig.patch.set_facecolor(fundo)
+
+    def texto(self, x, y, conteudo, **estilo):
+        estilo.setdefault("fontfamily", self.familia)
+        estilo.setdefault("va", "top")
+        return self.fig.text(x / self.L, 1 - y / self.A, conteudo, **estilo)
+
+    def medir(self, conteudo, corpo, peso="normal", entrelinha=1.2) -> tuple[float, float]:
+        alvo = self.fig.text(0, 0, conteudo, fontfamily=self.familia,
+                             fontsize=corpo, fontweight=peso, linespacing=entrelinha)
+        caixa = alvo.get_window_extent(self.fig.canvas.get_renderer())
+        alvo.remove()
+        return caixa.width, caixa.height
+
+    def quebrar(self, conteudo, corpo, largura, peso="normal") -> str:
+        """Quebra por palavra até caber na largura, respeitando as quebras que
+        já vieram no texto."""
+        saida = []
+        for paragrafo in str(conteudo).splitlines():
+            atual = ""
+            for palavra in paragrafo.split():
+                teste = f"{atual} {palavra}".strip()
+                if not atual or self.medir(teste, corpo, peso)[0] <= largura:
+                    atual = teste
+                else:
+                    saida.append(atual)
+                    atual = palavra
+            saida.append(atual)
+        return "\n".join(saida)
+
+    def retangulo(self, x, y, largura, altura, cor):
+        self.fig.add_artist(Rectangle(
+            (x / self.L, 1 - (y + altura) / self.A), largura / self.L,
+            altura / self.A, transform=self.fig.transFigure, facecolor=cor,
+            edgecolor="none"))
+
+
+def _logo_recortada(caminho: str):
+    """A logo sem a margem transparente/branca. Mesmo recorte do gráfico do
+    alerta (graficos_pesquisa_core._colocar_logo), que lá vem junto com o
+    posicionamento e por isso não dá para chamar daqui."""
+    if not caminho or not os.path.exists(caminho):
+        return None
+    try:
+        imagem = plt.imread(caminho)
+    except Exception:
+        return None
+    if imagem.ndim == 3:
+        alpha = imagem[:, :, 3] > 0.02 if imagem.shape[2] >= 4 else True
+        rgb = imagem[:, :, :3]
+        limite_branco = 0.92 if rgb.max() <= 1.0 else 235
+        visivel = alpha & (rgb.min(axis=2) < limite_branco)
+        if visivel.any():
+            ys, xs = visivel.nonzero()
+            margem = max(4, round(max(xs.max() - xs.min(), ys.max() - ys.min()) * 0.04))
+            imagem = imagem[max(0, ys.min() - margem):ys.max() + margem + 1,
+                            max(0, xs.min() - margem):xs.max() + margem + 1]
+    return imagem
+
+
+def _moldura(peca: _Peca, titulo: str, subtitulo: str, rodape: str,
+             caminho_logo: str, incluir_logo: bool) -> tuple[float, float]:
+    """Desenha título, subtítulo, logo e rodapé. Devolve (topo, base) em px da
+    faixa que sobra para o conteúdo.
+
+    A logo reserva o espaço dela mesmo na versão sem logo: as duas peças saem
+    no mesmo .zip e precisam ter a mesma quebra de título e a mesma geometria.
+    """
+    fig, L = peca.fig, peca.L
+    logo = _logo_recortada(caminho_logo)
+    logo_esq = L - MARGEM - LOGO_LARGURA
+    logo_base = 0.0
+    if logo is not None:
+        altura_logo = LOGO_LARGURA * logo.shape[0] / logo.shape[1]
+        logo_base = LOGO_TOPO + altura_logo
+        if incluir_logo:
+            eixo = fig.add_axes([logo_esq / L, 1 - logo_base / peca.A,
+                                 LOGO_LARGURA / L, altura_logo / peca.A], zorder=5)
+            eixo.imshow(logo, aspect="auto")
+            eixo.axis("off")
+
+    # Centrado na peça: a largura útil é o dobro da distância do centro à logo.
+    largura_util = 2 * (logo_esq - RESPIRO - L / 2)
+    y = TITULO_TOPO
+    titulo = str(titulo or "").strip()
+    if titulo:
+        linhas, corpo = None, TITULO_CORPOS[-1]
+        for corpo in TITULO_CORPOS:
+            linhas = gp._linhas_titulo(fig, titulo, peca.familia, corpo,
+                                       largura_util / L, max_linhas=3)
+            if linhas:
+                break
+        if not linhas:
+            linhas = gp._quebrar_corrido(fig, gp._tokens_titulo(titulo),
+                                         peca.familia, corpo, largura_util / L)
+        bloco = "\n".join(linhas)
+        peca.texto(L / 2, y, bloco, ha="center", fontsize=corpo,
+                   fontweight="bold", color=MARINHO,
+                   linespacing=gp.TITULO_ENTRELINHA)
+        y += peca.medir(bloco, corpo, "bold", gp.TITULO_ENTRELINHA)[1]
+
+    subtitulo = str(subtitulo or "").strip()
+    if subtitulo:
+        y += 9 if titulo else 0
+        bloco = peca.quebrar(subtitulo, 9.5, largura_util)
+        peca.texto(L / 2, y, bloco, ha="center", fontsize=9.5, color=SUBTEXTO,
+                   linespacing=1.4)
+        y += peca.medir(bloco, 9.5, entrelinha=1.4)[1]
+
+    topo = max(y, logo_base) + RESPIRO + 4
+
+    base = peca.A - 26
+    rodape = str(rodape or "").strip()
+    if rodape:
+        bloco = peca.quebrar(rodape, 8, L - 2 * MARGEM)
+        altura = peca.medir(bloco, 8, entrelinha=1.5)[1]
+        peca.texto(MARGEM, peca.A - 24 - altura, bloco, fontsize=8,
+                   color=SUBTEXTO, linespacing=1.5)
+        base = peca.A - 24 - altura - RESPIRO
+    return topo, base
+
+
+def _legenda(peca: _Peca, itens: list[tuple[str, str]], topo: float) -> float:
+    """Legenda em linha, centrada, quebrando quando não cabe. Devolve o novo
+    topo. Com uma série só não há legenda: o título já diz o que ela é."""
+    if len(itens) < 2:
+        return topo
+    amostra, folga, entre, alt_linha = 10, 6, 20, 19
+    larguras = [amostra + folga + peca.medir(nome, 9.5)[0] for nome, _ in itens]
+    limite = peca.L - 2 * MARGEM
+    linhas, atual, soma = [], [], 0.0
+    for item, largura in zip(itens, larguras):
+        extra = largura + (entre if atual else 0)
+        if atual and soma + extra > limite:
+            linhas.append((atual, soma))
+            atual, soma, extra = [], 0.0, largura
+        atual.append((item, largura))
+        soma += extra
+    linhas.append((atual, soma))
+
+    y = topo
+    for linha, soma in linhas:
+        x = (peca.L - soma) / 2
+        for (nome, cor), largura in linha:
+            peca.retangulo(x, y + (alt_linha - amostra) / 2 - 2, amostra, amostra, cor)
+            peca.texto(x + amostra + folga, y + alt_linha / 2 - 2, nome,
+                       va="center", fontsize=9.5, color=TINTA)
+            x += largura + entre
+        y += alt_linha
+    return y + 10
+
+
+def _eixos(peca: _Peca, eixo_valor: str):
+    ax = peca.fig.add_axes([0.1, 0.2, 0.8, 0.6])
+    ax.set_facecolor(peca.fundo)
+    for lado in ("top", "right", "left", "bottom"):
+        ax.spines[lado].set_visible(False)
+    base = "bottom" if eixo_valor == "y" else "left"
+    ax.spines[base].set_visible(True)
+    ax.spines[base].set_color(SUBTEXTO)
+    ax.spines[base].set_linewidth(0.8)
+    ax.grid(axis=eixo_valor, color=SUBTEXTO, alpha=0.28, linewidth=0.8,
+            linestyle=(0, (2, 4)), zorder=0)
+    ax.set_axisbelow(True)
+    ax.tick_params(axis="both", length=0, colors=SUBTEXTO, labelsize=9.5)
+    ax.tick_params(axis="x" if eixo_valor == "y" else "y", labelcolor=TINTA,
+                   labelsize=10)
+    return ax
+
+
+def _encaixar(peca: _Peca, ax, esquerda, topo, direita, base) -> None:
+    """Posiciona os eixos de modo que TUDO o que é deles (marcas, nomes do
+    eixo, rótulos) caiba na caixa em px. Margem fixa corta nome longo; aqui a
+    sobra é medida e devolvida, em poucas passadas."""
+    alvo = (esquerda / peca.L, 1 - base / peca.A, direita / peca.L, 1 - topo / peca.A)
+    pos = list(alvo)
+    for _ in range(3):
+        ax.set_position([pos[0], pos[1], max(0.05, pos[2] - pos[0]),
+                         max(0.05, pos[3] - pos[1])])
+        peca.fig.canvas.draw()
+        caixa = ax.get_tightbbox(peca.fig.canvas.get_renderer())
+        real = (caixa.x0 / peca.L, caixa.y0 / peca.A, caixa.x1 / peca.L, caixa.y1 / peca.A)
+        pos = [p + (a - r) for p, a, r in zip(pos, alvo, real)]
+    ax.set_position([pos[0], pos[1], max(0.05, pos[2] - pos[0]),
+                     max(0.05, pos[3] - pos[1])])
+    peca.fig.canvas.draw()
+
+
+def _escala_valor(ax, eixo: str, valores: list[float], unidade: str,
+                  do_zero: bool, folga: float = 0.12) -> None:
+    """Limites e marcas do eixo de valor, com folga para o rótulo."""
+    vmin, vmax = min(valores), max(valores)
+    lo, hi = (min(0.0, vmin), max(0.0, vmax)) if do_zero else (vmin, vmax)
+    vao = (hi - lo) or abs(hi) or 1.0
+    if hi > 0 or not do_zero:
+        hi += vao * folga
+    if lo < 0:
+        lo -= vao * folga
+    elif not do_zero:
+        lo = max(0.0, lo - vao * folga)
+    marcas = [m for m in MaxNLocator(nbins=5, steps=[1, 2, 2.5, 5, 10]).tick_values(lo, hi)
+              if lo - 1e-9 <= m <= hi + 1e-9]
+    casas = _casas_das_marcas(marcas)
+    prefixo, sufixo = UNIDADES.get(unidade, ("", ""))
+    rotulos = [f"{prefixo}{fmt_num(m, casas)}{sufixo}" for m in marcas]
+    if eixo == "y":
+        ax.set_ylim(lo, hi)
+        ax.set_yticks(marcas)
+        ax.set_yticklabels(rotulos)
+    else:
+        ax.set_xlim(lo, hi)
+        ax.set_xticks(marcas)
+        ax.set_xticklabels(rotulos)
+    if lo < 0:
+        (ax.axhline if eixo == "y" else ax.axvline)(0, color=SUBTEXTO, linewidth=0.8, zorder=2)
+
+
+def _categorias_no_x(peca: _Peca, ax, categorias: list[str]) -> None:
+    ax.set_xticks(range(len(categorias)))
+    ax.set_xticklabels([gp._quebrar(c, 14) for c in categorias])
+    if gp._rotulos_x_colidem(peca.fig, ax):
+        ax.set_xticklabels(categorias, rotation=32, ha="right",
+                           rotation_mode="anchor")
+
+
+def _cores(series: list[dict], destaque: str) -> list[str]:
+    if len(series) == 1:
+        return [destaque]
+    if all(0 <= s.get("indice", -1) < MAX_SERIES for s in series) and \
+            len({s["indice"] for s in series}) == len(series):
+        return [PALETA[s["indice"]] for s in series]
+    return [PALETA[i] for i in range(len(series))]
+
+
+def _corpo_rotulo(n_marcas: int) -> float:
+    return 10.5 if n_marcas <= 8 else 9 if n_marcas <= 14 else 8 if n_marcas <= 22 else 7
+
+
+# ── os quatro desenhos ───────────────────────────────────────────────────────
+
+def _desenhar_linha(peca, caixa, categorias, series, cores, unidade, casas,
+                    rotulos, eixo_zero):
+    esquerda, topo, direita, base = caixa
+    ax = _eixos(peca, "y")
+    n = len(categorias)
+    ax.set_xlim(-0.35, n - 0.65)
+    _escala_valor(ax, "y", [v for s in series for v in s["valores"] if v is not None],
+                  unidade, eixo_zero)
+    _categorias_no_x(peca, ax, categorias)
+
+    finais, todos = [], []
+    for serie, cor in zip(series, cores):
+        ys = [math.nan if v is None else v for v in serie["valores"]]
+        # Anel branco no marcador: separa os pontos onde duas linhas se cruzam.
+        ax.plot(range(n), ys, color=cor, linewidth=2, marker="o", markersize=6.5,
+                markeredgecolor=BRANCO, markeredgewidth=1.5, zorder=3,
+                solid_capstyle="round")
+        pontos = [(x, v) for x, v in enumerate(serie["valores"]) if v is not None]
+        if not pontos:
+            continue
+        todos.extend((x, v) for x, v in pontos)
+        finais.append((pontos[-1][0], pontos[-1][1], cor))
+
+    reserva = 0.0
+    if rotulos == "ultimo" and finais:
+        reserva = 12 + max(peca.medir(_fmt_rotulo(v, unidade, casas), 9.5, "bold")[0]
+                           for _, v, _ in finais)
+    _encaixar(peca, ax, esquerda, topo, direita - reserva, base)
+
+    if rotulos == "todos":
+        # Rótulo acima de cada ponto. No mesmo x, valores próximos empilham de
+        # baixo para cima em vez de se sobrepor; número repetido sai uma vez.
+        por_x: dict[int, list] = {}
+        for x, v in todos:
+            por_x.setdefault(x, []).append(v)
+        for x, grupo in por_x.items():
+            anterior, escritos = None, set()
+            for v in sorted(grupo):
+                texto = _fmt_rotulo(v, unidade, casas)
+                if texto in escritos:
+                    continue
+                escritos.add(texto)
+                y_px = ax.transData.transform((x, v))[1]
+                alvo = y_px + 9 if anterior is None else max(y_px + 9, anterior + 13)
+                anterior = alvo
+                ax.annotate(texto, (x, v), xytext=(0, (alvo - y_px) * 0.72),
+                            textcoords="offset points", ha="center", va="bottom",
+                            fontsize=8.5, color=TINTA, zorder=4,
+                            annotation_clip=False, path_effects=_halo(peca))
+
+    if rotulos == "ultimo":
+        # Rótulo à direita do último ponto de cada série. Quando duas séries
+        # terminam no mesmo x e perto uma da outra, os rótulos se afastam: o
+        # ponto fica onde está, quem cede é o texto.
+        por_x: dict[int, list] = {}
+        for x, v, cor in finais:
+            por_x.setdefault(x, []).append((v, cor))
+        for x, grupo in por_x.items():
+            grupo.sort(key=lambda g: g[0])
+            anterior, escrito = None, None
+            for v, cor in grupo:
+                y_px = ax.transData.transform((x, v))[1]
+                texto = _fmt_rotulo(v, unidade, casas)
+                # Duas séries no mesmo ponto com o mesmo número: um rótulo só.
+                if escrito == (texto, round(y_px)):
+                    continue
+                alvo = y_px if anterior is None else max(y_px, anterior + 16)
+                anterior, escrito = alvo, (texto, round(y_px))
+                ax.annotate(texto, (x, v),
+                            xytext=(9, (alvo - y_px) * 0.72),
+                            textcoords="offset points", ha="left", va="center",
+                            fontsize=9.5, fontweight="bold", color=TINTA,
+                            annotation_clip=False, zorder=4,
+                            path_effects=_halo(peca))
+
+
+def _desenhar_barras(peca, caixa, categorias, series, cores, unidade, casas,
+                     rotulos, vertical):
+    ax = _eixos(peca, "y" if vertical else "x")
+    n, k = len(categorias), len(series)
+    valores = [v for s in series for v in s["valores"] if v is not None]
+    _escala_valor(ax, "y" if vertical else "x", valores, unidade, True,
+                  folga=0.12 if vertical else 0.16)
+    if vertical:
+        ax.set_xlim(-0.6, n - 0.4)
+        _categorias_no_x(peca, ax, categorias)
+    else:
+        ax.set_ylim(n - 0.4, -0.6)   # primeira categoria no topo
+        ax.set_yticks(range(n))
+        ax.set_yticklabels(categorias)
+
+    grupo = 0.62 if k == 1 else 0.78
+    passo = grupo / k
+    largura = passo * (1.0 if k == 1 else 0.9)   # vão entre barras vizinhas
+    corpo = _corpo_rotulo(len(valores))
+    if vertical and rotulos == "todos":
+        # O rótulo não pode ser mais largo que o passo entre barras, senão
+        # encosta no vizinho. Mede a barra numa passada sem rótulo e desce o
+        # corpo até caber.
+        _encaixar(peca, ax, *caixa)
+        passo_px = abs(ax.transData.transform((passo, 0))[0]
+                       - ax.transData.transform((0, 0))[0])
+        textos = [_fmt_rotulo(v, unidade, casas) for v in valores]
+        for corpo in (10.5, 10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5):
+            if max(peca.medir(t, corpo, "bold")[0] for t in textos) <= passo_px - 3:
+                break
+    marcas = []
+    for j, serie in enumerate(series):
+        for i, v in enumerate(serie["valores"]):
+            if v is None:
+                continue
+            centro = i - grupo / 2 + passo * (j + 0.5)
+            marcas.append((centro, v, cores[j]))
+            if rotulos != "todos":
+                continue
+            texto = _fmt_rotulo(v, unidade, casas)
+            if vertical:
+                ax.annotate(texto, (centro, v), xytext=(0, 4 if v >= 0 else -4),
+                            textcoords="offset points", ha="center",
+                            va="bottom" if v >= 0 else "top", fontsize=corpo,
+                            fontweight="bold", color=TINTA, zorder=4)
+            else:
+                ax.annotate(texto, (v, centro), xytext=(5 if v >= 0 else -5, 0),
+                            textcoords="offset points",
+                            ha="left" if v >= 0 else "right", va="center",
+                            fontsize=corpo, fontweight="bold", color=TINTA, zorder=4)
+
+    _encaixar(peca, ax, *caixa)
+
+    # O raio só existe depois que os eixos têm posição e escala definitivas.
+    raio_x, raio_y = gp._px_em_dados(ax, gp.RAIO_PONTA_PX)
+    for centro, v, cor in marcas:
+        sinal = 1 if v >= 0 else -1
+        if vertical:
+            caminho = gp._path_barra(centro - largura / 2, centro + largura / 2,
+                                     0, v, raio_x, sinal * min(raio_y, abs(v)), True)
+        else:
+            caminho = gp._path_barra(0, v, centro - largura / 2, centro + largura / 2,
+                                     sinal * min(raio_x, abs(v)), raio_y, False)
+        ax.add_patch(PathPatch(caminho, facecolor=cor, edgecolor="none", zorder=3))
+
+
+def _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade, casas,
+                         rotulos, vertical):
+    if any(v is not None and v < 0 for s in series for v in s["valores"]):
+        raise ValueError("Barras empilhadas não aceitam valor negativo. "
+                         "Use Barras, que desenha cada série lado a lado.")
+    ax = _eixos(peca, "y" if vertical else "x")
+    n = len(categorias)
+    totais = [sum(s["valores"][i] or 0 for s in series) for i in range(n)]
+    _escala_valor(ax, "y" if vertical else "x", totais, unidade, True,
+                  folga=0.12 if vertical else 0.16)
+    if vertical:
+        ax.set_xlim(-0.6, n - 0.4)
+        _categorias_no_x(peca, ax, categorias)
+    else:
+        ax.set_ylim(n - 0.4, -0.6)
+        ax.set_yticks(range(n))
+        ax.set_yticklabels(categorias)
+
+    largura = 0.6
+    if rotulos in ("todos", "total"):
+        for i, total in enumerate(totais):
+            if not total:
+                continue
+            texto = _fmt_rotulo(total, unidade, casas)
+            if vertical:
+                ax.annotate(texto, (i, total), xytext=(0, 4), textcoords="offset points",
+                            ha="center", va="bottom", fontsize=_corpo_rotulo(n),
+                            fontweight="bold", color=TINTA, zorder=4)
+            else:
+                ax.annotate(texto, (total, i), xytext=(5, 0), textcoords="offset points",
+                            ha="left", va="center", fontsize=_corpo_rotulo(n),
+                            fontweight="bold", color=TINTA, zorder=4)
+
+    _encaixar(peca, ax, *caixa)
+
+    # Fio na cor do fundo entre as partes: separa segmento de segmento sem
+    # depender só da cor.
+    fio = BRANCO if peca.fundo == "none" else peca.fundo
+    acumulado = [0.0] * n
+    for serie, cor in zip(series, cores):
+        for i, v in enumerate(serie["valores"]):
+            if not v:
+                continue
+            inicio = acumulado[i]
+            acumulado[i] += v
+            if vertical:
+                forma = Rectangle((i - largura / 2, inicio), largura, v)
+            else:
+                forma = Rectangle((inicio, i - largura / 2), v, largura)
+            forma.set(facecolor=cor, edgecolor=fio, linewidth=1.6, zorder=3)
+            ax.add_patch(forma)
+            if rotulos != "todos" or len(series) < 2:
+                continue
+            # Rótulo da parte só entra se couber dentro dela.
+            texto = _fmt_rotulo(v, unidade, casas)
+            larg_txt, alt_txt = peca.medir(texto, 8.5)
+            p0 = ax.transData.transform((i - largura / 2, inicio) if vertical
+                                        else (inicio, i - largura / 2))
+            p1 = ax.transData.transform((i + largura / 2, inicio + v) if vertical
+                                        else (inicio + v, i + largura / 2))
+            if abs(p1[0] - p0[0]) < larg_txt + 6 or abs(p1[1] - p0[1]) < alt_txt + 4:
+                continue
+            centro = (i, inicio + v / 2) if vertical else (inicio + v / 2, i)
+            ax.text(*centro, texto, ha="center", va="center", fontsize=8.5,
+                    color=TINTA, zorder=4)
+
+
+def _tabela_medidas(peca, cabecalho, celulas, largura_util):
+    """Maior corpo em que a tabela cabe na largura. Devolve (corpo, corpo do
+    cabeçalho, cabeçalhos já quebrados, larguras de coluna)."""
+    recuo = 12
+    cab = [gp._quebrar(str(c).upper(), 12) for c in cabecalho]
+    # Mede uma vez no corpo 10 e escala: a largura do texto é linear no corpo.
+    larg_cab = [peca.medir(c, 10, "bold", 1.3)[0] for c in cab]
+    larg_cel = [max((peca.medir(linha[j], 10, "bold" if j == 0 else "normal")[0]
+                     for linha in celulas), default=0) for j in range(len(cab))]
+    for corpo in (11, 10.5, 10, 9.5, 9, 8.5, 8, 7.5, 7):
+        corpo_cab = max(6.5, corpo - 2.5)
+        colunas = [max(c * corpo_cab / 10, v * corpo / 10) + 2 * recuo
+                   for c, v in zip(larg_cab, larg_cel)]
+        if sum(colunas) <= largura_util:
+            sobra = (largura_util - sum(colunas)) / len(colunas)
+            return corpo, corpo_cab, cab, [c + sobra for c in colunas]
+    raise ValueError("A tabela não cabe na largura da peça: tire colunas, "
+                     "encurte os nomes ou escolha um tamanho mais largo.")
+
+
+def _desenhar_tabela(peca, topo, medidas, celulas, destaque):
+    corpo, corpo_cab, cab, colunas = medidas
+    recuo = 12
+    alt_cab = max(peca.medir(c, corpo_cab, "bold", 1.3)[1] for c in cab) + 22
+    alt_linha = corpo * 100 / 72 * 2.5
+    x0 = MARGEM
+    largura = sum(colunas)
+
+    peca.retangulo(x0, topo, largura, alt_cab, destaque)
+    x = x0
+    for j, (texto, larg) in enumerate(zip(cab, colunas)):
+        peca.texto(x + recuo if j == 0 else x + larg - recuo, topo + alt_cab / 2,
+                   texto, ha="left" if j == 0 else "right", va="center",
+                   multialignment="left" if j == 0 else "right",
+                   fontsize=corpo_cab, fontweight="bold", color=BRANCO,
+                   linespacing=1.3)
+        x += larg
+
+    y = topo + alt_cab
+    for r, linha in enumerate(celulas):
+        if r % 2:
+            peca.retangulo(x0, y, largura, alt_linha, GELO)
+        peca.retangulo(x0, y + alt_linha - 0.8, largura, 0.8, FILETE)
+        x = x0
+        for j, (texto, larg) in enumerate(zip(linha, colunas)):
+            peca.texto(x + recuo if j == 0 else x + larg - recuo, y + alt_linha / 2,
+                       texto, ha="left" if j == 0 else "right", va="center",
+                       fontsize=corpo, fontweight="bold" if j == 0 else "normal",
+                       color=MARINHO if j == 0 else TINTA)
+            x += larg
+        y += alt_linha
+    return alt_cab + alt_linha * len(celulas)
+
+
+# ── entrada única ────────────────────────────────────────────────────────────
+
+def gerar_peca(
+    tipo: str,
+    categorias: list[str],
+    series: list[dict],
+    *,
+    titulo: str = "",
+    subtitulo: str = "",
+    rodape: str = "",
+    rotulo_categoria: str = "",
+    unidade: str = "Número",
+    casas: int = 1,
+    orientacao: str = "vertical",
+    rotulos: str = "",
+    eixo_zero: bool = True,
+    identidade: str = "EixoGov",
+    incluir_logo: bool = True,
+    tamanho: str = "",
+    escala: int = 2,
+    formato: str = "png",
+    fundo_transparente: bool = False,
+) -> bytes:
+    """Devolve o arquivo em bytes, pronto pro st.image e pro st.download_button.
+
+    series: [{nome, valores, marcas, pct, indice}], como sai de
+    series_da_tabela(). Série com pct=True só é aceita na tabela.
+
+    Na tabela a altura da peça acompanha o número de linhas; o tamanho escolhido
+    manda só na largura.
+    """
+    if tipo not in TIPOS:
+        raise ValueError(f"Tipo desconhecido: {tipo}")
+    if not categorias or not series:
+        raise ValueError("Sem dados para desenhar.")
+    if tipo != "tabela":
+        if any(s.get("pct") for s in series):
+            raise ValueError("Série de percentual calculado só entra na tabela.")
+        if len(series) > MAX_SERIES:
+            raise ValueError(f"Gráfico com mais de {MAX_SERIES} séries não se lê: "
+                             "escolha até 6 ou use a tabela.")
+        if not any(v is not None for s in series for v in s["valores"]):
+            raise ValueError("Nenhum valor numérico nas séries escolhidas.")
+
+    ident = IDENTIDADES.get(identidade) or IDENTIDADES["EixoGov"]
+    largura, altura = TAMANHOS.get(tamanho) or next(iter(TAMANHOS.values()))
+    escala = escala if escala in ESCALAS_EXPORT else 2
+    formato = formato if formato in FORMATOS else "png"
+    rotulos = rotulos if rotulos in ROTULOS[tipo] else next(iter(ROTULOS[tipo]), "")
+    familia = gp._registrar_fonte()
+    fundo = "none" if fundo_transparente else BRANCO
+    moldura = (titulo, subtitulo, rodape, ident["logo"], incluir_logo)
+
+    # Texto do SVG vira contorno: o arquivo abre igual em máquina sem Montserrat.
+    with matplotlib.rc_context({"font.family": familia, "svg.fonttype": "path"}):
+        if tipo == "tabela":
+            celulas = [[cat] + [_fmt_celula(s["valores"][i], s["marcas"][i],
+                                            s.get("pct"), unidade, casas)
+                                for s in series]
+                       for i, cat in enumerate(categorias)]
+            cabecalho = [rotulo_categoria] + [s["nome"] for s in series]
+            # Primeira passada só mede: cabeçalho e rodapé têm altura em px que
+            # não depende da altura da figura.
+            rascunho = _Peca(largura, 600, fundo, familia)
+            topo, base = _moldura(rascunho, *moldura)
+            medidas = _tabela_medidas(rascunho, cabecalho, celulas, largura - 2 * MARGEM)
+            alt_tabela = _desenhar_tabela(rascunho, topo, medidas, celulas, ident["destaque"])
+            plt.close(rascunho.fig)
+            altura = math.ceil(topo + alt_tabela + RESPIRO + (600 - base))
+            peca = _Peca(largura, altura, fundo, familia)
+            topo, _ = _moldura(peca, *moldura)
+            _desenhar_tabela(peca, topo, medidas, celulas, ident["destaque"])
+        else:
+            peca = _Peca(largura, altura, fundo, familia)
+            topo, base = _moldura(peca, *moldura)
+            cores = _cores(series, ident["destaque"])
+            topo = _legenda(peca, [(s["nome"], c) for s, c in zip(series, cores)], topo)
+            caixa = (MARGEM, topo, largura - MARGEM, base)
+            if tipo == "linha":
+                _desenhar_linha(peca, caixa, categorias, series, cores, unidade,
+                                casas, rotulos, eixo_zero)
+            elif tipo == "barras":
+                _desenhar_barras(peca, caixa, categorias, series, cores, unidade,
+                                 casas, rotulos, orientacao != "horizontal")
+            else:
+                _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade,
+                                     casas, rotulos, orientacao != "horizontal")
+
+        buffer = io.BytesIO()
+        peca.fig.savefig(buffer, format=formato, dpi=100 * escala,
+                         facecolor=fundo, transparent=fundo_transparente)
+        plt.close(peca.fig)
+    return buffer.getvalue()
+
+
+def slug_arquivo(titulo: str, tipo: str, extensao: str = "png", sufixo: str = "") -> str:
+    """Nome do arquivo baixado: linha_acao-217m-evolucao-orcamentaria_com-logo.png"""
+    bruto = unicodedata.normalize("NFKD", str(titulo or ""))
+    bruto = "".join(c for c in bruto if not unicodedata.combining(c))
+    bruto = re.sub(r"[^A-Za-z0-9]+", "-", bruto).strip("-").lower()[:60].strip("-")
+    pedacos = [p for p in (tipo, bruto or "grafico", sufixo) if p]
+    return "_".join(pedacos) + f".{extensao}"
