@@ -255,9 +255,8 @@ def _definir_base(df: pd.DataFrame) -> None:
     st.session_state["gg_atual"] = df
     st.session_state["gg_v"] = st.session_state.get("gg_v", 0) + 1
     st.session_state["gg_colunas"] = ", ".join(df.columns)
-    tipo, orientacao, _ = sugerir_tipo(df.iloc[:, 0].tolist(), df.shape[1] - 1)
+    tipo, _, _ = sugerir_tipo(df.iloc[:, 0].tolist(), df.shape[1] - 1)
     st.session_state["gg_tipo"] = tipo
-    st.session_state["gg_orientacao"] = orientacao
     for chave in ("gg_erro",) + CHAVES_ORIGEM:
         st.session_state.pop(chave, None)
 
@@ -665,11 +664,26 @@ with col_ctl:
     casas = u2.selectbox("Casas decimais", [0, 1, 2], index=1, key="gg_casas")
 
     orientacao, rotulos, eixo_zero = "vertical", "", True
+    if tipo in ("barras", "empilhadas"):
+        # À vista, e não dentro dos ajustes: deitar a barra muda a peça inteira.
+        # Ponto de partida: tempo na primeira coluna fica em pé (o tempo corre
+        # da esquerda para a direita); composição entre categorias fica
+        # deitada, que é como se lê nome de órgão ou de programa; barra comum
+        # deita quando os nomes são longos ou muitos.
+        tipo_sug, orient_sug, _ = sugerir_tipo(categorias, len(series))
+        if tipo_sug == "linha":
+            padrao = "vertical"
+        elif tipo == "empilhadas":
+            padrao = "horizontal"
+        else:
+            padrao = orient_sug
+        orientacao = st.radio(
+            "Orientação", ["vertical", "horizontal"], horizontal=True,
+            index=["vertical", "horizontal"].index(padrao),
+            format_func={"vertical": "Em pé", "horizontal": "Deitada"}.get,
+            key=f"gg_orientacao_{st.session_state['gg_v']}_{tipo}")
     if tipo not in ("tabela", "execucao"):
         with st.expander("Ajustes do gráfico"):
-            if tipo in ("barras", "empilhadas"):
-                orientacao = st.radio("Orientação", ["vertical", "horizontal"],
-                                      horizontal=True, key="gg_orientacao")
             rotulos = st.radio("Rótulos de valor", list(ROTULOS[tipo]),
                                format_func=ROTULOS[tipo].get,
                                key=f"gg_rotulos_{tipo}",

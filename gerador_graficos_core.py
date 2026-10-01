@@ -466,6 +466,8 @@ def _eixos(peca: _Peca, eixo_valor: str):
     ax.spines[base].set_visible(True)
     ax.spines[base].set_color(SUBTEXTO)
     ax.spines[base].set_linewidth(0.8)
+    # Por cima das marcas: o fio branco das empilhadas não pode picotar a base.
+    ax.spines[base].set_zorder(6)
     ax.grid(axis=eixo_valor, color=SUBTEXTO, alpha=0.28, linewidth=0.8,
             linestyle=(0, (2, 4)), zorder=0)
     ax.set_axisbelow(True)
