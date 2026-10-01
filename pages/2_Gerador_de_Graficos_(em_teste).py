@@ -415,11 +415,41 @@ def _definir_base(df: pd.DataFrame) -> None:
         st.session_state.pop(chave, None)
 
 
+# Campos de texto da peça. O valor vive em dois lugares: na chave do widget e
+# numa cópia fora de widget (gg_guardado). O Streamlit apaga da sessão a chave
+# de todo widget que não foi desenhado na última execução, e isso acontece
+# sempre que a pessoa abre outra página do app: na volta, a tabela (que não é
+# chave de widget) estava lá e o título, o subtítulo e o rodapé tinham sumido.
+CAMPOS_TEXTO = ("gg_titulo", "gg_subtitulo", "gg_rodape", "gg_unidade")
+
+
 def _definir_textos(titulo="", subtitulo="", rodape="", unidade="Número") -> None:
-    st.session_state["gg_titulo"] = titulo
-    st.session_state["gg_subtitulo"] = subtitulo
-    st.session_state["gg_rodape"] = rodape
-    st.session_state["gg_unidade"] = unidade if unidade in UNIDADES else "Número"
+    valores = (titulo, subtitulo, rodape,
+               unidade if unidade in UNIDADES else "Número")
+    for chave, valor in zip(CAMPOS_TEXTO, valores):
+        st.session_state[chave] = valor
+    st.session_state["gg_guardado"] = dict(zip(CAMPOS_TEXTO, valores))
+
+
+def _restaurar_da_volta() -> None:
+    """Repõe o que o Streamlit apagou enquanto a pessoa estava em outra página.
+
+    O campo de colunas é desenhado em toda execução desta página, antes de
+    qualquer parada: se a chave dele sumiu, é porque a pessoa saiu e voltou.
+    """
+    if "gg_colunas" in st.session_state:
+        return
+    guardado = st.session_state.get("gg_guardado", {})
+    for chave in CAMPOS_TEXTO:
+        if chave in guardado:
+            st.session_state[chave] = guardado[chave]
+    # A tabela volta com as edições que estavam na tela, não com a versão de
+    # antes delas: o editor também é widget e perde as edições na saída.
+    st.session_state["gg_base"] = st.session_state["gg_atual"]
+    st.session_state["gg_v"] += 1
+    st.session_state["gg_colunas"] = ", ".join(st.session_state["gg_atual"].columns)
+    if st.session_state.get("gg_tipo") in GRUPO_DE:
+        _pedir_tipo(st.session_state["gg_tipo"])
 
 
 def _carregar_exemplo(tipo: str = "linha") -> None:
@@ -575,6 +605,8 @@ def _ler_com_gemini() -> None:
 
 if "gg_base" not in st.session_state:
     _carregar_exemplo()
+else:
+    _restaurar_da_volta()
 
 
 # Escolhas do download. A chave é o pedaço que vai no nome do arquivo.
@@ -953,6 +985,9 @@ with col_ctl:
                                help="Em tabela, matriz, linha do tempo, número "
                                     "em destaque e barras deitadas vale só a "
                                     "largura: a altura acompanha o conteúdo.")
+
+st.session_state["gg_guardado"] = {chave: st.session_state.get(chave, "")
+                                   for chave in CAMPOS_TEXTO}
 
 opcoes = {
     "titulo": titulo, "subtitulo": subtitulo, "rodape": rodape,
