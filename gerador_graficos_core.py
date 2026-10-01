@@ -186,6 +186,27 @@ def serie_percentual(nome: str, numerador: dict, denominador: dict) -> dict:
             "indice": -1}
 
 
+_TEMPO = re.compile(
+    r"^(\d{4}|\d{1,2}/\d{2,4}|\d{4}-\d{2}|[1-4]º? ?(tri|sem|bim)\w*[ /]?\d{0,4}"
+    r"|(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\w*[ ./-]*\d{0,4})$", re.I)
+
+
+def sugerir_tipo(categorias: list[str], n_series: int) -> tuple[str, str, str]:
+    """(tipo, orientação, motivo) para servir de ponto de partida.
+
+    Regra, não modelo: categoria que é tempo pede linha; comparação entre
+    nomes pede barra, deitada quando o nome é longo ou a lista é comprida.
+    """
+    cats = [c for c in categorias if c]
+    if len(cats) >= 3 and all(_TEMPO.match(c.strip()) for c in cats):
+        return "linha", "vertical", "a primeira coluna é tempo"
+    if n_series > MAX_SERIES:
+        return "tabela", "vertical", f"são mais de {MAX_SERIES} séries"
+    if len(cats) > 7 or any(len(c) > 14 for c in cats):
+        return "barras", "horizontal", "os nomes das categorias são longos ou muitos"
+    return "barras", "vertical", "a primeira coluna são categorias, não tempo"
+
+
 # ── formatação ───────────────────────────────────────────────────────────────
 
 def fmt_num(valor: float, casas: int = 1) -> str:
