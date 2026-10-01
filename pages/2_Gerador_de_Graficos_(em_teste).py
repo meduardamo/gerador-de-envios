@@ -386,6 +386,15 @@ MIMES_IMAGEM = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
 CHAVES_ORIGEM = ("gg_origem", "gg_fora", "gg_fonte_imgs", "gg_fonte_com_texto")
 
 
+def _pedir_tipo(tipo: str) -> None:
+    """Deixa pedido o tipo que a página deve abrir. Quem aplica é o seletor,
+    na hora de ser desenhado: o seletor de forma muda de opções conforme o
+    grupo, e o Streamlit descarta o valor gravado direto na chave de um widget
+    cujas opções mudaram."""
+    st.session_state["gg_tipo_pedido"] = tipo
+    st.session_state["gg_grupo"] = GRUPO_DE[tipo]
+
+
 def _definir_base(df: pd.DataFrame) -> None:
     """Troca a tabela inteira. A versão entra na chave do editor: sem isso o
     Streamlit reaplicaria na tabela nova as edições feitas na anterior.
@@ -399,8 +408,7 @@ def _definir_base(df: pd.DataFrame) -> None:
     st.session_state["gg_v"] = st.session_state.get("gg_v", 0) + 1
     st.session_state["gg_colunas"] = ", ".join(df.columns)
     tipo, _, _ = sugerir_tipo(df.iloc[:, 0].tolist(), df.shape[1] - 1)
-    st.session_state["gg_tipo"] = tipo
-    st.session_state["gg_grupo"] = GRUPO_DE[tipo]
+    _pedir_tipo(tipo)
     for chave in ("gg_erro",) + CHAVES_ORIGEM:
         st.session_state.pop(chave, None)
 
@@ -418,8 +426,7 @@ def _carregar_exemplo(tipo: str = "linha") -> None:
     _definir_base(pd.DataFrame(exemplo["linhas"], columns=exemplo["colunas"]))
     _definir_textos(exemplo["titulo"], exemplo["subtitulo"], exemplo["rodape"],
                     exemplo["unidade"])
-    st.session_state["gg_tipo"] = tipo
-    st.session_state["gg_grupo"] = GRUPO_DE[tipo]
+    _pedir_tipo(tipo)
 
 
 def _limpar_tabela() -> None:
@@ -530,8 +537,7 @@ def _aplicar_colunas() -> None:
                             index=atual.index)
     _definir_base(novo)
     if tipo in GRUPO_DE:
-        st.session_state["gg_tipo"] = tipo
-        st.session_state["gg_grupo"] = GRUPO_DE[tipo]
+        _pedir_tipo(tipo)
     for chave, valor in origem.items():
         if valor is not None:
             st.session_state[chave] = valor
@@ -725,13 +731,17 @@ sugerido, _, motivo = sugerir_tipo(categorias, len(series))
 grupo = st.segmented_control("O que a peça mostra", list(GRUPOS), key="gg_grupo") \
     or GRUPO_DE[sugerido]
 formas = GRUPOS[grupo]
-# Trocar de pergunta com uma forma da pergunta anterior escolhida: o seletor
-# de baixo não tem essa opção e o Streamlit recusaria o valor.
-if st.session_state.get("gg_tipo") not in formas:
-    st.session_state["gg_tipo"] = formas[0]
+# Um seletor de forma por grupo (a chave leva o grupo): cada grupo lembra a
+# forma que estava escolhida nele, e um pedido de tipo entra por aqui.
+chave_forma = f"gg_forma_{grupo}"
+pedido = st.session_state.pop("gg_tipo_pedido", None)
+if pedido in formas:
+    st.session_state[chave_forma] = pedido
 tipo = st.segmented_control(
-    "Forma", formas, key="gg_tipo",
+    "Forma", formas, key=chave_forma, default=formas[0],
     format_func=lambda t: f"{ICONES_TIPO[t]} {TIPOS[t]}") or formas[0]
+# Cópia fora de widget, para quem precisa saber o tipo atual num callback.
+st.session_state["gg_tipo"] = tipo
 
 serve, formato_dados = TIPO_SERVE[tipo]
 g1, g2 = st.columns([3, 1], vertical_alignment="center")
