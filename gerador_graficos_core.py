@@ -37,6 +37,7 @@ import matplotlib.pyplot as plt
 from matplotlib import patheffects
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.patches import PathPatch, Rectangle
 from matplotlib.ticker import MaxNLocator
 
@@ -49,6 +50,24 @@ RAIZ = os.path.dirname(os.path.abspath(__file__))
 VINHO = "#962E4D"
 FILETE = "#E1E1E1"
 
+# Série de contexto: cinza que recua atrás da série destacada.
+CINZA_CONTEXTO = "#B9B8B2"
+
+# Um matiz só, do claro ao escuro, para séries que são etapas ordenadas da
+# mesma coisa. O quarto tom é a própria cor da marca.
+RAMPA_VINHO = ("#E6BDC9", "#D08EA3", "#B55F7B", "#962E4D", "#6E1F37", "#4A1425")
+RAMPA_MARINHO = ("#C3CFE2", "#96A8C7", "#6B82AB", "#44597F", "#192D4E", "#0E1B31")
+
+ESQUEMAS = {
+    "tons": "Tons de uma cor (etapas do mesmo valor)",
+    "destaque": "Uma série em destaque, as outras em cinza",
+    "categorias": "Uma cor por série (coisas diferentes)",
+}
+
+# Sem eixo de valor, a unidade vai escrita uma vez na área do gráfico.
+NOTA_UNIDADE = {"R$ milhões": "Em R$ milhões", "R$ bilhões": "Em R$ bilhões",
+                "R$": "Em R$"}
+
 # Paleta de gráficos (arquivo de cores da casa), na ordem validada.
 PALETA = ("#6091D8", "#D8445D", "#C9A63F", "#4FA882", "#A96FAB", "#E8876A")
 MAX_SERIES = len(PALETA)
@@ -56,7 +75,8 @@ MAX_SERIES = len(PALETA)
 TIPOS = {
     "linha": "Linha",
     "barras": "Barras",
-    "empilhadas": "Barras empilhadas",
+    "execucao": "Previsto x realizado",
+    "empilhadas": "Composição (empilhadas)",
     "tabela": "Tabela",
 }
 
@@ -67,13 +87,15 @@ ROTULOS = {
     "barras": {"todos": "Em toda barra", "nenhum": "Nenhum"},
     "empilhadas": {"todos": "Partes e total", "total": "Só o total",
                    "nenhum": "Nenhum"},
+    "execucao": {},
     "tabela": {},
 }
 
 IDENTIDADES = {
     "EixoGov": {"logo": os.path.join(RAIZ, "logo_eixo_gov_magenta.png"),
-                "destaque": VINHO},
-    "Eleições 2026": {"logo": gp.LOGO_PADRAO, "destaque": MARINHO},
+                "destaque": VINHO, "rampa": RAMPA_VINHO},
+    "Eleições 2026": {"logo": gp.LOGO_PADRAO, "destaque": MARINHO,
+                      "rampa": RAMPA_MARINHO},
 }
 
 # (prefixo, sufixo) do eixo e da célula de tabela.
@@ -208,6 +230,31 @@ def sugerir_tipo(categorias: list[str], n_series: int) -> tuple[str, str, str]:
     if len(cats) > 7 or any(len(c) > 14 for c in cats):
         return "barras", "horizontal", "os nomes das categorias são longos ou muitos"
     return "barras", "vertical", "a primeira coluna são categorias, não tempo"
+
+
+_ETAPAS = re.compile(r"ploa|\bloa\b|dota[cç][aã]o|autorizad|empenh|liquidad|\bpag[oa]s?\b|"
+                     r"previst|realizad|executad|or[cç]ad", re.I)
+
+
+def parecem_etapas(nomes: list[str]) -> bool:
+    """As séries são etapas do mesmo dinheiro (PLOA, dotação, empenhado, pago)?
+    Decide a cor de partida: etapa ordenada pede tons de uma cor só."""
+    return len(nomes) >= 2 and all(_ETAPAS.search(n) for n in nomes)
+
+
+def par_execucao(nomes: list[str]) -> tuple[str, str]:
+    """(previsto, realizado) de partida para o gráfico Previsto x realizado."""
+    def achar(padroes, reserva):
+        for padrao in padroes:
+            for nome in nomes:
+                if re.search(padrao, nome, re.I):
+                    return nome
+        return reserva
+    previsto = achar((r"dota[cç][aã]o atual", r"autorizad", r"dota[cç][aã]o", r"\bloa\b",
+                      r"previst", r"or[cç]ad"), nomes[0])
+    realizado = achar((r"\bpag[oa]s?\b", r"liquidad", r"empenh", r"executad",
+                       r"realizad"), nomes[-1])
+    return previsto, realizado
 
 
 # ── formatação ───────────────────────────────────────────────────────────────
@@ -483,20 +530,72 @@ def _categorias_no_x(peca: _Peca, ax, categorias: list[str]) -> None:
                            rotation_mode="anchor")
 
 
-def _cores(series: list[dict], destaque: str) -> list[str]:
+def _passos_da_rampa(n: int) -> list[int]:
+    """Quais tons da rampa usar para n séries, sempre do claro para o escuro e
+    com distância entre vizinhos."""
+    return {1: [3], 2: [1, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4],
+            5: [0, 1, 2, 3, 4]}.get(n, list(range(6))[:n])
+
+
+def _cores(series: list[dict], ident: dict, esquema: str, destaque: str) -> list[str]:
+    """Cor de cada série conforme o papel que a cor cumpre na peça.
+
+    tons: as séries são etapas ordenadas da mesma coisa (PLOA, dotação,
+        empenhado, pago). Um matiz só, do claro ao escuro, na ordem das
+        colunas. Matizes diferentes diriam que são coisas diferentes.
+    destaque: uma série na cor da marca e as outras em cinza. É o que a peça
+        quer que se leia; o resto é contexto.
+    categorias: entidades distintas e sem ordem (órgãos, UFs, programas).
+    """
     if len(series) == 1:
-        return [destaque]
+        return [ident["destaque"]]
+    if esquema == "tons":
+        return [ident["rampa"][i] for i in _passos_da_rampa(len(series))]
+    if esquema == "destaque":
+        nomes = [s["nome"] for s in series]
+        alvo = destaque if destaque in nomes else nomes[-1]
+        return [ident["destaque"] if n == alvo else CINZA_CONTEXTO for n in nomes]
     if all(0 <= s.get("indice", -1) < MAX_SERIES for s in series) and \
             len({s["indice"] for s in series}) == len(series):
         return [PALETA[s["indice"]] for s in series]
     return [PALETA[i] for i in range(len(series))]
 
 
+def _tinta_sobre(cor: str) -> str:
+    """Branco sobre preenchimento escuro, tinta sobre claro."""
+    r, g, b = (int(cor[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return BRANCO if 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.42 else TINTA
+
+
 def _corpo_rotulo(n_marcas: int) -> float:
     return 10.5 if n_marcas <= 8 else 9 if n_marcas <= 14 else 8 if n_marcas <= 22 else 7
 
 
-# ── os quatro desenhos ───────────────────────────────────────────────────────
+def _eixo_valor_visivel(ax, eixo: str, visivel: bool) -> None:
+    """Liga ou desliga os números e a grade do eixo de valor.
+
+    Quando toda marca já tem o número escrito, o eixo repete a informação e a
+    grade só suja. Sem rótulo, é o eixo que dá a escala e ele fica.
+    """
+    ax.grid(visivel, axis=eixo)
+    if eixo == "y":
+        ax.tick_params(axis="y", labelleft=visivel)
+    else:
+        ax.tick_params(axis="x", labelbottom=visivel)
+
+
+def _nota_da_escala(peca, caixa, texto: str):
+    """Sem eixo de valor, a unidade precisa estar escrita em algum lugar da
+    peça. Vai uma linha discreta no canto da área do gráfico. Devolve a caixa
+    já descontada dessa linha."""
+    esquerda, topo, direita, base = caixa
+    if not texto:
+        return caixa
+    peca.texto(esquerda, topo, texto, fontsize=8.5, color=SUBTEXTO)
+    return esquerda, topo + 20, direita, base
+
+
+# ── os desenhos ──────────────────────────────────────────────────────────────
 
 def _desenhar_linha(peca, caixa, categorias, series, cores, unidade, casas,
                     rotulos, eixo_zero):
@@ -510,21 +609,30 @@ def _desenhar_linha(peca, caixa, categorias, series, cores, unidade, casas,
 
     finais, todos = [], []
     for serie, cor in zip(series, cores):
+        contexto = cor == CINZA_CONTEXTO
         ys = [math.nan if v is None else v for v in serie["valores"]]
         # Anel branco no marcador: separa os pontos onde duas linhas se cruzam.
-        ax.plot(range(n), ys, color=cor, linewidth=2, marker="o", markersize=6.5,
-                markeredgecolor=BRANCO, markeredgewidth=1.5, zorder=3,
-                solid_capstyle="round")
+        # Série de contexto vai mais fina e por baixo da destacada.
+        ax.plot(range(n), ys, color=cor, linewidth=1.6 if contexto else 2.4,
+                marker="o", markersize=5 if contexto else 6.5,
+                markeredgecolor=BRANCO, markeredgewidth=1.5,
+                zorder=3 if contexto else 4, solid_capstyle="round")
         pontos = [(x, v) for x, v in enumerate(serie["valores"]) if v is not None]
         if not pontos:
             continue
         todos.extend((x, v) for x, v in pontos)
-        finais.append((pontos[-1][0], pontos[-1][1], cor))
+        finais.append((pontos[-1][0], pontos[-1][1], serie["nome"], cor))
+
+    # No modo "último ponto" o nome da série vai escrito na ponta da linha, e
+    # não numa legenda separada: o olho não precisa ir e voltar.
+    def texto_final(v, nome):
+        return f"{nome}  {_fmt_rotulo(v, unidade, casas)}" if len(series) > 1 \
+            else _fmt_rotulo(v, unidade, casas)
 
     reserva = 0.0
     if rotulos == "ultimo" and finais:
-        reserva = 12 + max(peca.medir(_fmt_rotulo(v, unidade, casas), 9.5, "bold")[0]
-                           for _, v, _ in finais)
+        reserva = 30 + max(peca.medir(texto_final(v, nome), 9, "bold")[0]
+                           for _, v, nome, _ in finais)
     _encaixar(peca, ax, esquerda, topo, direita - reserva, base)
 
     if rotulos == "todos":
@@ -545,41 +653,40 @@ def _desenhar_linha(peca, caixa, categorias, series, cores, unidade, casas,
                 anterior = alvo
                 ax.annotate(texto, (x, v), xytext=(0, (alvo - y_px) * 0.72),
                             textcoords="offset points", ha="center", va="bottom",
-                            fontsize=8.5, color=TINTA, zorder=4,
+                            fontsize=8.5, color=TINTA, zorder=5,
                             annotation_clip=False, path_effects=_halo(peca))
 
     if rotulos == "ultimo":
-        # Rótulo à direita do último ponto de cada série. Quando duas séries
-        # terminam no mesmo x e perto uma da outra, os rótulos se afastam: o
-        # ponto fica onde está, quem cede é o texto.
-        por_x: dict[int, list] = {}
-        for x, v, cor in finais:
-            por_x.setdefault(x, []).append((v, cor))
-        for x, grupo in por_x.items():
-            grupo.sort(key=lambda g: g[0])
-            anterior, escrito = None, None
-            for v, cor in grupo:
-                y_px = ax.transData.transform((x, v))[1]
-                texto = _fmt_rotulo(v, unidade, casas)
-                # Duas séries no mesmo ponto com o mesmo número: um rótulo só.
-                if escrito == (texto, round(y_px)):
-                    continue
-                alvo = y_px if anterior is None else max(y_px, anterior + 16)
-                anterior, escrito = alvo, (texto, round(y_px))
-                ax.annotate(texto, (x, v),
-                            xytext=(9, (alvo - y_px) * 0.72),
-                            textcoords="offset points", ha="left", va="center",
-                            fontsize=9.5, fontweight="bold", color=TINTA,
-                            annotation_clip=False, zorder=4,
-                            path_effects=_halo(peca))
+        # Os rótulos formam uma coluna à direita do gráfico, cada um na altura
+        # do último ponto da sua série e com a amostra de cor ao lado. Rótulos
+        # próximos se afastam (o ponto fica onde está, quem cede é o texto), e
+        # a série que termina antes do fim ganha um fio até o seu rótulo.
+        borda = ax.get_window_extent(peca.fig.canvas.get_renderer()).x1
+        coluna = borda + 12
+        anterior = None
+        for x, v, nome, cor in sorted(finais, key=lambda f: f[1]):
+            x_px, y_px = ax.transData.transform((x, v))
+            alvo = y_px if anterior is None else max(y_px, anterior + 16)
+            anterior = alvo
+            contexto = cor == CINZA_CONTEXTO
+            if x_px < borda - 12 or abs(alvo - y_px) > 3:
+                peca.fig.add_artist(Line2D(
+                    [(x_px + 6) / peca.L, (coluna - 3) / peca.L],
+                    [y_px / peca.A, alvo / peca.A], transform=peca.fig.transFigure,
+                    color=SUBTEXTO, linewidth=0.6, alpha=0.55))
+            peca.retangulo(coluna, peca.A - alvo - 4, 8, 8, cor)
+            peca.texto(coluna + 13, peca.A - alvo, texto_final(v, nome), va="center",
+                       fontsize=9, fontweight="normal" if contexto else "bold",
+                       color=SUBTEXTO if contexto else TINTA)
 
 
 def _desenhar_barras(peca, caixa, categorias, series, cores, unidade, casas,
                      rotulos, vertical):
-    ax = _eixos(peca, "y" if vertical else "x")
+    eixo = "y" if vertical else "x"
+    ax = _eixos(peca, eixo)
     n, k = len(categorias), len(series)
     valores = [v for s in series for v in s["valores"] if v is not None]
-    _escala_valor(ax, "y" if vertical else "x", valores, unidade, True,
+    _escala_valor(ax, eixo, valores, unidade, True,
                   folga=0.12 if vertical else 0.16)
     if vertical:
         ax.set_xlim(-0.6, n - 0.4)
@@ -588,6 +695,10 @@ def _desenhar_barras(peca, caixa, categorias, series, cores, unidade, casas,
         ax.set_ylim(n - 0.4, -0.6)   # primeira categoria no topo
         ax.set_yticks(range(n))
         ax.set_yticklabels(categorias)
+
+    if rotulos == "todos":
+        _eixo_valor_visivel(ax, eixo, False)
+        caixa = _nota_da_escala(peca, caixa, NOTA_UNIDADE.get(unidade, ""))
 
     grupo = 0.62 if k == 1 else 0.78
     passo = grupo / k
@@ -608,10 +719,13 @@ def _desenhar_barras(peca, caixa, categorias, series, cores, unidade, casas,
         else:
             corpo, girado = 8, True
             if peca.medir("0", corpo, "bold")[1] > passo_px - 1:
+                # Sem rótulo nenhum, quem dá a escala volta a ser o eixo.
                 rotulos = "nenhum"
+                _eixo_valor_visivel(ax, eixo, True)
             else:
                 # Deitado, o rótulo precisa de altura: abre folga no topo.
                 _escala_valor(ax, "y", valores, unidade, True, folga=0.22)
+                _eixo_valor_visivel(ax, eixo, False)
     marcas = []
     for j, serie in enumerate(series):
         for i, v in enumerate(serie["valores"]):
@@ -655,10 +769,11 @@ def _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade, casas,
     if any(v is not None and v < 0 for s in series for v in s["valores"]):
         raise ValueError("Barras empilhadas não aceitam valor negativo. "
                          "Use Barras, que desenha cada série lado a lado.")
-    ax = _eixos(peca, "y" if vertical else "x")
+    eixo = "y" if vertical else "x"
+    ax = _eixos(peca, eixo)
     n = len(categorias)
     totais = [sum(s["valores"][i] or 0 for s in series) for i in range(n)]
-    _escala_valor(ax, "y" if vertical else "x", totais, unidade, True,
+    _escala_valor(ax, eixo, totais, unidade, True,
                   folga=0.12 if vertical else 0.16)
     if vertical:
         ax.set_xlim(-0.6, n - 0.4)
@@ -667,6 +782,10 @@ def _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade, casas,
         ax.set_ylim(n - 0.4, -0.6)
         ax.set_yticks(range(n))
         ax.set_yticklabels(categorias)
+
+    if rotulos in ("todos", "total"):
+        _eixo_valor_visivel(ax, eixo, False)
+        caixa = _nota_da_escala(peca, caixa, NOTA_UNIDADE.get(unidade, ""))
 
     largura = 0.6
     if rotulos in ("todos", "total"):
@@ -714,7 +833,66 @@ def _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade, casas,
                 continue
             centro = (i, inicio + v / 2) if vertical else (inicio + v / 2, i)
             ax.text(*centro, texto, ha="center", va="center", fontsize=8.5,
-                    color=TINTA, zorder=4)
+                    color=_tinta_sobre(cor), zorder=4)
+
+
+def _desenhar_execucao(peca, caixa, categorias, previsto, realizado, ident,
+                       unidade, casas):
+    """Previsto x realizado: a barra larga e clara é o que estava autorizado, a
+    estreita e escura por dentro é o que foi realizado. Em cima, o percentual.
+
+    É a forma usual de mostrar execução orçamentária: as duas medidas são o
+    mesmo dinheiro em momentos diferentes, então uma fica DENTRO da outra, e
+    não ao lado (seriam duas coisas) nem empilhada (seria uma soma).
+    """
+    ax = _eixos(peca, "y")
+    n = len(categorias)
+    valores = [v for s in (previsto, realizado) for v in s["valores"] if v is not None]
+    _escala_valor(ax, "y", valores, unidade, True, folga=0.2)
+    ax.set_xlim(-0.6, n - 0.4)
+    _categorias_no_x(peca, ax, categorias)
+    _eixo_valor_visivel(ax, "y", False)
+
+    nota = NOTA_UNIDADE.get(unidade, "")
+    razao = f"Percentual: {realizado['nome']} / {previsto['nome']}"
+    caixa = _nota_da_escala(peca, caixa, f"{nota}. {razao}" if nota else razao)
+
+    cor_prev, cor_real = ident["rampa"][0], ident["destaque"]
+    larg_prev, larg_real = 0.64, 0.34
+    for i in range(n):
+        p, r = previsto["valores"][i], realizado["valores"][i]
+        topo = max(v for v in (p, r, 0) if v is not None)
+        if p is not None and r is not None and p:
+            ax.annotate(f"{fmt_num(r / p * 100, 1)}%", (i, topo), xytext=(0, 17),
+                        textcoords="offset points", ha="center", va="bottom",
+                        fontsize=11, fontweight="bold", color=TINTA, zorder=5)
+        if p is not None:
+            ax.annotate(f"de {_fmt_rotulo(p, unidade, casas)}" if r is not None
+                        else _fmt_rotulo(p, unidade, casas), (i, topo),
+                        xytext=(0, 4), textcoords="offset points", ha="center",
+                        va="bottom", fontsize=8.5, color=SUBTEXTO, zorder=5)
+
+    _encaixar(peca, ax, *caixa)
+
+    raio_x, raio_y = gp._px_em_dados(ax, gp.RAIO_PONTA_PX)
+    for i in range(n):
+        p, r = previsto["valores"][i], realizado["valores"][i]
+        for v, larg, cor, z in ((p, larg_prev, cor_prev, 3), (r, larg_real, cor_real, 4)):
+            if v is None or v <= 0:
+                continue
+            caminho = gp._path_barra(i - larg / 2, i + larg / 2, 0, v,
+                                     raio_x, min(raio_y, v), True)
+            ax.add_patch(PathPatch(caminho, facecolor=cor, edgecolor="none", zorder=z))
+        if r is not None and r > 0:
+            # Valor realizado dentro da barra escura, se couber.
+            texto = _fmt_rotulo(r, unidade, casas)
+            larg_txt, alt_txt = peca.medir(texto, 8.5, "bold")
+            p0 = ax.transData.transform((i - larg_real / 2, 0))
+            p1 = ax.transData.transform((i + larg_real / 2, r))
+            if p1[0] - p0[0] >= larg_txt + 4 and p1[1] - p0[1] >= alt_txt + 12:
+                ax.annotate(texto, (i, r), xytext=(0, -7), textcoords="offset points",
+                            ha="center", va="top", fontsize=8.5, fontweight="bold",
+                            color=_tinta_sobre(cor_real), zorder=5)
 
 
 def _tabela_medidas(peca, cabecalho, celulas, largura_util):
@@ -806,6 +984,8 @@ def _gerar_peca(
     orientacao: str = "vertical",
     rotulos: str = "",
     eixo_zero: bool = True,
+    esquema: str = "categorias",
+    destaque: str = "",
     identidade: str = "EixoGov",
     incluir_logo: bool = True,
     tamanho: str = "",
@@ -856,18 +1036,32 @@ def _gerar_peca(
         else:
             peca = _Peca(largura, altura, fundo, familia)
             topo, base = _moldura(peca, *moldura)
-            cores = _cores(series, ident["destaque"])
-            topo = _legenda(peca, [(s["nome"], c) for s, c in zip(series, cores)], topo)
             caixa = (MARGEM, topo, largura - MARGEM, base)
-            if tipo == "linha":
-                _desenhar_linha(peca, caixa, categorias, series, cores, unidade,
-                                casas, rotulos, eixo_zero)
-            elif tipo == "barras":
-                _desenhar_barras(peca, caixa, categorias, series, cores, unidade,
-                                 casas, rotulos, orientacao != "horizontal")
+            if tipo == "execucao":
+                if len(series) != 2:
+                    raise ValueError("Previsto x realizado usa exatamente duas "
+                                     "séries: a prevista e a realizada.")
+                topo = _legenda(peca, [(series[0]["nome"], ident["rampa"][0]),
+                                       (series[1]["nome"], ident["destaque"])], topo)
+                _desenhar_execucao(peca, (MARGEM, topo, largura - MARGEM, base),
+                                   categorias, series[0], series[1], ident,
+                                   unidade, casas)
             else:
-                _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade,
+                cores = _cores(series, ident, esquema, destaque)
+                # Linha com o nome escrito na ponta dispensa legenda.
+                if not (tipo == "linha" and rotulos == "ultimo"):
+                    topo = _legenda(peca, [(s["nome"], c) for s, c in zip(series, cores)], topo)
+                caixa = (MARGEM, topo + (6 if tipo == "linha" else 0),
+                         largura - MARGEM, base)
+                if tipo == "linha":
+                    _desenhar_linha(peca, caixa, categorias, series, cores, unidade,
+                                    casas, rotulos, eixo_zero)
+                elif tipo == "barras":
+                    _desenhar_barras(peca, caixa, categorias, series, cores, unidade,
                                      casas, rotulos, orientacao != "horizontal")
+                else:
+                    _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade,
+                                         casas, rotulos, orientacao != "horizontal")
 
         buffer = io.BytesIO()
         peca.fig.savefig(buffer, format=formato, dpi=100 * escala,

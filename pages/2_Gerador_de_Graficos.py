@@ -37,6 +37,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from graficos_pesquisa_core import ESCALAS_EXPORT, montserrat_disponivel
 from gerador_graficos_core import (
+    ESQUEMAS,
     IDENTIDADES,
     MAX_SERIES,
     ROTULOS,
@@ -44,6 +45,8 @@ from gerador_graficos_core import (
     TIPOS,
     UNIDADES,
     gerar_peca,
+    par_execucao,
+    parecem_etapas,
     serie_percentual,
     series_da_tabela,
     slug_arquivo,
@@ -218,8 +221,19 @@ FONTES = {
 ICONES_TIPO = {
     "linha": ":material/show_chart:",
     "barras": ":material/bar_chart:",
+    "execucao": ":material/align_vertical_bottom:",
     "empilhadas": ":material/stacked_bar_chart:",
     "tabela": ":material/table:",
+}
+
+# O que cada tipo responde. Aparece embaixo do seletor: a escolha do tipo é a
+# escolha da pergunta que a peça responde.
+TIPO_SERVE = {
+    "linha": "Trajetória ao longo do tempo: como cada valor mudou de um período para o outro.",
+    "barras": "Comparação lado a lado: valores de poucas séries em cada categoria.",
+    "execucao": "Quanto do previsto foi realizado: a barra do realizado fica dentro da barra do previsto, com o percentual em cima.",
+    "empilhadas": "Composição: partes que somadas formam um total (gasto por órgão, por exemplo).",
+    "tabela": "Todos os números, para quem precisa do valor exato.",
 }
 
 MIMES_IMAGEM = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
@@ -565,28 +579,64 @@ sugerido, _, motivo = sugerir_tipo(categorias, len(series))
 tipo = st.segmented_control(
     "Tipo de peça", list(TIPOS), key="gg_tipo", label_visibility="collapsed",
     format_func=lambda t: f"{ICONES_TIPO[t]} {TIPOS[t]}") or sugerido
-st.markdown(f'<div class="gg-passo" style="margin-top:2px">Ponto de partida para '
-            f'estes dados: {TIPOS[sugerido]}, porque {motivo}.</div>',
+st.markdown(f'<div class="gg-passo" style="margin-top:2px">{TIPO_SERVE[tipo]}</div>',
             unsafe_allow_html=True)
 
 # Empilhar soma as séries. A ferramenta não sabe se a soma faz sentido para
 # estes dados (PLOA + dotação + pago, por exemplo, não é total de nada).
-if tipo == "empilhadas":
-    st.warning("Barras empilhadas somam as séries: use só quando elas são "
-               "partes de um total (por exemplo, gasto por órgão dentro de um "
-               "programa). Para comparar séries entre si, use Barras ou Linha.")
+nomes = [s["nome"] for s in series]
+if tipo == "empilhadas" and parecem_etapas(nomes):
+    st.warning("Estas séries parecem etapas do mesmo valor (dotação, empenhado, "
+               "pago). Empilhadas, elas se somam e o total não significa nada. "
+               "Para isso use Previsto x realizado ou Barras.")
 
 col_ctl, col_prev = st.columns([1, 2], gap="large")
 
 with col_ctl:
-    nomes = [s["nome"] for s in series]
-    escolhidas = st.multiselect(
-        "Colunas na tabela" if tipo == "tabela" else "Séries no gráfico",
-        nomes, default=nomes if tipo == "tabela" else nomes[:MAX_SERIES],
-        # A lista de séries muda com a tabela e o padrão muda com o tipo;
-        # chave fixa prenderia a seleção antiga.
-        key=f"gg_series_{st.session_state['gg_v']}_{tipo == 'tabela'}")
-    selecao = [s for s in series if s["nome"] in escolhidas]
+    esquema, destaque = "categorias", ""
+    if tipo == "execucao":
+        if len(series) < 2:
+            st.info("Previsto x realizado precisa de duas séries na tabela.")
+            st.stop()
+        prev_padrao, real_padrao = par_execucao(nomes)
+        x1, x2 = st.columns(2)
+        previsto = x1.selectbox("Previsto (barra larga)", nomes,
+                                index=nomes.index(prev_padrao),
+                                key=f"gg_prev_{st.session_state['gg_v']}")
+        realizado = x2.selectbox("Realizado (barra de dentro)", nomes,
+                                 index=nomes.index(real_padrao),
+                                 key=f"gg_real_{st.session_state['gg_v']}")
+        if previsto == realizado:
+            st.info("Escolha duas séries diferentes.")
+            st.stop()
+        selecao = [series[nomes.index(previsto)], series[nomes.index(realizado)]]
+    else:
+        escolhidas = st.multiselect(
+            "Colunas na tabela" if tipo == "tabela" else "Séries no gráfico",
+            nomes, default=nomes if tipo == "tabela" else nomes[:MAX_SERIES],
+            # A lista de séries muda com a tabela e o padrão muda com o tipo;
+            # chave fixa prenderia a seleção antiga.
+            key=f"gg_series_{st.session_state['gg_v']}_{tipo == 'tabela'}")
+        selecao = [s for s in series if s["nome"] in escolhidas]
+
+    if tipo in ("linha", "barras", "empilhadas") and len(selecao) >= 2:
+        # Destaque só existe na linha: em barra, várias séries no mesmo cinza
+        # não se distinguem.
+        opcoes_cor = [e for e in ESQUEMAS if e != "destaque" or tipo == "linha"]
+        etapas = parecem_etapas([s["nome"] for s in selecao])
+        esquema = st.selectbox(
+            "Cores", opcoes_cor, format_func=ESQUEMAS.get,
+            index=opcoes_cor.index("tons" if etapas else "categorias"),
+            key=f"gg_esquema_{st.session_state['gg_v']}_{tipo}_{etapas}",
+            help="Tons de uma cor: séries que são etapas do mesmo valor. "
+                 "Destaque: uma série é o assunto e as outras são contexto. "
+                 "Uma cor por série: coisas diferentes, sem ordem entre si.")
+        if esquema == "destaque":
+            nomes_sel = [s["nome"] for s in selecao]
+            padrao = par_execucao(nomes_sel)[1]
+            destaque = st.selectbox("Série em destaque", nomes_sel,
+                                    index=nomes_sel.index(padrao),
+                                    key=f"gg_destaque_{st.session_state['gg_v']}")
 
     if tipo == "tabela" and len(series) >= 2:
         if st.checkbox("Acrescentar coluna de percentual", key="gg_pct",
@@ -615,7 +665,7 @@ with col_ctl:
     casas = u2.selectbox("Casas decimais", [0, 1, 2], index=1, key="gg_casas")
 
     orientacao, rotulos, eixo_zero = "vertical", "", True
-    if tipo != "tabela":
+    if tipo not in ("tabela", "execucao"):
         with st.expander("Ajustes do gráfico"):
             if tipo in ("barras", "empilhadas"):
                 orientacao = st.radio("Orientação", ["vertical", "horizontal"],
@@ -644,6 +694,7 @@ opcoes = {
     "titulo": titulo, "subtitulo": subtitulo, "rodape": rodape,
     "rotulo_categoria": editado.columns[0], "unidade": unidade, "casas": casas,
     "orientacao": orientacao, "rotulos": rotulos, "eixo_zero": eixo_zero,
+    "esquema": esquema, "destaque": destaque,
     "identidade": identidade, "tamanho": tamanho,
 }
 
