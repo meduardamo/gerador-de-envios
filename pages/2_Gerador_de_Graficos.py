@@ -406,21 +406,32 @@ if "gg_base" not in st.session_state:
     _carregar_exemplo()
 
 
+# Escolhas do download. A chave é o pedaço que vai no nome do arquivo.
+SAIDA_FUNDO = {"fundo-branco": "Branco", "sem-fundo": "Sem fundo"}
+SAIDA_LOGO = {"com-logo": "Com logo", "sem-logo": "Sem logo"}
+SAIDA_FORMATO = {"png": "PNG", "svg": "SVG"}
+MIMES_SAIDA = {"png": "image/png", "svg": "image/svg+xml"}
+
+
 @st.cache_data(show_spinner=False, max_entries=6)
-def _pacote(assinatura: str) -> bytes:
-    """Zip com a mesma peça em quatro arquivos: PNG e SVG, com e sem logo.
-    Em cache pela assinatura, como no Alerta de Pesquisa: o download_button
-    precisa dos bytes prontos a cada rerun."""
+def _arquivos(assinatura: str) -> bytes:
+    """Os arquivos pedidos no download: um só sai direto, mais de um sai em
+    zip. Em cache pela assinatura, como no Alerta de Pesquisa: o
+    download_button precisa dos bytes prontos a cada rerun."""
     cfg = json.loads(assinatura)
+    prontos = [
+        (nome, gerar_peca(cfg["tipo"], cfg["categorias"], cfg["series"],
+                          incluir_logo=logo == "com-logo", formato=formato,
+                          fundo_transparente=fundo == "sem-fundo",
+                          escala=cfg["escala"], **cfg["opcoes"]))
+        for nome, fundo, logo, formato in cfg["arquivos"]
+    ]
+    if len(prontos) == 1:
+        return prontos[0][1]
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_saida:
-        for sufixo, com_logo in (("com-logo", True), ("sem-logo", False)):
-            for formato in ("png", "svg"):
-                zip_saida.writestr(
-                    cfg["nomes"][f"{sufixo}_{formato}"],
-                    gerar_peca(cfg["tipo"], cfg["categorias"], cfg["series"],
-                               incluir_logo=com_logo, formato=formato,
-                               escala=cfg["escala"], **cfg["opcoes"]))
+        for nome, dados in prontos:
+            zip_saida.writestr(nome, dados)
     return buffer.getvalue()
 
 
@@ -618,21 +629,12 @@ with col_ctl:
         tamanho = st.selectbox("Tamanho", list(TAMANHOS), key="gg_tamanho",
                                help="Na tabela vale só a largura: a altura "
                                     "acompanha o número de linhas.")
-        incluir_logo = st.checkbox(
-            "Logo na prévia", True, key="gg_logo",
-            help="Só muda a prévia: o arquivo baixado sai sempre nas duas "
-                 "versões, com e sem logo.")
-        fundo_transparente = st.checkbox(
-            "Fundo transparente", False, key="gg_fundo",
-            help="Sai sem fundo, para assentar em slide. O texto continua "
-                 "escuro, então pede fundo claro.")
 
 opcoes = {
     "titulo": titulo, "subtitulo": subtitulo, "rodape": rodape,
     "rotulo_categoria": editado.columns[0], "unidade": unidade, "casas": casas,
     "orientacao": orientacao, "rotulos": rotulos, "eixo_zero": eixo_zero,
     "identidade": identidade, "tamanho": tamanho,
-    "fundo_transparente": fundo_transparente,
 }
 
 with col_prev:
@@ -640,8 +642,16 @@ with col_prev:
     if not selecao:
         st.info("Escolha ao menos uma série.")
         st.stop()
+
+    # A prévia mostra a primeira combinação escolhida para o download, então o
+    # que está na tela é um dos arquivos que vão sair. Os seletores ficam
+    # embaixo da imagem, e por isso são lidos da sessão antes de desenhar.
+    fundos = st.session_state.get("gg_saida_fundo", ["fundo-branco"])
+    logos = st.session_state.get("gg_saida_logo", ["com-logo", "sem-logo"])
     try:
-        st.image(gerar_peca(tipo, categorias, selecao, incluir_logo=incluir_logo,
+        st.image(gerar_peca(tipo, categorias, selecao,
+                            incluir_logo="com-logo" in logos or not logos,
+                            fundo_transparente=bool(fundos) and "fundo-branco" not in fundos,
                             **opcoes), use_container_width=True)
     except ValueError as exc:
         st.error(str(exc))
@@ -650,23 +660,61 @@ with col_prev:
         st.error(f"Falha ao gerar a peça: {exc}")
         st.stop()
 
-    e1, e2 = st.columns([2, 1], vertical_alignment="bottom")
-    escala = e1.radio(
-        "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
-        index=list(ESCALAS_EXPORT).index(2), key="gg_escala",
-        format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}")
+    st.markdown('<div class="gg-grupo">Baixar</div>', unsafe_allow_html=True)
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        st.segmented_control(
+            "Fundo", list(SAIDA_FUNDO), format_func=SAIDA_FUNDO.get,
+            selection_mode="multi", default=["fundo-branco"], key="gg_saida_fundo",
+            help="Sem fundo assenta direto em slide ou documento. O texto "
+                 "continua escuro, então pede fundo claro.")
+    with s2:
+        st.segmented_control(
+            "Logo", list(SAIDA_LOGO), format_func=SAIDA_LOGO.get,
+            selection_mode="multi", default=["com-logo", "sem-logo"],
+            key="gg_saida_logo")
+    with s3:
+        formatos = st.segmented_control(
+            "Formato", list(SAIDA_FORMATO), format_func=SAIDA_FORMATO.get,
+            selection_mode="multi", default=["png", "svg"], key="gg_saida_formato",
+            help="PNG para WhatsApp, slide e documento. SVG é vetor, para "
+                 "quem vai editar depois.") or []
 
-    nomes_arq = {f"{suf}_{fmt}": slug_arquivo(titulo, tipo, fmt, suf)
-                 for suf in ("com-logo", "sem-logo") for fmt in ("png", "svg")}
+    # Ordem fixa, igual à dos seletores, seja qual for a ordem do clique.
+    fundos = [f for f in SAIDA_FUNDO if f in fundos]
+    logos = [l for l in SAIDA_LOGO if l in logos]
+    formatos = [f for f in SAIDA_FORMATO if f in formatos]
+
+    escala = 2
+    if "png" in formatos:
+        escala = st.radio(
+            "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
+            index=list(ESCALAS_EXPORT).index(2), key="gg_escala",
+            format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}")
+
+    arquivos = [(slug_arquivo(titulo, tipo, formato, f"{logo}_{fundo}"),
+                 fundo, logo, formato)
+                for fundo in fundos for logo in logos for formato in formatos]
+    if not arquivos:
+        st.info("Marque pelo menos uma opção de fundo, de logo e de formato.")
+        st.stop()
+
     assinatura = json.dumps({
         "logo": _marca_da_logo(identidade), "tipo": tipo,
         "categorias": categorias, "series": selecao, "opcoes": opcoes,
-        "escala": escala, "nomes": nomes_arq,
+        "escala": escala, "arquivos": arquivos,
     }, sort_keys=True, ensure_ascii=False)
-    e2.download_button(
-        "Baixar tudo (.zip)", _pacote(assinatura),
-        file_name=slug_arquivo(titulo, tipo, "zip"),
-        mime="application/zip", use_container_width=True, type="primary",
-        help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
-    st.caption("O zip traz PNG e SVG, cada um com e sem logo. O SVG é vetor: a "
-               "escala não muda nada nele.")
+    if len(arquivos) == 1:
+        nome, _, _, formato = arquivos[0]
+        st.download_button(
+            f"Baixar {SAIDA_FORMATO[formato]}", _arquivos(assinatura),
+            file_name=nome, mime=MIMES_SAIDA[formato],
+            use_container_width=True, type="primary")
+        st.caption(nome)
+    else:
+        st.download_button(
+            f"Baixar {len(arquivos)} arquivos (.zip)", _arquivos(assinatura),
+            file_name=slug_arquivo(titulo, tipo, "zip"), mime="application/zip",
+            use_container_width=True, type="primary")
+        st.caption("Uma opção marcada em cada grupo baixa o arquivo direto, "
+                   "sem zip.")
