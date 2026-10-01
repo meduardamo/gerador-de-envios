@@ -198,6 +198,8 @@ if authentication_status is None:
 
 # ── configurações ─────────────────────────────────────────────────────────────
 
+LOGO_PATH = str(ROOT_DIR / "logo_eixo_gov_magenta.png")
+
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
 # Os cores não importam Streamlit: a chave dos Secrets entra por aqui.
 definir_api_key(GEMINI_API_KEY)
@@ -622,9 +624,34 @@ st.markdown('<div class="ge-hero"><div class="ge-hero-title">Gerador de Gráfico
 st.caption("Página em teste: o desenho das peças ainda está sendo ajustado. "
            "Confira a peça antes de usar em material de cliente.")
 
-if not montserrat_disponivel():
-    st.warning("A fonte Montserrat não foi encontrada em fontes/. A peça vai sair "
-               "fora da tipografia da casa.")
+# Mesma lateral das outras páginas: logo, o que a página faz, usuário e sair.
+with st.sidebar:
+    try:
+        st.image(LOGO_PATH, use_container_width=True)
+    except Exception:
+        st.caption("Logo não encontrada.")
+    st.markdown(
+        '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
+        'margin:10px 0 0 0;background:transparent;">'
+        '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
+        'color:#111;line-height:1.65;margin:0;">'
+        'Traga uma tabela e gere <strong>gráfico</strong> ou '
+        '<strong>tabela</strong> na identidade da casa, em PNG e SVG.'
+        '</p></div>',
+        unsafe_allow_html=True,
+    )
+    if not montserrat_disponivel():
+        st.warning("Montserrat não encontrada em fontes/. A peça sai fora da "
+                   "tipografia da casa.")
+    st.markdown("---")
+    # Sem help: com tooltip o Streamlit embrulha o botão e ele perde o
+    # estilo dos outros botões da lateral.
+    st.button("Limpar tudo", on_click=_limpar_tabela, use_container_width=True)
+    st.markdown("---")
+    st.caption(f"Usuário: **{st.session_state.get('name', '')}** "
+               f"({st.session_state.get('username', '')})")
+    if _auth_cfg:
+        authenticator.logout("Sair", "sidebar")
 
 # ── 1. dados ─────────────────────────────────────────────────────────────────
 
@@ -641,7 +668,7 @@ if fonte == "colar":
     st.text_area("Copie as células no Sheets, Excel ou Docs (com o cabeçalho) e cole aqui",
                  key="gg_colado", height=110,
                  placeholder="Ano\tPLOA\tPago\n2023\t225,5\t312,7\n2024\t445,0\t384,7")
-    b1, b2 = st.columns([1, 4])
+    b1, b2 = st.columns([1.5, 4])
     b1.button("Usar dados colados", on_click=_usar_colado, use_container_width=True)
     b2.caption("Ou digite direto na tabela abaixo.")
 elif fonte == "ia":
