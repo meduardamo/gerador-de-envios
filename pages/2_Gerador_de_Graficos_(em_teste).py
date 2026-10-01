@@ -37,6 +37,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from graficos_pesquisa_core import ESCALAS_EXPORT, montserrat_disponivel
 from gerador_graficos_core import (
+    DUAS_SERIES,
     ESQUEMAS,
     IDENTIDADES,
     MAX_SERIES,
@@ -44,6 +45,7 @@ from gerador_graficos_core import (
     ROTULOS,
     TAMANHOS,
     TIPOS,
+    UMA_SERIE,
     UNIDADES,
     gerar_peca,
     par_execucao,
@@ -200,7 +202,7 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY",
 # Os cores não importam Streamlit: a chave dos Secrets entra por aqui.
 definir_api_key(GEMINI_API_KEY)
 
-EXEMPLO = {
+_EX_217M = {
     "colunas": ["Ano", "PLOA", "Dotação inicial", "Dotação atual",
                 "Empenhado", "Pago"],
     "linhas": [
@@ -216,29 +218,166 @@ EXEMPLO = {
     "unidade": "R$ milhões",
 }
 
+_UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
+        "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC",
+        "SP", "SE", "TO"]
+_SITUACOES = ["Tem lei", "Em tramitação", "Sem norma"]
+
+# Um exemplo por tipo, para a pessoa ver em que formato a tabela precisa estar.
+# Fora o da Ação 217M, os números são inventados e o título diz isso: exemplo
+# fictício não pode sair daqui parecendo dado.
+EXEMPLOS = {
+    "linha": _EX_217M, "barras": _EX_217M, "execucao": _EX_217M, "tabela": _EX_217M,
+    "variacao": {
+        "colunas": ["Ano", "Variação"],
+        "linhas": [["2022", "12,4"], ["2023", "-8,1"], ["2024", "3,2"],
+                   ["2025", "-15,6"], ["2026", "6,0"]],
+        "titulo": "Variação anual da dotação (exemplo fictício)",
+        "subtitulo": "Em relação ao ano anterior", "rodape": "", "unidade": "%",
+    },
+    "tempo": {
+        "colunas": ["Data", "Marco"],
+        "linhas": [
+            ["12/03/2026", "Apresentação do projeto na Câmara dos Deputados."],
+            ["02/04/2026", "Despacho às comissões de Educação e de Finanças e Tributação."],
+            ["18/06/2026", "Parecer do relator pela aprovação, com substitutivo."],
+            ["20/08/2026", "Aprovado na comissão de mérito."],
+        ],
+        "titulo": "Tramitação do projeto (exemplo fictício)",
+        "subtitulo": "", "rodape": "", "unidade": "Número",
+    },
+    "ranking": {
+        "colunas": ["Tema", "Proposições"],
+        "linhas": [["Educação", "42"], ["Saúde", "37"], ["Segurança pública", "29"],
+                   ["Meio ambiente", "18"], ["Cultura", "9"],
+                   ["Ciência e tecnologia", "6"]],
+        "titulo": "Proposições por tema (exemplo fictício)",
+        "subtitulo": "Número de proposições apresentadas", "rodape": "",
+        "unidade": "Número",
+    },
+    "dois": {
+        "colunas": ["Região", "2022", "2026"],
+        "linhas": [["Norte", "31,5", "35,2"], ["Nordeste", "48,0", "44,1"],
+                   ["Centro-Oeste", "27,3", "27,9"], ["Sudeste", "39,8", "46,0"],
+                   ["Sul", "35,1", "30,4"]],
+        "titulo": "Indicador por região, 2022 e 2026 (exemplo fictício)",
+        "subtitulo": "", "rodape": "", "unidade": "%",
+    },
+    "cem": {
+        "colunas": ["Cargo", "Mulheres", "Homens"],
+        "linhas": [["Deputado federal", "3400", "6900"], ["Senador", "70", "170"],
+                   ["Governador", "40", "180"]],
+        "titulo": "Candidaturas por gênero e cargo (exemplo fictício)",
+        "subtitulo": "Participação de cada grupo no total do cargo", "rodape": "",
+        "unidade": "Número",
+    },
+    "empilhadas": {
+        "colunas": ["Órgão", "Pessoal", "Custeio", "Investimento"],
+        "linhas": [["Órgão A", "120,5", "80,2", "30,1"], ["Órgão B", "150,0", "140,3", "22,8"],
+                   ["Órgão C", "40,2", "210,7", "5,4"], ["Órgão D", "18,9", "35,0", "96,3"]],
+        "titulo": "Despesa por órgão e grupo (exemplo fictício)",
+        "subtitulo": "", "rodape": "", "unidade": "R$ milhões",
+    },
+    "hemiciclo": {
+        "colunas": ["Posição", "Votos"],
+        "linhas": [["Sim", "280"], ["Não", "150"], ["Abstenção", "12"],
+                   ["Ausente", "71"]],
+        "titulo": "Placar da votação (exemplo fictício)",
+        "subtitulo": "Câmara dos Deputados, 513 cadeiras", "rodape": "",
+        "unidade": "Número",
+    },
+    "mapa": {
+        "colunas": ["UF", "Situação"],
+        "linhas": [[uf, _SITUACOES[i % 3]] for i, uf in enumerate(_UFS)],
+        "titulo": "Legislação estadual por UF (exemplo fictício)",
+        "subtitulo": "", "rodape": "", "unidade": "Número",
+    },
+    "numero": {
+        "colunas": ["Indicador", "Valor"],
+        "linhas": [["Proposições monitoradas", "285"], ["Em tramitação", "142"],
+                   ["Aprovadas no ano", "12"]],
+        "titulo": "Monitoramento legislativo (exemplo fictício)",
+        "subtitulo": "", "rodape": "", "unidade": "Número",
+    },
+    "matriz": {
+        "colunas": ["Tema", "Partido A", "Partido B", "Partido C", "Partido D"],
+        "linhas": [["Educação", "12", "4", "9", "1"], ["Saúde", "7", "11", "3", ""],
+                   ["Segurança", "2", "15", "6", "8"],
+                   ["Meio ambiente", "9", "1", "", "5"]],
+        "titulo": "Proposições por tema e partido (exemplo fictício)",
+        "subtitulo": "", "rodape": "", "unidade": "Número",
+    },
+}
+
 FONTES = {
     "colar": ":material/content_paste: Colar ou digitar",
     "ia": ":material/auto_awesome: Ler de PDF, imagem ou texto",
     "arquivo": ":material/upload_file: Planilha (.xlsx ou .csv)",
 }
 
+# Escolha em dois níveis: primeiro a pergunta que a peça responde, depois a
+# forma. Catorze botões numa fileira só não se leem.
+GRUPOS = {
+    "Evolução no tempo": ["linha", "variacao", "tempo"],
+    "Comparação": ["barras", "ranking", "dois", "execucao"],
+    "Composição": ["cem", "empilhadas", "hemiciclo"],
+    "Território": ["mapa"],
+    "Número e detalhe": ["numero", "matriz", "tabela"],
+}
+GRUPO_DE = {tipo: grupo for grupo, tipos in GRUPOS.items() for tipo in tipos}
+
 ICONES_TIPO = {
     "linha": ":material/show_chart:",
+    "variacao": ":material/swap_vert:",
+    "tempo": ":material/timeline:",
     "barras": ":material/bar_chart:",
+    "ranking": ":material/sort:",
+    "dois": ":material/compare_arrows:",
     "execucao": ":material/align_vertical_bottom:",
+    "cem": ":material/percent:",
     "empilhadas": ":material/stacked_bar_chart:",
+    "hemiciclo": ":material/groups:",
+    "mapa": ":material/grid_view:",
+    "numero": ":material/pin:",
+    "matriz": ":material/grid_on:",
     "tabela": ":material/table:",
 }
 
-# O que cada tipo responde. Aparece embaixo do seletor: a escolha do tipo é a
-# escolha da pergunta que a peça responde.
+# O que cada tipo responde e em que formato a tabela precisa estar.
 TIPO_SERVE = {
-    "linha": "Trajetória ao longo do tempo: como cada valor mudou de um período para o outro.",
-    "barras": "Comparação lado a lado: valores de poucas séries em cada categoria.",
-    "execucao": "Quanto do previsto foi realizado: a barra do realizado fica dentro da barra do previsto, com o percentual em cima.",
-    "empilhadas": "Composição: partes que somadas formam um total (gasto por órgão, por exemplo).",
-    "tabela": "Todos os números, para quem precisa do valor exato.",
+    "linha": ("Trajetória: como cada valor mudou de um período para o outro.",
+              "Primeira coluna: os períodos. Demais: uma série por coluna."),
+    "variacao": ("Subiu ou caiu, e quanto: barras para cima e para baixo a partir do zero.",
+                 "Primeira coluna: período ou item. Segunda: a variação, com sinal de menos quando cai."),
+    "tempo": ("Em que pé está: os marcos em ordem, com data e descrição.",
+              "Primeira coluna: a data. Segunda: o texto do marco."),
+    "barras": ("Comparação lado a lado: valores de poucas séries em cada categoria.",
+               "Primeira coluna: as categorias. Demais: uma série por coluna (até 6)."),
+    "ranking": ("Quem tem mais: itens ordenados do maior para o menor, com um em destaque se quiser.",
+                "Primeira coluna: os itens. Segunda: o valor."),
+    "dois": ("O que mudou entre dois momentos: dois pontos ligados em cada linha.",
+             "Primeira coluna: os itens. Duas colunas de valor: antes e depois."),
+    "execucao": ("Quanto do previsto foi realizado: a barra do realizado fica dentro da barra do previsto, com o percentual em cima.",
+                 "Primeira coluna: os períodos ou itens. Duas colunas de valor: previsto e realizado."),
+    "cem": ("Como cada linha se divide: partes em percentual, somando 100%.",
+            "Primeira coluna: os itens. Demais: as partes (o percentual é calculado aqui)."),
+    "empilhadas": ("Composição em valor: partes que somadas formam um total.",
+                   "Primeira coluna: os itens. Demais: as partes."),
+    "hemiciclo": ("Quem compõe a Casa: um ponto por cadeira, agrupado.",
+                  "Primeira coluna: grupo, partido ou posição. Segunda: número de cadeiras (até 6 grupos)."),
+    "mapa": ("Como está em cada UF: os 27 estados em quadrados iguais.",
+             "Primeira coluna: sigla ou nome da UF. Segunda: um número ou uma categoria."),
+    "numero": ("O número que importa: de um a quatro números grandes, com legenda.",
+               "Primeira coluna: a legenda. Segunda: o número."),
+    "matriz": ("Onde se concentra: linhas por colunas, com a célula mais escura onde o valor é maior.",
+               "Primeira coluna: as linhas. Demais: as colunas da matriz."),
+    "tabela": ("Todos os números, para quem precisa do valor exato.",
+               "Qualquer tabela."),
 }
+
+# Rótulo do seletor de coluna nos tipos que usam uma coluna só.
+ROTULO_COLUNA = {"tempo": "Coluna do texto", "hemiciclo": "Coluna das cadeiras",
+                 "mapa": "Coluna do mapa"}
 
 MIMES_IMAGEM = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
                 "webp": "image/webp"}
@@ -261,6 +400,7 @@ def _definir_base(df: pd.DataFrame) -> None:
     st.session_state["gg_colunas"] = ", ".join(df.columns)
     tipo, _, _ = sugerir_tipo(df.iloc[:, 0].tolist(), df.shape[1] - 1)
     st.session_state["gg_tipo"] = tipo
+    st.session_state["gg_grupo"] = GRUPO_DE[tipo]
     for chave in ("gg_erro",) + CHAVES_ORIGEM:
         st.session_state.pop(chave, None)
 
@@ -272,10 +412,14 @@ def _definir_textos(titulo="", subtitulo="", rodape="", unidade="Número") -> No
     st.session_state["gg_unidade"] = unidade if unidade in UNIDADES else "Número"
 
 
-def _carregar_exemplo() -> None:
-    _definir_base(pd.DataFrame(EXEMPLO["linhas"], columns=EXEMPLO["colunas"]))
-    _definir_textos(EXEMPLO["titulo"], EXEMPLO["subtitulo"], EXEMPLO["rodape"],
-                    EXEMPLO["unidade"])
+def _carregar_exemplo(tipo: str = "linha") -> None:
+    """Põe na tabela o exemplo daquele tipo e deixa o tipo escolhido."""
+    exemplo = EXEMPLOS[tipo]
+    _definir_base(pd.DataFrame(exemplo["linhas"], columns=exemplo["colunas"]))
+    _definir_textos(exemplo["titulo"], exemplo["subtitulo"], exemplo["rodape"],
+                    exemplo["unidade"])
+    st.session_state["gg_tipo"] = tipo
+    st.session_state["gg_grupo"] = GRUPO_DE[tipo]
 
 
 def _limpar_tabela() -> None:
@@ -385,7 +529,9 @@ def _aplicar_colunas() -> None:
         novo = pd.DataFrame({n: (atual[n] if n in atual.columns else "") for n in nomes},
                             index=atual.index)
     _definir_base(novo)
-    st.session_state["gg_tipo"] = tipo
+    if tipo in GRUPO_DE:
+        st.session_state["gg_tipo"] = tipo
+        st.session_state["gg_grupo"] = GRUPO_DE[tipo]
     for chave, valor in origem.items():
         if valor is not None:
             st.session_state[chave] = valor
@@ -546,12 +692,11 @@ if st.session_state.get("gg_origem") == "ia":
             for imagem in st.session_state["gg_fonte_imgs"]:
                 st.image(imagem, use_container_width=True)
 
-t1, t2, t3 = st.columns([3.2, 1.4, 1.2], vertical_alignment="bottom")
+t1, t3 = st.columns([4.6, 1.2], vertical_alignment="bottom")
 t1.text_input("Colunas (separadas por vírgula)", key="gg_colunas",
               on_change=_aplicar_colunas,
               help="Edite para renomear, acrescentar ou tirar colunas. Linhas "
                    "você acrescenta direto na tabela.")
-t2.button("Carregar exemplo", on_click=_carregar_exemplo, use_container_width=True)
 t3.button("Limpar tabela", on_click=_limpar_tabela, use_container_width=True)
 
 base = st.session_state["gg_base"]
@@ -563,93 +708,141 @@ editado = st.data_editor(
 st.session_state["gg_atual"] = editado
 st.caption("A primeira coluna é a categoria (ano, órgão, UF) e cada outra coluna é "
            "uma série. Número em formato brasileiro (1.234,5). Célula vazia ou com "
-           "traço fica sem valor. Asterisco junto do número aparece na tabela.")
+           "traço fica sem valor. Asterisco junto do número aparece na tabela. "
+           "Cada forma do passo 2 diz como a tabela precisa estar e tem um "
+           "exemplo para carregar.")
 
 categorias, series, avisos = series_da_tabela(list(editado.columns),
                                               editado.values.tolist())
-if avisos:
-    st.warning("Não entendi como número, e ficou sem valor: " + "; ".join(avisos[:8])
-               + ("; e outros." if len(avisos) > 8 else "."))
 
 # ── 2. peça ──────────────────────────────────────────────────────────────────
 
 st.markdown('<div class="ge-rule">2. Peça</div>', unsafe_allow_html=True)
 
-if not categorias or not any(v is not None for s in series for v in s["valores"]):
-    st.info("Preencha a tabela acima para ver a peça.")
-    st.stop()
-
 # O tipo é a decisão principal do passo: fica sozinho, acima dos controles e da
-# prévia, e não dentro da coluna de ajustes.
+# prévia. Primeiro a pergunta, depois a forma.
 sugerido, _, motivo = sugerir_tipo(categorias, len(series))
+grupo = st.segmented_control("O que a peça mostra", list(GRUPOS), key="gg_grupo") \
+    or GRUPO_DE[sugerido]
+formas = GRUPOS[grupo]
+# Trocar de pergunta com uma forma da pergunta anterior escolhida: o seletor
+# de baixo não tem essa opção e o Streamlit recusaria o valor.
+if st.session_state.get("gg_tipo") not in formas:
+    st.session_state["gg_tipo"] = formas[0]
 tipo = st.segmented_control(
-    "Tipo de peça", list(TIPOS), key="gg_tipo", label_visibility="collapsed",
-    format_func=lambda t: f"{ICONES_TIPO[t]} {TIPOS[t]}") or sugerido
-st.markdown(f'<div class="gg-passo" style="margin-top:2px">{TIPO_SERVE[tipo]}</div>',
+    "Forma", formas, key="gg_tipo",
+    format_func=lambda t: f"{ICONES_TIPO[t]} {TIPOS[t]}") or formas[0]
+
+serve, formato_dados = TIPO_SERVE[tipo]
+g1, g2 = st.columns([3, 1], vertical_alignment="center")
+g1.markdown(f'<div class="gg-passo" style="margin:2px 0 4px">{serve}<br>'
+            f'<b>Como a tabela precisa estar:</b> {formato_dados}</div>',
             unsafe_allow_html=True)
+g2.button("Carregar exemplo desta forma", on_click=_carregar_exemplo,
+          args=(tipo,), use_container_width=True)
+
+# Linha do tempo lê texto, e o mapa aceita categoria: nesses dois a célula que
+# não é número não é erro.
+if avisos and tipo not in ("tempo", "mapa"):
+    st.warning("Não entendi como número, e ficou sem valor: " + "; ".join(avisos[:8])
+               + ("; e outros." if len(avisos) > 8 else "."))
+
+if not categorias or not series:
+    st.info("Preencha a tabela no passo 1, ou carregue o exemplo desta forma.")
+    st.stop()
 
 # Empilhar soma as séries. A ferramenta não sabe se a soma faz sentido para
 # estes dados (PLOA + dotação + pago, por exemplo, não é total de nada).
 nomes = [s["nome"] for s in series]
-if tipo == "empilhadas" and parecem_etapas(nomes):
+if tipo in ("empilhadas", "cem") and parecem_etapas(nomes):
     st.warning("Estas séries parecem etapas do mesmo valor (dotação, empenhado, "
                "pago). Empilhadas, elas se somam e o total não significa nada. "
                "Para isso use Previsto x realizado ou Barras.")
 
 col_ctl, col_prev = st.columns([1, 2], gap="large")
+versao = st.session_state["gg_v"]
 
 with col_ctl:
-    esquema, destaque = "categorias", ""
-    if tipo == "execucao":
+    esquema, destaque, limite = "categorias", "", 0
+    orientacao, rotulos, eixo_zero = "vertical", "", True
+
+    # ── quais colunas entram ────────────────────────────────────────────────
+    if tipo in DUAS_SERIES:
         if len(series) < 2:
-            st.info("Previsto x realizado precisa de duas séries na tabela.")
+            st.info(f"{TIPOS[tipo]} precisa de duas colunas de valor na tabela.")
             st.stop()
-        prev_padrao, real_padrao = par_execucao(nomes)
+        if tipo == "execucao":
+            padrao_a, padrao_b = par_execucao(nomes)
+            rot_a, rot_b = "Previsto (barra larga)", "Realizado (barra de dentro)"
+        else:
+            padrao_a, padrao_b = nomes[0], nomes[-1]
+            rot_a, rot_b = "Antes", "Depois"
         x1, x2 = st.columns(2)
-        previsto = x1.selectbox("Previsto (barra larga)", nomes,
-                                index=nomes.index(prev_padrao),
-                                key=f"gg_prev_{st.session_state['gg_v']}")
-        realizado = x2.selectbox("Realizado (barra de dentro)", nomes,
-                                 index=nomes.index(real_padrao),
-                                 key=f"gg_real_{st.session_state['gg_v']}")
-        if previsto == realizado:
-            st.info("Escolha duas séries diferentes.")
+        nome_a = x1.selectbox(rot_a, nomes, index=nomes.index(padrao_a),
+                              key=f"gg_a_{versao}_{tipo}")
+        nome_b = x2.selectbox(rot_b, nomes, index=nomes.index(padrao_b),
+                              key=f"gg_b_{versao}_{tipo}")
+        if nome_a == nome_b:
+            st.info("Escolha duas colunas diferentes.")
             st.stop()
-        selecao = [series[nomes.index(previsto)], series[nomes.index(realizado)]]
+        selecao = [series[nomes.index(nome_a)], series[nomes.index(nome_b)]]
+    elif tipo in UMA_SERIE:
+        nome = nomes[0] if len(nomes) == 1 else st.selectbox(
+            ROTULO_COLUNA.get(tipo, "Coluna de valores"), nomes,
+            key=f"gg_uma_{versao}_{tipo}")
+        selecao = [series[nomes.index(nome)]]
     else:
+        todas = tipo in ("tabela", "matriz")
         escolhidas = st.multiselect(
-            "Colunas na tabela" if tipo == "tabela" else "Séries no gráfico",
-            nomes, default=nomes if tipo == "tabela" else nomes[:MAX_SERIES],
+            "Colunas" if todas else "Séries no gráfico",
+            nomes, default=nomes if todas else nomes[:MAX_SERIES],
             # A lista de séries muda com a tabela e o padrão muda com o tipo;
             # chave fixa prenderia a seleção antiga.
-            key=f"gg_series_{st.session_state['gg_v']}_{tipo == 'tabela'}")
+            key=f"gg_series_{versao}_{todas}")
         selecao = [s for s in series if s["nome"] in escolhidas]
 
-    if tipo in ("linha", "barras", "empilhadas") and len(selecao) >= 2:
+    # ── cor ─────────────────────────────────────────────────────────────────
+    if tipo in ("linha", "barras", "empilhadas", "cem") and len(selecao) >= 2:
         # Destaque só existe na linha: em barra, várias séries no mesmo cinza
-        # não se distinguem.
-        # Tons de uma cor só até três séries: com mais, os tons vizinhos se
-        # confundem.
+        # não se distinguem. Tons de uma cor só até três séries: com mais, os
+        # tons vizinhos se confundem.
         opcoes_cor = [e for e in ESQUEMAS
                       if (e != "destaque" or tipo == "linha")
                       and (e != "tons" or len(selecao) <= MAX_TONS)]
         etapas = (parecem_etapas([s["nome"] for s in selecao])
                   and len(selecao) <= MAX_TONS)
+        # Na participação, duas ou três partes do mesmo todo leem melhor em
+        # tons de uma cor.
+        em_tons = etapas or (tipo == "cem" and len(selecao) <= MAX_TONS)
         esquema = st.selectbox(
             "Cores", opcoes_cor, format_func=ESQUEMAS.get,
-            index=opcoes_cor.index("tons" if etapas else "categorias"),
-            key=f"gg_esquema_{st.session_state['gg_v']}_{tipo}_{etapas}",
-            help="Tons de uma cor: até três séries que são etapas do mesmo "
-                 "valor (com mais, os tons se confundem). "
+            index=opcoes_cor.index("tons" if em_tons else "categorias"),
+            key=f"gg_esquema_{versao}_{tipo}_{em_tons}",
+            help="Tons de uma cor: até três séries que são etapas ou partes da "
+                 "mesma coisa (com mais, os tons se confundem). "
                  "Destaque: uma série é o assunto e as outras são contexto. "
                  "Uma cor por série: coisas diferentes, sem ordem entre si.")
         if esquema == "destaque":
             nomes_sel = [s["nome"] for s in selecao]
-            padrao = par_execucao(nomes_sel)[1]
             destaque = st.selectbox("Série em destaque", nomes_sel,
-                                    index=nomes_sel.index(padrao),
-                                    key=f"gg_destaque_{st.session_state['gg_v']}")
+                                    index=nomes_sel.index(par_execucao(nomes_sel)[1]),
+                                    key=f"gg_destaque_{versao}")
 
+    # ── o que é próprio de cada forma ───────────────────────────────────────
+    if tipo == "ranking":
+        r1, r2 = st.columns(2)
+        itens_rank = [c for c, v in zip(categorias, selecao[0]["valores"])
+                      if v is not None]
+        escolha = r1.selectbox("Item em destaque", ["Nenhum"] + itens_rank,
+                               key=f"gg_rank_dest_{versao}",
+                               help="O item escolhido fica na cor da marca e os "
+                                    "outros em cinza. Sem destaque, todas as "
+                                    "barras saem na cor da marca.")
+        destaque = "" if escolha == "Nenhum" else escolha
+        limite = r2.number_input("Mostrar só os primeiros", min_value=0,
+                                 max_value=max(1, len(itens_rank)), value=0,
+                                 key=f"gg_rank_lim_{versao}",
+                                 help="Zero mostra todos.")
     if tipo == "tabela" and len(series) >= 2:
         if st.checkbox("Acrescentar coluna de percentual", key="gg_pct",
                        help="Divide uma coluna pela outra, linha a linha. Sai "
@@ -664,29 +857,16 @@ with col_ctl:
                                      key=f"gg_pct_nome_{num}_{den}")
             selecao.append(serie_percentual(nome_pct, series[nomes.index(num)],
                                             series[nomes.index(den)]))
-
-    st.markdown('<div class="gg-grupo">Texto da peça</div>', unsafe_allow_html=True)
-    titulo = st.text_input("Título", key="gg_titulo")
-    subtitulo = st.text_input("Subtítulo", key="gg_subtitulo",
-                              placeholder="O que é, período e unidade")
-    rodape = st.text_area("Rodapé (fonte e notas)", key="gg_rodape", height=70)
-
-    st.markdown('<div class="gg-grupo">Números</div>', unsafe_allow_html=True)
-    u1, u2 = st.columns(2)
-    unidade = u1.selectbox("Unidade", list(UNIDADES), key="gg_unidade")
-    casas = u2.selectbox("Casas decimais", [0, 1, 2], index=1, key="gg_casas")
-
-    orientacao, rotulos, eixo_zero = "vertical", "", True
-    if tipo in ("barras", "empilhadas"):
+    if tipo in ("barras", "empilhadas", "variacao"):
         # À vista, e não dentro dos ajustes: deitar a barra muda a peça inteira.
         # Ponto de partida: tempo na primeira coluna fica em pé (o tempo corre
         # da esquerda para a direita); composição entre categorias fica
         # deitada, que é como se lê nome de órgão ou de programa; barra comum
         # deita quando os nomes são longos ou muitos.
-        tipo_sug, orient_sug, _ = sugerir_tipo(categorias, len(series))
+        tipo_sug, orient_sug, _ = sugerir_tipo(categorias, 2)
         if tipo_sug == "linha":
             padrao = "vertical"
-        elif tipo == "empilhadas":
+        elif tipo in ("empilhadas", "variacao"):
             padrao = "horizontal"
         else:
             padrao = orient_sug
@@ -694,8 +874,27 @@ with col_ctl:
             "Orientação", ["vertical", "horizontal"], horizontal=True,
             index=["vertical", "horizontal"].index(padrao),
             format_func={"vertical": "Em pé", "horizontal": "Deitada"}.get,
-            key=f"gg_orientacao_{st.session_state['gg_v']}_{tipo}")
-    if tipo not in ("tabela", "execucao"):
+            key=f"gg_orientacao_{versao}_{tipo}")
+
+    st.markdown('<div class="gg-grupo">Texto da peça</div>', unsafe_allow_html=True)
+    titulo = st.text_input("Título", key="gg_titulo")
+    subtitulo = st.text_input("Subtítulo", key="gg_subtitulo",
+                              placeholder="O que é, período e unidade")
+    rodape = st.text_area("Rodapé (fonte e notas)", key="gg_rodape", height=70)
+
+    unidade, casas = st.session_state.get("gg_unidade", "Número"), 1
+    if tipo != "tempo":
+        st.markdown('<div class="gg-grupo">Números</div>', unsafe_allow_html=True)
+        # Contagem (proposições, cadeiras, UFs) não tem casa decimal: o padrão
+        # acompanha o dado, e a pessoa muda se quiser.
+        numeros = [v for s in selecao for v in s["valores"] if v is not None]
+        inteiros = bool(numeros) and all(float(v).is_integer() for v in numeros)
+        u1, u2 = st.columns(2)
+        unidade = u1.selectbox("Unidade", list(UNIDADES), key="gg_unidade")
+        casas = u2.selectbox("Casas decimais", [0, 1, 2], index=0 if inteiros else 1,
+                             key=f"gg_casas_{versao}_{inteiros}")
+
+    if tipo in ROTULOS:
         with st.expander("Ajustes do gráfico"):
             rotulos = st.radio("Rótulos de valor", list(ROTULOS[tipo]),
                                format_func=ROTULOS[tipo].get,
@@ -714,14 +913,15 @@ with col_ctl:
         identidade = st.radio("Marca", list(IDENTIDADES), horizontal=True,
                               key="gg_identidade")
         tamanho = st.selectbox("Tamanho", list(TAMANHOS), key="gg_tamanho",
-                               help="Na tabela vale só a largura: a altura "
-                                    "acompanha o número de linhas.")
+                               help="Em tabela, matriz, linha do tempo, número "
+                                    "em destaque e barras deitadas vale só a "
+                                    "largura: a altura acompanha o conteúdo.")
 
 opcoes = {
     "titulo": titulo, "subtitulo": subtitulo, "rodape": rodape,
     "rotulo_categoria": editado.columns[0], "unidade": unidade, "casas": casas,
     "orientacao": orientacao, "rotulos": rotulos, "eixo_zero": eixo_zero,
-    "esquema": esquema, "destaque": destaque,
+    "esquema": esquema, "destaque": destaque, "limite": int(limite),
     "identidade": identidade, "tamanho": tamanho,
 }
 

@@ -38,7 +38,7 @@ from matplotlib import patheffects
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from matplotlib.patches import PathPatch, Rectangle
+from matplotlib.patches import Ellipse, PathPatch, Rectangle
 from matplotlib.ticker import MaxNLocator
 
 import graficos_pesquisa_core as gp
@@ -49,6 +49,10 @@ RAIZ = os.path.dirname(os.path.abspath(__file__))
 
 VINHO = "#962E4D"
 FILETE = "#E1E1E1"
+
+# Variação: dois sentidos, duas cores da marca. Nem verde nem vermelho.
+COR_SOBE = "#44597F"
+COR_CAI = VINHO
 
 # Série de contexto: cinza que recua atrás da série destacada.
 CINZA_CONTEXTO = "#B9B8B2"
@@ -74,11 +78,26 @@ MAX_SERIES = len(PALETA)
 
 TIPOS = {
     "linha": "Linha",
+    "variacao": "Variação",
+    "tempo": "Linha do tempo",
     "barras": "Barras",
+    "ranking": "Ranking",
+    "dois": "Dois momentos",
     "execucao": "Previsto x realizado",
+    "cem": "Participação (100%)",
     "empilhadas": "Composição (empilhadas)",
+    "hemiciclo": "Hemiciclo",
+    "mapa": "Mapa de UFs",
+    "numero": "Número em destaque",
+    "matriz": "Matriz",
     "tabela": "Tabela",
 }
+
+# Quantas colunas de valor cada tipo usa. Fora daqui, o tipo aceita várias.
+UMA_SERIE = ("ranking", "variacao", "mapa", "hemiciclo", "numero", "tempo")
+DUAS_SERIES = ("execucao", "dois")
+# A altura da peça acompanha o conteúdo; o tamanho escolhido manda na largura.
+ALTURA_LIVRE = ("tabela", "tempo", "matriz", "numero")
 
 # Rótulos de valor que cada tipo aceita; o primeiro é o padrão.
 ROTULOS = {
@@ -87,8 +106,6 @@ ROTULOS = {
     "barras": {"todos": "Em toda barra", "nenhum": "Nenhum"},
     "empilhadas": {"todos": "Partes e total", "total": "Só o total",
                    "nenhum": "Nenhum"},
-    "execucao": {},
-    "tabela": {},
 }
 
 IDENTIDADES = {
@@ -181,7 +198,8 @@ def series_da_tabela(cabecalho: list[str], linhas: list[list]) -> tuple[list[str
     """
     categorias, avisos = [], []
     nomes = [str(c).strip() for c in cabecalho[1:]]
-    colunas = [{"nome": n, "valores": [], "marcas": [], "pct": False, "indice": i}
+    colunas = [{"nome": n, "valores": [], "marcas": [], "textos": [],
+                "pct": False, "indice": i}
                for i, n in enumerate(nomes)]
     for linha in linhas:
         celulas = ["" if c is None else str(c).strip() for c in linha]
@@ -195,6 +213,7 @@ def series_da_tabela(cabecalho: list[str], linhas: list[list]) -> tuple[list[str
                 avisos.append(f'"{celula}" em {coluna["nome"]} / {celulas[0] or "sem categoria"}')
             coluna["valores"].append(numero)
             coluna["marcas"].append(marca)
+            coluna["textos"].append(celula)
     return categorias, colunas, avisos
 
 
@@ -207,8 +226,8 @@ def serie_percentual(nome: str, numerador: dict, denominador: dict) -> dict:
         ok = n is not None and d not in (None, 0)
         valores.append(n / d * 100 if ok else None)
         marcas.append(bool(ok and (mn or md)))
-    return {"nome": nome, "valores": valores, "marcas": marcas, "pct": True,
-            "indice": -1}
+    return {"nome": nome, "valores": valores, "marcas": marcas,
+            "textos": [""] * len(valores), "pct": True, "indice": -1}
 
 
 _TEMPO = re.compile(
@@ -219,14 +238,20 @@ _TEMPO = re.compile(
 def sugerir_tipo(categorias: list[str], n_series: int) -> tuple[str, str, str]:
     """(tipo, orientação, motivo) para servir de ponto de partida.
 
-    Regra, não modelo: categoria que é tempo pede linha; comparação entre
-    nomes pede barra, deitada quando o nome é longo ou a lista é comprida.
+    Regra, não modelo: categoria que é tempo pede linha; UF pede mapa; uma
+    coluna só de valor pede ranking; várias pedem barra, deitada quando o nome
+    é longo ou a lista é comprida.
     """
     cats = [c for c in categorias if c]
     if len(cats) >= 3 and all(_TEMPO.match(c.strip()) for c in cats):
         return "linha", "vertical", "a primeira coluna é tempo"
+    if len(cats) >= 10 and sum(1 for c in cats if sigla_uf(c)) >= len(cats) * 0.9 \
+            and n_series == 1:
+        return "mapa", "vertical", "a primeira coluna são UFs"
     if n_series > MAX_SERIES:
         return "tabela", "vertical", f"são mais de {MAX_SERIES} séries"
+    if n_series == 1:
+        return "ranking", "horizontal", "há uma coluna de valor e a primeira não é tempo"
     if len(cats) > 7 or any(len(c) > 14 for c in cats):
         return "barras", "horizontal", "os nomes das categorias são longos ou muitos"
     return "barras", "vertical", "a primeira coluna são categorias, não tempo"
@@ -334,6 +359,12 @@ class _Peca:
                     atual = palavra
             saida.append(atual)
         return "\n".join(saida)
+
+    def circulo(self, x, y, raio, cor, borda=None):
+        self.fig.add_artist(Ellipse(
+            (x / self.L, 1 - y / self.A), 2 * raio / self.L, 2 * raio / self.A,
+            transform=self.fig.transFigure, facecolor=cor,
+            edgecolor=borda or "none", linewidth=1.5 if borda else 0, zorder=3))
 
     def retangulo(self, x, y, largura, altura, cor):
         self.fig.add_artist(Rectangle(
@@ -906,6 +937,427 @@ def _desenhar_execucao(peca, caixa, categorias, previsto, realizado, ident,
                             color=_tinta_sobre(cor_real), zorder=5)
 
 
+# ── formas novas ─────────────────────────────────────────────────────────────
+
+def _desenhar_ranking(peca, caixa, itens, ident, unidade, casas, destaque):
+    """Barras deitadas, da maior para a menor. Todas medem a mesma coisa, então
+    têm a mesma cor; com um item em destaque, ele fica na cor da marca e os
+    outros recuam para o cinza."""
+    ax = _eixos(peca, "x")
+    n = len(itens)
+    valores = [v for _, v in itens]
+    _escala_valor(ax, "x", valores, unidade, True, folga=0.16)
+    ax.set_ylim(n - 0.4, -0.6)
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([c for c, _ in itens])
+    _eixo_valor_visivel(ax, "x", False)
+    caixa = _nota_da_escala(peca, caixa, NOTA_UNIDADE.get(unidade, ""))
+    corpo = 10.5 if n <= 10 else 9.5 if n <= 16 else 8.5
+    for i, (cat, v) in enumerate(itens):
+        forte = not destaque or cat == destaque
+        ax.annotate(_fmt_rotulo(v, unidade, casas), (v, i),
+                    xytext=(5 if v >= 0 else -5, 0), textcoords="offset points",
+                    ha="left" if v >= 0 else "right", va="center", fontsize=corpo,
+                    fontweight="bold" if forte else "normal",
+                    color=TINTA if forte else SUBTEXTO, zorder=4)
+    if destaque:
+        for rotulo, (cat, _) in zip(ax.get_yticklabels(), itens):
+            if cat == destaque:
+                rotulo.set_fontweight("bold")
+    _encaixar(peca, ax, *caixa)
+    raio_x, raio_y = gp._px_em_dados(ax, gp.RAIO_PONTA_PX)
+    for i, (cat, v) in enumerate(itens):
+        cor = ident["destaque"] if not destaque or cat == destaque else CINZA_CONTEXTO
+        sinal = 1 if v >= 0 else -1
+        caminho = gp._path_barra(0, v, i - 0.32, i + 0.32,
+                                 sinal * min(raio_x, abs(v)), raio_y, False)
+        ax.add_patch(PathPatch(caminho, facecolor=cor, edgecolor="none", zorder=3))
+
+
+def _desenhar_variacao(peca, caixa, categorias, serie, unidade, casas, vertical):
+    """Barras a partir do zero, para cima ou para baixo. Duas cores porque são
+    dois sentidos; nenhuma delas é verde ou vermelha, para a peça não dizer
+    por conta própria que subir é bom e cair é ruim."""
+    itens = [(c, v) for c, v in zip(categorias, serie["valores"]) if v is not None]
+    eixo = "y" if vertical else "x"
+    ax = _eixos(peca, eixo)
+    n = len(itens)
+    _escala_valor(ax, eixo, [v for _, v in itens] + [0], unidade, True,
+                  folga=0.14 if vertical else 0.2)
+    if vertical:
+        ax.set_xlim(-0.6, n - 0.4)
+        _categorias_no_x(peca, ax, [c for c, _ in itens])
+    else:
+        ax.set_ylim(n - 0.4, -0.6)
+        ax.set_yticks(range(n))
+        ax.set_yticklabels([c for c, _ in itens])
+    _eixo_valor_visivel(ax, eixo, False)
+    caixa = _nota_da_escala(peca, caixa, NOTA_UNIDADE.get(unidade, ""))
+    corpo = _corpo_rotulo(n)
+    for i, (_, v) in enumerate(itens):
+        texto = ("+" if v > 0 else "") + _fmt_rotulo(v, unidade, casas)
+        if vertical:
+            ax.annotate(texto, (i, v), xytext=(0, 4 if v >= 0 else -4),
+                        textcoords="offset points", ha="center",
+                        va="bottom" if v >= 0 else "top", fontsize=corpo,
+                        fontweight="bold", color=TINTA, zorder=4)
+        else:
+            ax.annotate(texto, (v, i), xytext=(5 if v >= 0 else -5, 0),
+                        textcoords="offset points", ha="left" if v >= 0 else "right",
+                        va="center", fontsize=corpo, fontweight="bold",
+                        color=TINTA, zorder=4)
+    _encaixar(peca, ax, *caixa)
+    raio_x, raio_y = gp._px_em_dados(ax, gp.RAIO_PONTA_PX)
+    for i, (_, v) in enumerate(itens):
+        if not v:
+            continue
+        cor = COR_SOBE if v > 0 else COR_CAI
+        sinal = 1 if v > 0 else -1
+        if vertical:
+            caminho = gp._path_barra(i - 0.31, i + 0.31, 0, v, raio_x,
+                                     sinal * min(raio_y, abs(v)), True)
+        else:
+            caminho = gp._path_barra(0, v, i - 0.31, i + 0.31,
+                                     sinal * min(raio_x, abs(v)), raio_y, False)
+        ax.add_patch(PathPatch(caminho, facecolor=cor, edgecolor="none", zorder=3))
+
+
+def _desenhar_cem(peca, caixa, categorias, series, cores, casas):
+    """Cada linha é um todo de 100% dividido nas séries. Deitada, porque o que
+    se compara é a fatia de cada linha, e nome de categoria se lê deitado."""
+    if any(v is not None and v < 0 for s in series for v in s["valores"]):
+        raise ValueError("Participação não aceita valor negativo.")
+    linhas = []
+    for i, cat in enumerate(categorias):
+        partes = [s["valores"][i] or 0 for s in series]
+        if sum(partes) > 0:
+            linhas.append((cat, [p / sum(partes) * 100 for p in partes]))
+    if not linhas:
+        raise ValueError("Nenhuma linha com valor para dividir em 100%.")
+    ax = _eixos(peca, "x")
+    n = len(linhas)
+    ax.set_xlim(0, 100)
+    ax.set_xticks([])
+    ax.set_ylim(n - 0.4, -0.6)
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([c for c, _ in linhas])
+    ax.spines["left"].set_visible(False)
+    _eixo_valor_visivel(ax, "x", False)
+    _encaixar(peca, ax, *caixa)
+    fio = BRANCO if peca.fundo == "none" else peca.fundo
+    for i, (_, partes) in enumerate(linhas):
+        inicio = 0.0
+        for parte, cor in zip(partes, cores):
+            if parte <= 0:
+                continue
+            forma = Rectangle((inicio, i - 0.31), parte, 0.62)
+            forma.set(facecolor=cor, edgecolor=fio, linewidth=1.6, zorder=3)
+            ax.add_patch(forma)
+            texto = fmt_num(parte, min(casas, 1)) + "%"
+            larg_txt = peca.medir(texto, 9.5, "bold")[0]
+            p0 = ax.transData.transform((inicio, 0))[0]
+            p1 = ax.transData.transform((inicio + parte, 0))[0]
+            if p1 - p0 >= larg_txt + 8:
+                ax.text(inicio + parte / 2, i, texto, ha="center", va="center",
+                        fontsize=9.5, fontweight="bold", color=_tinta_sobre(cor),
+                        zorder=4)
+            inicio += parte
+
+
+def _desenhar_dois(peca, caixa, itens, antes, depois, ident, unidade, casas):
+    """Dois momentos da mesma medida, ligados por um fio em cada linha. O olho
+    lê o tamanho e o sentido da mudança de cada item."""
+    ax = _eixos(peca, "x")
+    n = len(itens)
+    valores = [v for _, a, d in itens for v in (a, d) if v is not None]
+    _escala_valor(ax, "x", valores, unidade, False, folga=0.22)
+    ax.set_ylim(n - 0.4, -0.6)
+    ax.set_yticks(range(n))
+    ax.set_yticklabels([c for c, _, _ in itens])
+    ax.spines["left"].set_visible(False)
+    _eixo_valor_visivel(ax, "x", False)
+    caixa = _nota_da_escala(peca, caixa, NOTA_UNIDADE.get(unidade, ""))
+    cor_antes, cor_depois = ident["rampa"][1], ident["destaque"]
+    for i, (_, a, d) in enumerate(itens):
+        ax.axhline(i, color=FILETE, linewidth=0.8, zorder=1)
+        if a is not None and d is not None:
+            ax.plot([a, d], [i, i], color=CINZA_CONTEXTO, linewidth=3, zorder=2,
+                    solid_capstyle="round")
+        for v, cor, forte in ((a, cor_antes, False), (d, cor_depois, True)):
+            if v is None:
+                continue
+            outro = d if not forte else a
+            # O rótulo vai para o lado de fora do par, para não cair no fio.
+            direita = outro is None or v >= outro
+            if outro is not None and v == outro and not forte:
+                continue
+            ax.plot([v], [i], marker="o", markersize=10, color=cor,
+                    markeredgecolor=BRANCO, markeredgewidth=1.5, zorder=4 if forte else 3)
+            ax.annotate(_fmt_rotulo(v, unidade, casas), (v, i),
+                        xytext=(10 if direita else -10, 0), textcoords="offset points",
+                        ha="left" if direita else "right", va="center", fontsize=9.5,
+                        fontweight="bold" if forte else "normal",
+                        color=TINTA if forte else SUBTEXTO, zorder=5)
+    _encaixar(peca, ax, *caixa)
+
+
+# Mapa de UFs em grade: cada UF é um quadrado do mesmo tamanho, na posição
+# aproximada do mapa. (linha, coluna)
+GRADE_UF = {
+    "RR": (0, 1), "AP": (0, 3),
+    "AC": (1, 0), "AM": (1, 1), "PA": (1, 2), "MA": (1, 3), "CE": (1, 4), "RN": (1, 5),
+    "RO": (2, 1), "TO": (2, 2), "PI": (2, 3), "PB": (2, 4), "PE": (2, 5),
+    "MT": (3, 1), "GO": (3, 2), "BA": (3, 3), "AL": (3, 4), "SE": (3, 5),
+    "MS": (4, 1), "DF": (4, 2), "MG": (4, 3), "ES": (4, 4),
+    "SP": (5, 2), "RJ": (5, 3),
+    "PR": (6, 2), "SC": (6, 3),
+    "RS": (7, 2),
+}
+
+_NOMES_UF = {
+    "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM", "bahia": "BA",
+    "ceara": "CE", "distrito federal": "DF", "espirito santo": "ES", "goias": "GO",
+    "maranhao": "MA", "mato grosso": "MT", "mato grosso do sul": "MS",
+    "minas gerais": "MG", "para": "PA", "paraiba": "PB", "parana": "PR",
+    "pernambuco": "PE", "piaui": "PI", "rio de janeiro": "RJ",
+    "rio grande do norte": "RN", "rio grande do sul": "RS", "rondonia": "RO",
+    "roraima": "RR", "santa catarina": "SC", "sao paulo": "SP", "sergipe": "SE",
+    "tocantins": "TO",
+}
+
+SEM_DADO = "#ECEBE6"
+
+
+def sigla_uf(texto: str) -> str:
+    """'pe', 'Pernambuco' ou 'PE' -> 'PE'. Vazio se não for UF."""
+    bruto = str(texto or "").strip()
+    if bruto.upper() in GRADE_UF:
+        return bruto.upper()
+    chave = unicodedata.normalize("NFKD", bruto.lower())
+    chave = "".join(c for c in chave if not unicodedata.combining(c))
+    return _NOMES_UF.get(chave, "")
+
+
+def _classes_do_mapa(categorias, serie, ident, unidade, casas):
+    """(cor e texto de cada UF, legenda). Coluna numérica vira até cinco faixas
+    de um tom só; coluna de texto vira uma cor por categoria."""
+    dados = {}
+    for cat, valor, texto in zip(categorias, serie["valores"], serie["textos"]):
+        uf = sigla_uf(cat)
+        if uf and str(texto).strip() and str(texto).strip().lower() not in _VAZIOS:
+            dados[uf] = (valor, str(texto).strip())
+    if not dados:
+        raise ValueError("Nenhuma UF reconhecida na primeira coluna. Use a sigla "
+                         "(PE) ou o nome do estado.")
+    numerico = all(v is not None for v, _ in dados.values())
+    por_uf, legenda = {}, []
+    if numerico:
+        valores = [v for v, _ in dados.values()]
+        lo, hi = min(valores), max(valores)
+        k = min(5, len(set(valores)))
+        passos = [round(j * 4 / max(1, k - 1)) for j in range(k)] if k > 1 else [3]
+        cores = [ident["rampa"][p] for p in passos]
+        for uf, (v, _) in dados.items():
+            classe = 0 if hi == lo else min(int((v - lo) / (hi - lo) * k), k - 1)
+            por_uf[uf] = (cores[classe], _fmt_rotulo(v, unidade, casas))
+        for j, cor in enumerate(cores):
+            if k == 1 or hi == lo:
+                legenda.append((cor, _fmt_rotulo(lo, unidade, casas)))
+            else:
+                a, b = lo + (hi - lo) * j / k, lo + (hi - lo) * (j + 1) / k
+                legenda.append((cor, f"{_fmt_rotulo(a, unidade, casas)} a "
+                                     f"{_fmt_rotulo(b, unidade, casas)}"))
+    else:
+        nomes = list(dict.fromkeys(t for _, t in dados.values()))
+        if len(nomes) > MAX_SERIES:
+            raise ValueError(f"O mapa aceita até {MAX_SERIES} categorias; "
+                             f"esta coluna tem {len(nomes)}.")
+        # Duas categorias: a cor da marca contra um neutro. Três: tons. Mais:
+        # uma cor por categoria.
+        if len(nomes) <= 2:
+            cores = [ident["destaque"], ident["rampa"][0]][:len(nomes)]
+        elif len(nomes) == 3:
+            cores = list(reversed(_tons(3, ident["rampa"])))
+        else:
+            cores = list(PALETA[:len(nomes)])
+        cor_de = dict(zip(nomes, cores))
+        for uf, (_, t) in dados.items():
+            por_uf[uf] = (cor_de[t], "")
+        legenda = [(cor_de[nome], nome) for nome in nomes]
+    if len(por_uf) < len(GRADE_UF):
+        legenda.append((SEM_DADO, "Sem dado"))
+    return por_uf, legenda
+
+
+def _desenhar_mapa(peca, caixa, categorias, serie, ident, unidade, casas):
+    esquerda, topo, direita, base = caixa
+    por_uf, legenda = _classes_do_mapa(categorias, serie, ident, unidade, casas)
+    larg_leg = 26 + max(peca.medir(t, 9.5)[0] for _, t in legenda)
+    vao = 4
+    lado = min((base - topo) / 8, (direita - esquerda - larg_leg - 44) / 6) - vao
+    larg_mapa = 6 * (lado + vao) - vao
+    x0 = esquerda + (direita - esquerda - larg_mapa - 44 - larg_leg) / 2
+    y0 = topo + (base - topo - (8 * (lado + vao) - vao)) / 2
+    for uf, (lin, col) in GRADE_UF.items():
+        cor, valor = por_uf.get(uf, (SEM_DADO, ""))
+        x, y = x0 + col * (lado + vao), y0 + lin * (lado + vao)
+        peca.retangulo(x, y, lado, lado, cor)
+        tinta = _tinta_sobre(cor) if uf in por_uf else SUBTEXTO
+        cabe = bool(valor) and peca.medir(valor, 7.5)[0] <= lado - 6
+        peca.texto(x + lado / 2, y + lado / 2 - (6 if cabe else 0), uf, ha="center",
+                   va="center", fontsize=10, fontweight="bold", color=tinta)
+        if cabe:
+            peca.texto(x + lado / 2, y + lado / 2 + 8, valor, ha="center",
+                       va="center", fontsize=7.5, color=tinta)
+    xl = x0 + larg_mapa + 44
+    yl = y0 + (8 * (lado + vao) - len(legenda) * 24) / 2
+    if serie["nome"]:
+        peca.texto(xl, yl - 24, serie["nome"], fontsize=9.5, fontweight="bold",
+                   color=TINTA, va="center")
+    for j, (cor, texto) in enumerate(legenda):
+        peca.retangulo(xl, yl + j * 24, 14, 14, cor)
+        peca.texto(xl + 22, yl + j * 24 + 7, texto, fontsize=9.5, color=TINTA,
+                   va="center")
+
+
+def _desenhar_hemiciclo(peca, caixa, grupos, cores, rotulo_total):
+    """Um ponto por cadeira, em arcos. Os grupos ocupam fatias da esquerda para
+    a direita, na ordem em que vieram na tabela."""
+    esquerda, topo, direita, base = caixa
+    total = sum(n for _, n in grupos)
+    if total < 1:
+        raise ValueError("O hemiciclo precisa de pelo menos uma cadeira.")
+    if total > 700:
+        raise ValueError("O hemiciclo desenha até 700 cadeiras.")
+    cx, cy = (esquerda + direita) / 2, base - 6
+    # Folga do tamanho de um ponto: a cadeira da borda não pode sair da área.
+    raio = min((direita - esquerda) / 2, base - topo - 10) - 14
+    cy -= 14
+    interno = raio * 0.40
+    # Menor número de arcos em que todas as cadeiras cabem com o mesmo
+    # espaçamento entre arcos e ao longo de cada arco.
+    for arcos in range(1, 20):
+        passo = (raio - interno) / max(1, arcos - 1) if arcos > 1 else raio - interno
+        raios = [interno + i * passo for i in range(arcos)] if arcos > 1 else [raio * 0.8]
+        capacidade = [int(math.pi * r / passo) + 1 for r in raios]
+        if sum(capacidade) >= total:
+            break
+    soma = sum(raios)
+    cotas = [total * r / soma for r in raios]
+    por_arco = [int(c) for c in cotas]
+    for i in sorted(range(arcos), key=lambda i: cotas[i] - por_arco[i], reverse=True):
+        if sum(por_arco) >= total:
+            break
+        por_arco[i] += 1
+    cadeiras = []
+    for r, n in zip(raios, por_arco):
+        for j in range(n):
+            angulo = math.pi - j * math.pi / (n - 1) if n > 1 else math.pi / 2
+            cadeiras.append((angulo, r))
+    cadeiras.sort(key=lambda c: (-c[0], c[1]))
+    arco_menor = math.pi * raios[0] / max(1, por_arco[0] - 1) if por_arco[0] > 1 else passo
+    ponto = min(min(passo, arco_menor) * 0.40, 12)
+    donos = [cor for (_, n), cor in zip(grupos, cores) for _ in range(n)]
+    for (angulo, r), cor in zip(cadeiras, donos):
+        peca.circulo(cx + r * math.cos(angulo), cy - r * math.sin(angulo), ponto, cor)
+    peca.texto(cx, cy - 30, fmt_num(total, 0), ha="center", va="center",
+               fontsize=26, fontweight="bold", color=MARINHO)
+    if rotulo_total:
+        peca.texto(cx, cy - 6, rotulo_total.lower(), ha="center", va="center",
+                   fontsize=9.5, color=SUBTEXTO)
+
+
+def _desenhar_numero(peca, topo, itens, ident) -> float:
+    """De um a quatro números grandes lado a lado, cada um com a sua legenda.
+    Devolve a altura ocupada."""
+    esquerda, direita = MARGEM, peca.L - MARGEM
+    coluna = (direita - esquerda) / len(itens)
+    for corpo in (64, 56, 48, 42, 36, 30, 26):
+        if max(peca.medir(numero, corpo, "bold")[0] for _, numero in itens) <= coluna - 36:
+            break
+    alt_num = peca.medir("0", corpo, "bold")[1]
+    blocos = []
+    for legenda, numero in itens:
+        texto = peca.quebrar(legenda, 11, coluna - 40)
+        blocos.append((numero, texto, peca.medir(texto, 11, entrelinha=1.4)[1]))
+    alt_total = alt_num + 16 + max(b[2] for b in blocos)
+    y = topo + 22
+    for i, (numero, texto, _) in enumerate(blocos):
+        cx = esquerda + coluna * (i + 0.5)
+        if i:
+            peca.retangulo(esquerda + coluna * i, y, 1, alt_total, FILETE)
+        peca.texto(cx, y, numero, ha="center", fontsize=corpo, fontweight="bold",
+                   color=ident["destaque"])
+        peca.texto(cx, y + alt_num + 16, texto, ha="center", fontsize=11,
+                   color=TINTA, linespacing=1.4)
+    return alt_total + 44
+
+
+def _desenhar_tempo(peca, topo, marcos, ident) -> float:
+    """Marcos de cima para baixo: data à esquerda, ponto no fio, texto à
+    direita. Devolve a altura ocupada; a peça cresce com o número de marcos."""
+    larg_data = min(190, max(peca.medir(d, 10, "bold")[0] for d, _ in marcos))
+    x_fio = MARGEM + larg_data + 20
+    x_txt = x_fio + 20
+    y = topo + 6
+    pontos = []
+    for data, texto in marcos:
+        bloco = peca.quebrar(texto, 10, peca.L - MARGEM - x_txt) if texto else ""
+        alt = max(16, peca.medir(bloco, 10, entrelinha=1.45)[1] if bloco else 0)
+        peca.texto(x_fio - 20, y, data, ha="right", fontsize=10, fontweight="bold",
+                   color=MARINHO)
+        if bloco:
+            peca.texto(x_txt, y, bloco, fontsize=10, color=TINTA, linespacing=1.45)
+        pontos.append(y + 7)
+        y += alt + 22
+    if len(pontos) > 1:
+        peca.retangulo(x_fio - 1, pontos[0], 2, pontos[-1] - pontos[0], FILETE)
+    for py in pontos:
+        peca.circulo(x_fio, py, 5.5, ident["destaque"], borda=BRANCO)
+    return y - 22 - topo + 6
+
+
+def _desenhar_matriz(peca, topo, categorias, series, ident, unidade, casas) -> float:
+    """Linhas x colunas com a célula mais escura onde o valor é maior. Devolve
+    a altura ocupada."""
+    valores = [v for s in series for v in s["valores"] if v is not None]
+    if not valores:
+        raise ValueError("Nenhum valor numérico para a matriz.")
+    lo, hi = min(valores), max(valores)
+    util = peca.L - 2 * MARGEM
+    larg_rot = min(util * 0.34, 14 + max(peca.medir(c, 10, "bold")[0] for c in categorias))
+    col = (util - larg_rot) / len(series)
+    if col < 44:
+        raise ValueError("A matriz não cabe na largura da peça: tire colunas ou "
+                         "escolha um tamanho mais largo.")
+    cab = [peca.quebrar(s["nome"], 8.5, col - 8, "bold") for s in series]
+    alt_cab = max(peca.medir(c, 8.5, "bold", 1.3)[1] for c in cab) + 14
+    alt_lin, vao = 34, 3
+    for j, texto in enumerate(cab):
+        peca.texto(MARGEM + larg_rot + col * (j + 0.5), topo + alt_cab - 8, texto,
+                   ha="center", va="bottom", multialignment="center", fontsize=8.5,
+                   fontweight="bold", color=SUBTEXTO, linespacing=1.3)
+    y = topo + alt_cab
+    for i, cat in enumerate(categorias):
+        rot = peca.quebrar(cat, 10, larg_rot - 10, "bold").split("\n")[0]
+        peca.texto(MARGEM, y + alt_lin / 2, rot, va="center", fontsize=10,
+                   fontweight="bold", color=MARINHO)
+        for j, serie in enumerate(series):
+            v = serie["valores"][i]
+            x = MARGEM + larg_rot + col * j
+            if v is None:
+                peca.retangulo(x, y, col - vao, alt_lin - vao, SEM_DADO)
+                continue
+            passo = 2 if hi == lo else min(int((v - lo) / (hi - lo) * 5), 4)
+            cor = ident["rampa"][passo]
+            peca.retangulo(x, y, col - vao, alt_lin - vao, cor)
+            peca.texto(x + (col - vao) / 2, y + (alt_lin - vao) / 2,
+                       _fmt_rotulo(v, unidade, casas), ha="center", va="center",
+                       fontsize=9.5, color=_tinta_sobre(cor))
+        y += alt_lin
+    return y - topo
+
+
 def _tabela_medidas(peca, cabecalho, celulas, largura_util):
     """Maior corpo em que a tabela cabe na largura. Devolve (corpo, corpo do
     cabeçalho, cabeçalhos já quebrados, larguras de coluna)."""
@@ -997,6 +1449,7 @@ def _gerar_peca(
     eixo_zero: bool = True,
     esquema: str = "categorias",
     destaque: str = "",
+    limite: int = 0,
     identidade: str = "EixoGov",
     incluir_logo: bool = True,
     tamanho: str = "",
@@ -1008,71 +1461,141 @@ def _gerar_peca(
         raise ValueError(f"Tipo desconhecido: {tipo}")
     if not categorias or not series:
         raise ValueError("Sem dados para desenhar.")
-    if tipo != "tabela":
-        if any(s.get("pct") for s in series):
-            raise ValueError("Série de percentual calculado só entra na tabela.")
-        if len(series) > MAX_SERIES:
-            raise ValueError(f"Gráfico com mais de {MAX_SERIES} séries não se lê: "
-                             "escolha até 6 ou use a tabela.")
-        if not any(v is not None for s in series for v in s["valores"]):
-            raise ValueError("Nenhum valor numérico nas séries escolhidas.")
+    if tipo != "tabela" and any(s.get("pct") for s in series):
+        raise ValueError("Série de percentual calculado só entra na tabela.")
+    if tipo in UMA_SERIE and len(series) != 1:
+        raise ValueError(f"{TIPOS[tipo]} usa uma coluna de valor só.")
+    if tipo in DUAS_SERIES and len(series) != 2:
+        raise ValueError(f"{TIPOS[tipo]} usa exatamente duas séries.")
+    if tipo in ("linha", "barras", "empilhadas", "cem") and len(series) > MAX_SERIES:
+        raise ValueError(f"Gráfico com mais de {MAX_SERIES} séries não se lê: "
+                         "escolha até 6 ou use a tabela.")
+    if tipo not in ("tabela", "tempo", "mapa") and \
+            not any(v is not None for s in series for v in s["valores"]):
+        raise ValueError("Nenhum valor numérico nas séries escolhidas.")
 
     ident = IDENTIDADES.get(identidade) or IDENTIDADES["EixoGov"]
     largura, altura = TAMANHOS.get(tamanho) or next(iter(TAMANHOS.values()))
     escala = escala if escala in ESCALAS_EXPORT else 2
     formato = formato if formato in FORMATOS else "png"
-    rotulos = rotulos if rotulos in ROTULOS[tipo] else next(iter(ROTULOS[tipo]), "")
+    opcoes_rotulo = ROTULOS.get(tipo, {})
+    rotulos = rotulos if rotulos in opcoes_rotulo else next(iter(opcoes_rotulo), "")
     familia = gp._registrar_fonte()
     fundo = "none" if fundo_transparente else BRANCO
     moldura = (titulo, subtitulo, rodape, ident["logo"], incluir_logo)
+    um = series[0]
+    com_valor = [(c, v, i) for i, (c, v) in enumerate(zip(categorias, um["valores"]))
+                 if v is not None]
 
     # Texto do SVG vira contorno: o arquivo abre igual em máquina sem Montserrat.
     with matplotlib.rc_context({"font.family": familia, "svg.fonttype": "path"}):
-        if tipo == "tabela":
-            celulas = [[cat] + [_fmt_celula(s["valores"][i], s["marcas"][i],
-                                            s.get("pct"), unidade, casas)
-                                for s in series]
-                       for i, cat in enumerate(categorias)]
-            cabecalho = [rotulo_categoria] + [s["nome"] for s in series]
+        if tipo in ALTURA_LIVRE:
             # Primeira passada só mede: cabeçalho e rodapé têm altura em px que
             # não depende da altura da figura.
             rascunho = _Peca(largura, 600, fundo, familia)
             topo, base = _moldura(rascunho, *moldura)
-            medidas = _tabela_medidas(rascunho, cabecalho, celulas, largura - 2 * MARGEM)
-            alt_tabela = _desenhar_tabela(rascunho, topo, medidas, celulas, ident["destaque"])
-            altura = math.ceil(topo + alt_tabela + RESPIRO + (600 - base))
+            if tipo == "tabela":
+                celulas = [[cat] + [_fmt_celula(s["valores"][i], s["marcas"][i],
+                                                s.get("pct"), unidade, casas)
+                                    for s in series]
+                           for i, cat in enumerate(categorias)]
+                cabecalho = [rotulo_categoria] + [s["nome"] for s in series]
+                medidas = _tabela_medidas(rascunho, cabecalho, celulas,
+                                          largura - 2 * MARGEM)
+                desenhar = lambda p, t: _desenhar_tabela(p, t, medidas, celulas,
+                                                         ident["destaque"])
+            elif tipo == "tempo":
+                marcos = [(c, t) for c, t in zip(categorias, um["textos"]) if c or t]
+                if not marcos:
+                    raise ValueError("Nenhum marco para a linha do tempo.")
+                desenhar = lambda p, t: _desenhar_tempo(p, t, marcos, ident)
+            elif tipo == "numero":
+                itens = [(c, _fmt_celula(v, um["marcas"][i], False, unidade, casas))
+                         for c, v, i in com_valor]
+                if len(itens) > 4:
+                    raise ValueError("Número em destaque mostra até quatro números. "
+                                     "Deixe na tabela só as linhas que entram.")
+                desenhar = lambda p, t: _desenhar_numero(p, t, itens, ident)
+            else:
+                desenhar = lambda p, t: _desenhar_matriz(p, t, categorias, series,
+                                                         ident, unidade, casas)
+            ocupado = desenhar(rascunho, topo)
+            altura = math.ceil(topo + ocupado + RESPIRO + (600 - base))
             peca = _Peca(largura, altura, fundo, familia)
             topo, _ = _moldura(peca, *moldura)
-            _desenhar_tabela(peca, topo, medidas, celulas, ident["destaque"])
+            desenhar(peca, topo)
         else:
+            # Barra deitada precisa de altura por linha: a peça cresce quando a
+            # lista é comprida, em vez de espremer as barras.
+            deitada = tipo in ("ranking", "cem", "dois") or \
+                (tipo == "variacao" and orientacao == "horizontal")
+            if deitada:
+                n_linhas = len(com_valor) if tipo in ("ranking", "variacao") else len(categorias)
+                if tipo == "ranking" and limite:
+                    n_linhas = min(n_linhas, limite)
+                altura = max(altura, 240 + 36 * n_linhas)
             peca = _Peca(largura, altura, fundo, familia)
             topo, base = _moldura(peca, *moldura)
             caixa = (MARGEM, topo, largura - MARGEM, base)
+
+            def com_legenda(itens):
+                return (MARGEM, _legenda(peca, itens, topo), largura - MARGEM, base)
+
             if tipo == "execucao":
-                if len(series) != 2:
-                    raise ValueError("Previsto x realizado usa exatamente duas "
-                                     "séries: a prevista e a realizada.")
-                topo = _legenda(peca, [(series[0]["nome"], ident["rampa"][0]),
-                                       (series[1]["nome"], ident["destaque"])], topo)
-                _desenhar_execucao(peca, (MARGEM, topo, largura - MARGEM, base),
-                                   categorias, series[0], series[1], ident,
-                                   unidade, casas)
+                _desenhar_execucao(
+                    peca, com_legenda([(series[0]["nome"], ident["rampa"][0]),
+                                       (series[1]["nome"], ident["destaque"])]),
+                    categorias, series[0], series[1], ident, unidade, casas)
+            elif tipo == "ranking":
+                itens = sorted(((c, v) for c, v, _ in com_valor),
+                               key=lambda t: t[1], reverse=True)
+                _desenhar_ranking(peca, caixa, itens[:limite] if limite else itens,
+                                  ident, unidade, casas, destaque)
+            elif tipo == "variacao":
+                _desenhar_variacao(peca, caixa, categorias, um, unidade, casas,
+                                   orientacao != "horizontal")
+            elif tipo == "dois":
+                antes, depois = series
+                itens = [(c, a, d) for c, a, d in zip(categorias, antes["valores"],
+                                                     depois["valores"])
+                         if a is not None or d is not None]
+                itens.sort(key=lambda t: (t[2] is None, -(t[2] or 0)))
+                _desenhar_dois(
+                    peca, com_legenda([(antes["nome"], ident["rampa"][1]),
+                                       (depois["nome"], ident["destaque"])]),
+                    itens, antes, depois, ident, unidade, casas)
+            elif tipo == "mapa":
+                _desenhar_mapa(peca, caixa, categorias, um, ident, unidade, casas)
+            elif tipo == "hemiciclo":
+                grupos = [(c, int(round(v))) for c, v, _ in com_valor if v > 0]
+                if len(grupos) > MAX_SERIES:
+                    raise ValueError(f"O hemiciclo aceita até {MAX_SERIES} grupos: "
+                                     "junte os menores numa linha Outros.")
+                cores = list(PALETA[:len(grupos)]) if len(grupos) > 1 else [ident["destaque"]]
+                _desenhar_hemiciclo(
+                    peca, com_legenda([(f"{nome}  {fmt_num(n, 0)}", cor)
+                                       for (nome, n), cor in zip(grupos, cores)]),
+                    grupos, cores, um["nome"])
             else:
                 cores = _cores(series, ident, esquema, destaque)
-                # Linha com o nome escrito na ponta dispensa legenda.
-                if not (tipo == "linha" and rotulos == "ultimo"):
-                    topo = _legenda(peca, [(s["nome"], c) for s, c in zip(series, cores)], topo)
-                caixa = (MARGEM, topo + (6 if tipo == "linha" else 0),
-                         largura - MARGEM, base)
+                legenda = [(s["nome"], c) for s, c in zip(series, cores)]
                 if tipo == "linha":
-                    _desenhar_linha(peca, caixa, categorias, series, cores, unidade,
-                                    casas, rotulos, eixo_zero)
+                    # Linha com o nome escrito na ponta dispensa legenda.
+                    esq, topo_l, dir_, base_l = caixa if rotulos == "ultimo" \
+                        else com_legenda(legenda)
+                    _desenhar_linha(peca, (esq, topo_l + 6, dir_, base_l), categorias,
+                                    series, cores, unidade, casas, rotulos, eixo_zero)
                 elif tipo == "barras":
-                    _desenhar_barras(peca, caixa, categorias, series, cores, unidade,
-                                     casas, rotulos, orientacao != "horizontal")
+                    _desenhar_barras(peca, com_legenda(legenda), categorias, series,
+                                     cores, unidade, casas, rotulos,
+                                     orientacao != "horizontal")
+                elif tipo == "cem":
+                    _desenhar_cem(peca, com_legenda(legenda), categorias, series,
+                                  cores, casas)
                 else:
-                    _desenhar_empilhadas(peca, caixa, categorias, series, cores, unidade,
-                                         casas, rotulos, orientacao != "horizontal")
+                    _desenhar_empilhadas(peca, com_legenda(legenda), categorias,
+                                         series, cores, unidade, casas, rotulos,
+                                         orientacao != "horizontal")
 
         buffer = io.BytesIO()
         peca.fig.savefig(buffer, format=formato, dpi=100 * escala,
