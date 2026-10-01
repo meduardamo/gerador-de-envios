@@ -40,6 +40,7 @@ from gerador_graficos_core import (
     ESQUEMAS,
     IDENTIDADES,
     MAX_SERIES,
+    MAX_TONS,
     ROTULOS,
     TAMANHOS,
     TIPOS,
@@ -627,13 +628,19 @@ with col_ctl:
     if tipo in ("linha", "barras", "empilhadas") and len(selecao) >= 2:
         # Destaque só existe na linha: em barra, várias séries no mesmo cinza
         # não se distinguem.
-        opcoes_cor = [e for e in ESQUEMAS if e != "destaque" or tipo == "linha"]
-        etapas = parecem_etapas([s["nome"] for s in selecao])
+        # Tons de uma cor só até três séries: com mais, os tons vizinhos se
+        # confundem.
+        opcoes_cor = [e for e in ESQUEMAS
+                      if (e != "destaque" or tipo == "linha")
+                      and (e != "tons" or len(selecao) <= MAX_TONS)]
+        etapas = (parecem_etapas([s["nome"] for s in selecao])
+                  and len(selecao) <= MAX_TONS)
         esquema = st.selectbox(
             "Cores", opcoes_cor, format_func=ESQUEMAS.get,
             index=opcoes_cor.index("tons" if etapas else "categorias"),
             key=f"gg_esquema_{st.session_state['gg_v']}_{tipo}_{etapas}",
-            help="Tons de uma cor: séries que são etapas do mesmo valor. "
+            help="Tons de uma cor: até três séries que são etapas do mesmo "
+                 "valor (com mais, os tons se confundem). "
                  "Destaque: uma série é o assunto e as outras são contexto. "
                  "Uma cor por série: coisas diferentes, sem ordem entre si.")
         if esquema == "destaque":

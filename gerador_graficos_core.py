@@ -59,7 +59,7 @@ RAMPA_VINHO = ("#E6BDC9", "#D08EA3", "#B55F7B", "#962E4D", "#6E1F37", "#4A1425")
 RAMPA_MARINHO = ("#C3CFE2", "#96A8C7", "#6B82AB", "#44597F", "#192D4E", "#0E1B31")
 
 ESQUEMAS = {
-    "tons": "Tons de uma cor (etapas do mesmo valor)",
+    "tons": "Tons de uma cor (até 3 etapas do mesmo valor)",
     "destaque": "Uma série em destaque, as outras em cinza",
     "categorias": "Uma cor por série (coisas diferentes)",
 }
@@ -532,11 +532,20 @@ def _categorias_no_x(peca: _Peca, ax, categorias: list[str]) -> None:
                            rotation_mode="anchor")
 
 
-def _passos_da_rampa(n: int) -> list[int]:
-    """Quais tons da rampa usar para n séries, sempre do claro para o escuro e
-    com distância entre vizinhos."""
-    return {1: [3], 2: [1, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4],
-            5: [0, 1, 2, 3, 4]}.get(n, list(range(6))[:n])
+# Tons de uma cor só se sustentam até três séries: claro, cor da marca e
+# escuro ficam longe um do outro. Com quatro ou cinco os vizinhos se confundem
+# e ninguém sabe qual faixa é qual. Daí para cima, uma cor por série.
+MAX_TONS = 3
+
+
+def _tons(n: int, rampa: tuple) -> list[str]:
+    """n tons (até MAX_TONS) do claro ao escuro: os extremos da rampa e, com
+    três séries, a cor da marca no meio."""
+    marca = VINHO if rampa is RAMPA_VINHO else rampa[2]
+    escuro = rampa[5] if rampa is RAMPA_VINHO else rampa[4]
+    return {1: [escuro if rampa is RAMPA_MARINHO else marca],
+            2: [rampa[0], escuro if rampa is RAMPA_MARINHO else marca],
+            3: [rampa[0], marca, escuro]}[n]
 
 
 def _cores(series: list[dict], ident: dict, esquema: str, destaque: str) -> list[str]:
@@ -551,8 +560,8 @@ def _cores(series: list[dict], ident: dict, esquema: str, destaque: str) -> list
     """
     if len(series) == 1:
         return [ident["destaque"]]
-    if esquema == "tons":
-        return [ident["rampa"][i] for i in _passos_da_rampa(len(series))]
+    if esquema == "tons" and len(series) <= MAX_TONS:
+        return _tons(len(series), ident["rampa"])
     if esquema == "destaque":
         nomes = [s["nome"] for s in series]
         alvo = destaque if destaque in nomes else nomes[-1]
