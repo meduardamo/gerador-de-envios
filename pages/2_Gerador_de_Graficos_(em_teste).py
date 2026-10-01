@@ -1,5 +1,5 @@
 """
-Gerador de Gráficos: uma tabela entra e sai peça na identidade da casa (linha,
+Gerador de Gráficos: uma tabela entra e sai peça na identidade da EixoGov (linha,
 barras, barras empilhadas ou tabela), em PNG e SVG, com e sem logo.
 
 A página tem dois passos e a ordem deles é a ordem de quem usa: 1. Dados,
@@ -636,13 +636,13 @@ with st.sidebar:
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
         'Traga uma tabela e gere <strong>gráfico</strong> ou '
-        '<strong>tabela</strong> na identidade da casa, em PNG e SVG.'
+        '<strong>tabela</strong> na identidade da EixoGov, em PNG e SVG.'
         '</p></div>',
         unsafe_allow_html=True,
     )
     if not montserrat_disponivel():
         st.warning("Montserrat não encontrada em fontes/. A peça sai fora da "
-                   "tipografia da casa.")
+                   "tipografia da EixoGov.")
     st.markdown("---")
     # Sem help: com tooltip o Streamlit embrulha o botão e ele perde o
     # estilo dos outros botões da lateral.
