@@ -592,18 +592,26 @@ def _desenhar_barras(peca, caixa, categorias, series, cores, unidade, casas,
     grupo = 0.62 if k == 1 else 0.78
     passo = grupo / k
     largura = passo * (1.0 if k == 1 else 0.9)   # vão entre barras vizinhas
-    corpo = _corpo_rotulo(len(valores))
+    corpo, girado = _corpo_rotulo(len(valores)), False
     if vertical and rotulos == "todos":
         # O rótulo não pode ser mais largo que o passo entre barras, senão
         # encosta no vizinho. Mede a barra numa passada sem rótulo e desce o
-        # corpo até caber.
+        # corpo até caber. Abaixo de 8 o número não se lê: aí o rótulo sobe
+        # deitado sobre a barra, e se nem assim couber não é desenhado.
         _encaixar(peca, ax, *caixa)
         passo_px = abs(ax.transData.transform((passo, 0))[0]
                        - ax.transData.transform((0, 0))[0])
         textos = [_fmt_rotulo(v, unidade, casas) for v in valores]
-        for corpo in (10.5, 10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5):
+        for corpo in (10.5, 10, 9.5, 9, 8.5, 8):
             if max(peca.medir(t, corpo, "bold")[0] for t in textos) <= passo_px - 3:
                 break
+        else:
+            corpo, girado = 8, True
+            if peca.medir("0", corpo, "bold")[1] > passo_px - 1:
+                rotulos = "nenhum"
+            else:
+                # Deitado, o rótulo precisa de altura: abre folga no topo.
+                _escala_valor(ax, "y", valores, unidade, True, folga=0.22)
     marcas = []
     for j, serie in enumerate(series):
         for i, v in enumerate(serie["valores"]):
@@ -618,7 +626,9 @@ def _desenhar_barras(peca, caixa, categorias, series, cores, unidade, casas,
                 ax.annotate(texto, (centro, v), xytext=(0, 4 if v >= 0 else -4),
                             textcoords="offset points", ha="center",
                             va="bottom" if v >= 0 else "top", fontsize=corpo,
-                            fontweight="bold", color=TINTA, zorder=4)
+                            rotation=90 if girado else 0,
+                            fontweight="normal" if girado else "bold",
+                            color=TINTA, zorder=4)
             else:
                 ax.annotate(texto, (v, centro), xytext=(5 if v >= 0 else -5, 0),
                             textcoords="offset points",

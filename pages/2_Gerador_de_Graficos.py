@@ -569,7 +569,14 @@ st.markdown(f'<div class="gg-passo" style="margin-top:2px">Ponto de partida para
             f'estes dados: {TIPOS[sugerido]}, porque {motivo}.</div>',
             unsafe_allow_html=True)
 
-col_ctl, col_prev = st.columns([1, 1.7], gap="large")
+# Empilhar soma as séries. A ferramenta não sabe se a soma faz sentido para
+# estes dados (PLOA + dotação + pago, por exemplo, não é total de nada).
+if tipo == "empilhadas":
+    st.warning("Barras empilhadas somam as séries: use só quando elas são "
+               "partes de um total (por exemplo, gasto por órgão dentro de um "
+               "programa). Para comparar séries entre si, use Barras ou Linha.")
+
+col_ctl, col_prev = st.columns([1, 2], gap="large")
 
 with col_ctl:
     nomes = [s["nome"] for s in series]
@@ -615,7 +622,10 @@ with col_ctl:
                                       horizontal=True, key="gg_orientacao")
             rotulos = st.radio("Rótulos de valor", list(ROTULOS[tipo]),
                                format_func=ROTULOS[tipo].get,
-                               key=f"gg_rotulos_{tipo}")
+                               key=f"gg_rotulos_{tipo}",
+                               help="Com muitas barras o número sobe deitado "
+                                    "sobre a barra. Para número exato de "
+                                    "muitas séries, a Tabela lê melhor.")
             if tipo == "linha":
                 eixo_zero = st.checkbox(
                     "Eixo começa no zero", True, key="gg_zero",
