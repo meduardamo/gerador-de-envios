@@ -969,7 +969,8 @@ def marcar_topline_extraida_manual(gc, df_p: pd.DataFrame) -> tuple[int, list[st
 
 def atualizar_status_rastreamento_equipe(gc, df_p: pd.DataFrame) -> list[str]:
     """Atualiza a coluna 'Atualização pela equipe' nas abas de acompanhamento
-    ('Eduarda' e 'Giovana') para a disputa (Cargo, UF, Turno) recém-gravada."""
+    ('Disputas 2º turno'; 'Eduarda' e 'Giovana' eram os nomes até o 1º turno) para a
+    disputa (Cargo, UF, Turno) recém-gravada."""
     mensagens: list[str] = []
     if not SPREADSHEET_ID_RELATORIOS or df_p is None or df_p.empty or not gc:
         return mensagens
@@ -996,7 +997,7 @@ def atualizar_status_rastreamento_equipe(gc, df_p: pd.DataFrame) -> list[str]:
     agora_str = datetime.now(BRT).strftime("%d/%m/%Y %H:%M")
 
     # Procura nas abas de acompanhamento da equipe
-    abas_disponiveis = [w for w in sh.worksheets() if w.title in ["Eduarda", "Giovana"]]
+    abas_disponiveis = [w for w in sh.worksheets() if w.title in ["Disputas 2º turno", "Eduarda", "Giovana"]]
 
     CINZA_BORDA = {"red": 0.88, "green": 0.88, "blue": 0.88}
     borda = {"style": "SOLID", "width": 1, "color": CINZA_BORDA}
