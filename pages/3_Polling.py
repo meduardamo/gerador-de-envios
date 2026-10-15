@@ -2160,9 +2160,11 @@ def render_colar():
     for aviso in res["avisos"]:
         st.markdown(f'<div class="ge-alerta-cenario">⚠️ {aviso}</div>', unsafe_allow_html=True)
 
-    df = pd.DataFrame(res["linhas_r"])[
-        ["registro_tse", "instituto", "data_campo", "scenario_label",
-         "candidato_partido", "partido", "tipo", "percentual"]]
+    # reindex em vez de [[...]]: sem resultado o DataFrame vem sem colunas e o
+    # recorte por nome derrubava a página (KeyError).
+    df = pd.DataFrame(res["linhas_r"]).reindex(columns=[
+        "registro_tse", "instituto", "data_campo", "scenario_label",
+        "candidato_partido", "partido", "tipo", "percentual"])
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     st.markdown('<div class="ge-rule">Gravar</div>', unsafe_allow_html=True)

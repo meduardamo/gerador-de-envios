@@ -164,7 +164,9 @@ def parsear(texto, cargo=""):
                 margem = m.group(1).replace(",", ".")
                 confianca = m.group(2) or ""
                 j += 1
-        while j < len(linhas) and linhas[j].startswith(("CNPJ", "CPF")):
+        # CNPJ do instituto e do contratante; contratante vazio vem como "—".
+        while j < len(linhas) and (linhas[j].startswith(("CNPJ", "CPF"))
+                                   or linhas[j] in ("-", "—", "–")):
             j += 1
 
         # Cabeçalho de colunas: "Cenário<tab>cand1<tab>cand2...", partido pode vir
