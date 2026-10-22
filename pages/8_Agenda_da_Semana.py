@@ -141,8 +141,7 @@ if authentication_status is None:
 LOGO_PATH = "logo_eixo_gov_magenta.png"
 PASTA_SEMANAS = Path("agenda/semanas")
 MODELO = Path("modelos/agenda_semana_modelo.docx")
-SELECAO_SHEET_ID = (st.secrets.get("AGENDA_SHEET_ID") or os.getenv("AGENDA_SHEET_ID", "")
-                    or "")
+SELECAO_SHEET_ID = (st.secrets.get("AGENDA_SHEET_ID") or os.getenv("AGENDA_SHEET_ID", "")).strip()
 SELECAO_ABA = "Seleção"
 
 
@@ -170,6 +169,8 @@ def _carregar_google_creds_dict():
 
 @st.cache_resource
 def _aba_selecao():
+    if not SELECAO_SHEET_ID:
+        raise RuntimeError("AGENDA_SHEET_ID não configurado nos Secrets")
     creds = _carregar_google_creds_dict()
     if not creds:
         raise RuntimeError("Credencial do Google não configurada.")
