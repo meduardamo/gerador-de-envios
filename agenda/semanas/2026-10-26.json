@@ -28,6 +28,21 @@
    "dia": "2026-10-28",
    "hora": "10h",
    "ordem": "10:00",
+   "colegiado": "COMISSÃO DE DESENVOLVIMENTO ECONÔMICO (CDE)",
+   "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83060",
+   "id": "CD-83060",
+   "tipo": "evento",
+   "rotulo": "Reunião Deliberativa",
+   "titulo": "Discussão e votação de propostas legislativas",
+   "tituloLink": "https://www.camara.leg.br/evento-legislativo/83060",
+   "ementa": "",
+   "convidados": []
+  },
+  {
+   "casa": "CD",
+   "dia": "2026-10-28",
+   "hora": "10h",
+   "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
    "id": "CD-83091-1",
@@ -498,5 +513,5 @@
   }
  ],
  "erros": [],
- "coletadoEm": "22/10 11:50"
+ "coletadoEm": "22/10 11:55"
 }
