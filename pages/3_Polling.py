@@ -163,6 +163,8 @@ authenticator = stauth.Authenticate(
 # sem ninguém logado o gate chama st.stop() e nada depois dele roda.
 from ui_login import CSS_LOGIN
 st.markdown(CSS_LOGIN, unsafe_allow_html=True)
+from menu_paginas import CSS_MENU
+st.markdown(CSS_MENU, unsafe_allow_html=True)
 
 sig = inspect.signature(authenticator.login)
 params = sig.parameters
