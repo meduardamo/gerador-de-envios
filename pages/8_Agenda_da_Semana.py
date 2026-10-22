@@ -72,9 +72,12 @@ footer { display: none !important; }
 /* clientes: botões de alternar no lugar de seis caixas */
 [data-testid="stButtonGroup"] button {
     border-radius: 999px !important; border: 1px solid #DADAD4 !important; background: #fff !important;
-    color: #767672 !important; font-size: 12px !important; padding: 2px 12px !important; min-height: 28px !important;
+    color: #767672 !important; font-size: 11.5px !important; padding: 2px 9px !important; min-height: 26px !important;
 }
-[data-testid="stButtonGroup"] button p { font-size: 12px !important; font-weight: 600 !important; }
+[data-testid="stButtonGroup"] button p { font-size: 11.5px !important; font-weight: 600 !important; }
+/* os sete clientes numa linha só, alinhados à direita */
+[data-testid="stElementContainer"]:has(> [data-testid="stButtonGroup"]), [data-testid="stButtonGroup"] { width: 100% !important; }
+[data-testid="stButtonGroup"] [role="toolbar"] { width: 100% !important; max-width: none !important; gap: 4px !important; justify-content: flex-end !important; }
 [data-testid="stButtonGroup"] button[kind="pillsActive"], [data-testid="stButtonGroup"] button[aria-pressed="true"] {
     background: #962E4D !important; border-color: #962E4D !important; color: #fff !important;
 }
