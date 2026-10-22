@@ -39,14 +39,14 @@ span.material-symbols-rounded, span.material-symbols-outlined, span.material-ico
 }
 footer { display: none !important; }
 #MainMenu { display: none !important; }
-[data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button, [data-testid="stDownloadButton"] > button {
+[data-testid="stButton"] button, [data-testid="stFormSubmitButton"] > button, [data-testid="stDownloadButton"] > button {
     font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.1em !important;
     text-transform: uppercase !important; border-radius: 0 !important;
     border: 1px solid #962E4D !important; background: transparent !important;
     color: #962E4D !important; padding: 5px 14px !important;
     transition: background 0.15s, color 0.15s !important;
 }
-[data-testid="stButton"] > button:hover, [data-testid="stFormSubmitButton"] > button:hover,
+[data-testid="stButton"] button:hover, [data-testid="stFormSubmitButton"] > button:hover,
 [data-testid="stDownloadButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
 /* ação principal (gerar e baixar) cheia, como o download do Gerador de Gráficos */
 [data-testid="stFormSubmitButton"] > button[kind="primaryFormSubmit"], [data-testid="stDownloadButton"] > button {

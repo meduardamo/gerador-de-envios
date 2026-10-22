@@ -91,16 +91,16 @@ span.material-symbols-rounded, span.material-symbols-outlined, span.material-ico
 }
 footer { display: none !important; }
 #MainMenu { display: none !important; }
-[data-testid="stButton"] > button {
+[data-testid="stButton"] button {
     font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.1em !important;
     text-transform: uppercase !important; border-radius: 0 !important;
     border: 1px solid #962E4D !important; background: transparent !important;
     color: #962E4D !important; padding: 5px 14px !important;
     transition: background 0.15s, color 0.15s !important;
 }
-[data-testid="stButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] > button { border: 1px solid #962E4D !important; color: #962E4D !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
+[data-testid="stButton"] button:hover { background: #962E4D !important; color: #fff !important; }
+[data-testid="stSidebar"] [data-testid="stButton"] button { border: 1px solid #962E4D !important; color: #962E4D !important; }
+[data-testid="stSidebar"] [data-testid="stButton"] button:hover { background: #962E4D !important; color: #fff !important; }
 [data-testid="stRadio"] > label, [data-testid="stSelectbox"] > label,
 [data-testid="stMultiSelect"] > label, [data-testid="stTextInput"] > label,
 [data-testid="stNumberInput"] > label, [data-testid="stTextArea"] > label {
@@ -344,7 +344,7 @@ with st.sidebar:
         st.warning("Montserrat não encontrada em fontes/. O gráfico sai fora da "
                    "tipografia da casa.")
     st.markdown("---")
-    if st.button("🧹 Limpar tudo", use_container_width=True,
+    if st.button("Limpar tudo", use_container_width=True,
                  help="Zera a pesquisa da tela (texto, extração, gráfico e alerta) "
                       "pra começar do zero"):
         _limpar(limpar_fonte=True)
