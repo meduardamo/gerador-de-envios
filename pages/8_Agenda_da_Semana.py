@@ -212,7 +212,7 @@ def _salvar_selecao(sid: str, semana: dict, base: dict, atual: dict, quem: str) 
         salvo[iid] = final
         it = por_id.get(iid, {})
         dia = dt.date.fromisoformat(it["dia"]).strftime("%d/%m/%Y") if it.get("dia") else ""
-        linha = [sid, iid, dia, it.get("colegiado", ""), it.get("titulo", ""),
+        linha = [sid, iid, dia, ag.nome_colegiado(it.get("colegiado", "")), it.get("titulo", ""),
                  ", ".join(c for c in ag.CLIENTES if c in final), quem, agora]
         if iid in linha_de:
             trocas.append({"range": f"A{linha_de[iid]}:H{linha_de[iid]}", "values": [linha]})
