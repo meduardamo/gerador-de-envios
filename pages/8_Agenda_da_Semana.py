@@ -105,6 +105,14 @@ footer { display: none !important; }
 .ag-fora .ag-tit a, .ag-fora .ag-tit { color: #9A9A95; text-decoration: line-through; }
 .ag-fora .ag-ementa { color: #9A9A95; }
 .ag-nota { font-size: 12.5px; color: #767672; margin: 4px 0 0; }
+.ag-tit span.ag-novo { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #192D4E; border: 1px solid #192D4E; border-radius: 3px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
+/* chave "só os novos" em vinho, não no vermelho padrão */
+.st-key-ag_novos label:has(input:checked) > div:first-of-type { background-color: #962E4D !important; }
+/* download por cliente em contorno; o zip com todos fica cheio */
+.st-key-ag_por_cliente [data-testid="stDownloadButton"] > button {
+    background: transparent !important; color: #962E4D !important; font-weight: 500 !important; }
+.st-key-ag_por_cliente [data-testid="stDownloadButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
 .ag-fim { border-top: 1px solid #DADAD4; margin: 36px 0 18px; }
 .ag-fio { border-bottom: 1px solid #DADAD4; margin: 10px 0 12px; }
 </style>""", unsafe_allow_html=True)
@@ -337,8 +345,10 @@ vivas = st.session_state.setdefault("ag_vivas", {})
 if atualizar:
     ini = dt.date.fromisoformat(sid)
     with st.spinner("Buscando a pauta na Câmara e no Senado…"):
-        vivas[sid] = {**ag.coletar_semana(ini, ini + dt.timedelta(days=4)),
-                      "coletadoEm": dt.datetime.now().strftime("%d/%m %H:%M")}
+        viva = {**ag.coletar_semana(ini, ini + dt.timedelta(days=4)),
+                "coletadoEm": dt.datetime.now(ZoneInfo("America/Recife")).strftime("%d/%m %H:%M")}
+        hoje = dt.datetime.now(ZoneInfo("America/Recife")).date()
+        vivas[sid] = {**viva, **ag.foto_segunda(viva, _ler_semana(sid) if sid in semanas else None, hoje <= ini)}
     st.session_state.pop("ag_pacote", None)
 
 if sid in vivas:
@@ -400,20 +410,40 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ── o que entrou depois de segunda ───────────────────────────────────────────
+novos = ag.novos_desde_segunda(semana)
+so_novos = False
+if novos:
+    so_novos = st.container(key="ag_novos").toggle(
+        f"Só os {len(novos)} {'item novo' if len(novos) == 1 else 'itens novos'} desde a coleta de "
+        f"{semana.get('coletadoSegunda', 'segunda')}",
+        key=f"ag_so_novos_{sid}",
+        help="Mostra só o que entrou na pauta depois de segunda. O Word sai só com esses itens, "
+             "num arquivo de atualização.",
+    )
+
 for tipo, msg in st.session_state.pop("ag_msg", []):
     getattr(st, tipo)(msg)
 
 if st.session_state.get("ag_pacote") and st.session_state["ag_pacote"][0] == sid:
-    _, pacote, contagem = st.session_state["ag_pacote"]
+    _, pacote, arquivos, contagem, atualizacao = st.session_state["ag_pacote"]
+    extra = f" (atualização {dt.date.fromisoformat(atualizacao):%d.%m})" if atualizacao else ""
     st.download_button(
-        f"⬇ Baixar {len(contagem)} {'documento' if len(contagem) == 1 else 'documentos'} (.zip) · "
-        + " · ".join(f"{c} {n}" for c, n in contagem.items()),
+        f"⬇ Baixar todos{' os ' + str(len(contagem)) if len(contagem) > 1 else ''}"
+        + (f" · atualização {dt.date.fromisoformat(atualizacao):%d.%m}" if atualizacao else "") + " (.zip)",
         data=pacote,
-        file_name=f"Agenda da Semana {semana['periodo']}.zip",
+        file_name=f"Agenda da Semana {semana['periodo']}{extra}.zip",
         mime="application/zip",
         use_container_width=True,
         key="ag_baixar",
     )
+    # um botão por cliente, para baixar só o documento de um
+    with st.container(key="ag_por_cliente"):
+        cols = st.columns(len(ag.CLIENTES))
+        for col, (nome, dados), (cli, n) in zip(cols, arquivos.items(), contagem.items()):
+            col.download_button(f"⬇ {cli} · {n}", data=dados, file_name=nome, use_container_width=True,
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                key=f"ag_baixar_{cli}")
 
 
 # ── seleção ──────────────────────────────────────────────────────────────────
@@ -429,7 +459,9 @@ def _item(it: dict, fio: bool) -> None:
         conv = "; ".join(it.get("convidados") or [])
         st.markdown(
             f'<div class="{"ag-fora" if it.get("situacao") else ""}">'
-            f'<p class="ag-tit" title="{_html.escape(titulo)}">{_a(titulo, it.get("tituloLink"))}</p>'
+            f'<p class="ag-tit" title="{_html.escape(titulo)}">'
+            + ('<span class="ag-novo">novo</span>' if it["id"] in novos else "")
+            + f'{_a(titulo, it.get("tituloLink"))}</p>'
             + (f'<p class="ag-ementa" title="{_html.escape(ementa)}">{_html.escape(ementa)}</p>' if ementa else "")
             + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else "")
             + (f'<p class="ag-conv" title="{_html.escape(conv)}"><b>Convidados:</b> {_html.escape(conv)}</p>' if conv else "")
@@ -451,16 +483,24 @@ def _item(it: dict, fio: bool) -> None:
         st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
 
 
+# Com a chave de novos ligada, os outros itens saem da tela. O Streamlit esquece o valor
+# de widget que não foi desenhado, então quem volta à tela nasce de novo da seleção salva.
+visiveis = [i for i in itens if not so_novos or i["id"] in novos]
+for it in visiveis:
+    if _chave(sid, it["id"]) not in st.session_state:
+        st.session_state[_chave(sid, it["id"])] = list(base.get(it["id"], []))
+dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
+
 # Tudo dentro de um formulário: marcar um cliente não recarrega a página.
 with st.form("ag_form", border=False):
     a1, a2, _ = st.columns([1, 1, 2])
     salvar = a1.form_submit_button("Salvar seleção", use_container_width=True)
     gerar = a2.form_submit_button("Salvar e gerar Word", use_container_width=True, type="primary")
 
-    abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in itens if i['dia'] == d)}" for d in dias_com])
-    for aba, dia in zip(abas, dias_com):
+    abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in visiveis if i['dia'] == d)}" for d in dias_vis])
+    for aba, dia in zip(abas, dias_vis):
         with aba:
-            do_dia = [i for i in itens if i["dia"] == dia]
+            do_dia = [i for i in visiveis if i["dia"] == dia]
             for casa, casa_nome in ag.CASAS[:2]:
                 da_casa = [i for i in do_dia if i["casa"] == casa]
                 if not da_casa:
@@ -490,9 +530,12 @@ with st.form("ag_form", border=False):
 
 if salvar or gerar:
     msgs = []
-    atual = _selecao_na_tela(sid, itens, st.session_state.get(chave_base, {}))
+    base = st.session_state.get(chave_base, {})
+    ids_vis = {i["id"] for i in visiveis}
+    # item fora da tela fica como estava salvo
+    atual = {k: v for k, v in base.items() if k not in ids_vis} | _selecao_na_tela(sid, visiveis, base)
     try:
-        selecao = _salvar_selecao(sid, semana, st.session_state.get(chave_base, {}), atual,
+        selecao = _salvar_selecao(sid, semana, base, atual,
                                   st.session_state.get("name") or st.session_state.get("username") or "")
         msgs.append(("success", "Seleção salva. A tela mostra também o que o resto da equipe salvou."))
     except Exception as e:
@@ -505,14 +548,21 @@ if salvar or gerar:
         elif not MODELO.exists():
             msgs.append(("error", "O modelo do Word não está no repositório."))
         else:
-            pacote, contagem = ag.gerar_pacote(MODELO.read_bytes(), semana, selecao)
+            atualizacao = ""
+            if so_novos:
+                dia, mes = semana.get("coletadoEm", "")[:5].split("/")
+                atualizacao = dt.date(int(sid[:4]), int(mes), int(dia)).isoformat()
+            pacote, arquivos, contagem = ag.gerar_pacote(MODELO.read_bytes(), semana, selecao,
+                                                         so_ids=novos if so_novos else None,
+                                                         atualizacao=atualizacao)
             if contagem:
-                st.session_state["ag_pacote"] = (sid, pacote, contagem)
+                st.session_state["ag_pacote"] = (sid, pacote, arquivos, contagem, atualizacao)
             sairam = [i["titulo"] for i in itens if i.get("situacao") and selecao.get(i["id"])]
             if sairam:
                 msgs.append(("info", f"Ficaram fora do Word por reunião cancelada ou adiada: {_lista_e(sairam)}."))
             if not contagem:
-                msgs.append(("warning", "Todos os itens marcados são de reunião cancelada ou adiada."))
+                msgs.append(("warning", "Nenhum item novo está marcado." if so_novos else
+                             "Todos os itens marcados são de reunião cancelada ou adiada."))
     st.session_state["ag_aplicar"] = (sid, selecao)
     st.session_state["ag_msg"] = msgs
     st.rerun()

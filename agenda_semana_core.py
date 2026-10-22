@@ -159,6 +159,16 @@ def _convidados_camara(descricao: str) -> list[str]:
     return out
 
 
+def _id_unico(iid: str, usados: set) -> str:
+    """Mesma matéria duas vezes na mesma pauta ganha sufixo."""
+    k, out = 1, iid
+    while out in usados:
+        k += 1
+        out = f"{iid}-{k}"
+    usados.add(out)
+    return out
+
+
 def _eventos_camara(ini: dt.date, fim: dt.date) -> list[dict]:
     url = f"{CAMARA}/eventos"
     params = {"dataInicio": ini.isoformat(), "dataFim": fim.isoformat(), "itens": 100,
@@ -247,7 +257,10 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
                           "convidados": _convidados_camara(ev.get("descricao"))})
             continue
 
-        for n, p in enumerate(pauta, 1):
+        # o código vem da proposição, não da posição na pauta: item que entra no meio da
+        # pauta não pode trocar o código dos outros (a seleção salva e o "novo" dependem dele)
+        usados = set()
+        for p in pauta:
             prop = p.get("proposicao_") or {}
             rel = p.get("proposicaoRelacionada_") or {}
             if prop.get("siglaTipo") == "REQ" or not rel:
@@ -265,7 +278,8 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
                 # "Parecer do Relator, Dep. X (P-UF), pela ..." e "Parecer às Emendas ... Dep. X (P-UF) pela: ..."
                 parecer = _maiuscula(re.sub(r"^Parecer\b.*?Dep\.\s*[^()]+\([^)]*\)[,:]?\s*", "", _limpa(p["textoParecer"])))
                 parecer_link = (prls.get(prop.get("id")) or {}).get("urlInteiroTeor") or ""
-            itens.append({**base, "id": f"CD-{ev['id']}-{n}", "tipo": "materia", "rotulo": rotulo,
+            iid = _id_unico(f"CD-{ev['id']}-{alvo.get('id')}", usados)
+            itens.append({**base, "id": iid, "tipo": "materia", "rotulo": rotulo,
                           "titulo": titulo, "ementa": _limpa(alvo.get("ementa")),
                           "tituloLink": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={alvo.get('id')}",
                           "autor": autoria(alvo.get("id")), "relator": relator,
@@ -502,9 +516,11 @@ def coletar_senado_plenario(ini: dt.date, fim: dt.date) -> list[dict]:
                 itens.append({**base, "id": f"SF-PLEN-{cod}", "tipo": "evento", "rotulo": titulo,
                               "titulo": titulo, "tituloLink": base["reuniaoLink"],
                               "ementa": _limpa(ev.get("DescricaoEvento"))})
+            usados = set()
             for n, m in enumerate(_lista((s.get("Materias") or {}).get("Materia")), 1):
                 cm = m.get("CodigoMateria")
-                itens.append({**base, "id": f"SF-PLEN-{cod}-{n}", "tipo": "materia", "rotulo": tipo_sessao,
+                iid = _id_unico(f"SF-PLEN-{cod}-{cm or f'n{n}'}", usados)
+                itens.append({**base, "id": iid, "tipo": "materia", "rotulo": tipo_sessao,
                               "titulo": _limpa(m.get("DescricaoIdentificacaoMateria")),
                               "tituloLink": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{cm}" if cm else "",
                               "ementa": _limpa(m.get("Ementa")), "autor": _limpa(m.get("NomeAutor")),
@@ -673,9 +689,27 @@ def _tabela(d: _Doc, modelo_doc: str, dias: list[str], itens: list[dict]) -> str
     return f"<w:tbl>{tblpr}{''.join(rows)}</w:tbl>"
 
 
-def nome_arquivo(cliente: str, dias: list[str]) -> str:
+def nome_arquivo(cliente: str, dias: list[str], atualizacao: str = "") -> str:
     ini, fim = dt.date.fromisoformat(dias[0]), dt.date.fromisoformat(dias[-1])
-    return f"Agenda da Semana - {cliente} {ini:%d.%m} a {fim:%d.%m}.docx"
+    extra = f" (atualização {dt.date.fromisoformat(atualizacao):%d.%m})" if atualizacao else ""
+    return f"Agenda da Semana - {cliente} {ini:%d.%m} a {fim:%d.%m}{extra}.docx"
+
+
+def foto_segunda(semana: dict, anterior: dict | None, ate_segunda: bool) -> dict:
+    """Campos idsSegunda/coletadoSegunda: quais itens já estavam na pauta na coleta de segunda."""
+    if ate_segunda or not anterior or not anterior.get("itens"):
+        return {"idsSegunda": [i["id"] for i in semana["itens"]], "coletadoSegunda": semana.get("coletadoEm", "")}
+    return {"idsSegunda": anterior.get("idsSegunda") or [i["id"] for i in anterior["itens"]],
+            "coletadoSegunda": anterior.get("coletadoSegunda") or anterior.get("coletadoEm", "")}
+
+
+def novos_desde_segunda(semana: dict) -> set[str]:
+    """Itens que não estavam na coleta de segunda (reunião cancelada não conta)."""
+    foto = semana.get("idsSegunda")
+    if foto is None:
+        return set()
+    foto = set(foto)
+    return {i["id"] for i in semana["itens"] if i["id"] not in foto and not i.get("situacao")}
 
 
 def gerar_docx(modelo: bytes, cliente: str, periodo: str, dias: list[str], itens: list[dict]) -> bytes:
@@ -707,16 +741,24 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, dias: list[str], itens
     return buf.getvalue()
 
 
-def gerar_pacote(modelo: bytes, semana: dict, selecao: dict[str, list[str]]) -> tuple[bytes, dict[str, int]]:
-    """Zip com um .docx por cliente que tenha ao menos um item marcado."""
-    contagem = {}
+def gerar_pacote(modelo: bytes, semana: dict, selecao: dict[str, list[str]],
+                 so_ids: set[str] | None = None, atualizacao: str = "") -> tuple[bytes, dict[str, bytes], dict[str, int]]:
+    """Um .docx por cliente que tenha ao menos um item marcado, soltos e num zip.
+
+    Com `so_ids` (atualização de terça), entram só esses itens e só os dias que têm algum deles.
+    """
+    contagem, arquivos = {}, {}
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for cli in CLIENTES:
-            itens = [i for i in semana["itens"] if cli in selecao.get(i["id"], []) and not i.get("situacao")]
+            itens = [i for i in semana["itens"] if cli in selecao.get(i["id"], []) and not i.get("situacao")
+                     and (so_ids is None or i["id"] in so_ids)]
             if not itens:
                 continue
+            dias = [d for d in semana["dias"] if any(i["dia"] == d for i in itens)] if so_ids is not None else semana["dias"]
+            nome = nome_arquivo(cli, semana["dias"], atualizacao)
+            arquivos[nome] = gerar_docx(modelo, cli, semana["periodo"] + (" | Atualização" if atualizacao else ""),
+                                        dias, itens)
             contagem[cli] = len(itens)
-            z.writestr(nome_arquivo(cli, semana["dias"]),
-                       gerar_docx(modelo, cli, semana["periodo"], semana["dias"], itens))
-    return buf.getvalue(), contagem
+            z.writestr(nome, arquivos[nome])
+    return buf.getvalue(), arquivos, contagem

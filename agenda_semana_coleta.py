@@ -3,6 +3,10 @@
 Roda pelo workflow "Agenda da Semana" toda segunda. Sem argumento, pega a semana
 corrente (ou a seguinte, se rodar no fim de semana); com AAAA-MM-DD, a semana
 que começa na segunda daquela data.
+
+A rodada de segunda (ou anterior) fixa a foto da pauta em `idsSegunda`; as rodadas
+seguintes da mesma semana (terça) mantêm a foto, e a página marca como novo o que
+não estava nela.
 """
 import datetime as dt
 import json
@@ -27,6 +31,8 @@ for erro in semana["erros"]:
     print(f"::warning::{erro}")
 
 saida = Path("agenda/semanas") / f"{seg.isoformat()}.json"
+anterior = json.loads(saida.read_text(encoding="utf-8")) if saida.exists() else None
+semana.update(ag.foto_segunda(semana, anterior, agora.date() <= seg))
 saida.parent.mkdir(parents=True, exist_ok=True)
 saida.write_text(json.dumps(semana, ensure_ascii=False, indent=1), encoding="utf-8")
 print(f"{saida}: {len(semana['itens'])} itens ({semana['periodo']})")
