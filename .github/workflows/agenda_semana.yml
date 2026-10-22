@@ -1,0 +1,38 @@
+name: Agenda da Semana
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # segunda, 6h em Brasília
+  workflow_dispatch:
+    inputs:
+      semana:
+        description: "Qualquer dia da semana (AAAA-MM-DD). Vazio = semana corrente"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agenda-semana
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - run: python agenda_semana_coleta.py "${{ github.event.inputs.semana }}"
+      - name: Grava a pauta no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add agenda/semanas
+          git diff --cached --quiet && exit 0
+          git commit -m "Agenda da Semana: pauta coletada"
+          git pull --rebase
+          git push
