@@ -1,6 +1,10 @@
 name: Agenda da Semana
 
 on:
+  # disparo principal: cron-job.org às 7h de segunda (o cron do GitHub atrasa até 4h);
+  # o schedule fica de reserva
+  repository_dispatch:
+    types: [agenda-semana]
   schedule:
     - cron: "0 9 * * 1"   # segunda, 6h em Brasília
   workflow_dispatch:

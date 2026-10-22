@@ -79,6 +79,35 @@ def _sem_cargo(nome: str) -> str:
     return re.sub(r"^(Senador|Senadora|Deputado|Deputada)\s+", "", _limpa(nome))
 
 
+def _maiuscula(s: str) -> str:
+    return s[:1].upper() + s[1:]
+
+
+_SIGLAS = {"PEC", "MPV", "PL", "PLP", "PDL", "CPI", "CPMI", "SUS", "LOA", "LDO", "CN", "SF", "CD"}
+_PARTICULAS = _MINUSCULAS | {"a", "o", "as", "os", "à", "às", "ao", "aos", "em", "no", "na", "nos", "nas",
+                             "para", "sobre", "com", "por", "pela", "pelo"}
+
+
+def nome_colegiado(s: str) -> str:
+    """'COMISSÃO DE SAÚDE (CSAUDE)' -> 'Comissão de Saúde (CSAUDE)'; a sigla entre parênteses fica."""
+    m = re.match(r"^(.*?)\s*\(([^()]*)\)$", s or "")
+    base, sigla = (m.group(1), m.group(2)) if m else (s or "", "")
+    if sigla and " " in sigla and not any(ch.isdigit() for ch in sigla):
+        base, sigla = f"{base} ({sigla})", ""
+    palavras = []
+    for i, p in enumerate(base.split()):
+        nu = p.strip("().,-").upper()
+        if nu in _SIGLAS or any(ch.isdigit() for ch in p):
+            palavras.append(p.upper() if nu in _SIGLAS else p)
+        elif i and p.lower() in _PARTICULAS:
+            palavras.append(p.lower())
+        elif p.startswith("("):
+            palavras.append("(" + _maiuscula(p[1:].lower()))
+        else:
+            palavras.append(_maiuscula(p.lower()))
+    return " ".join(palavras) + (f" ({sigla})" if sigla else "")
+
+
 def periodo_extenso(ini: dt.date, fim: dt.date) -> str:
     if ini.month == fim.month:
         return f"{ini.day} a {fim.day} de {MESES[fim.month - 1]} de {fim.year}"
@@ -190,8 +219,9 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
             "casa": "CD", "dia": inicio[:10], "hora": _hora(inicio[11:16]), "ordem": inicio[11:16],
             "colegiado": _colegiado_camara(orgao),
             "reuniaoLink": f"https://www.camara.leg.br/evento-legislativo/{ev['id']}",
+            "reuniao": _limpa(ev.get("descricaoTipo")),
         }
-        tipo_ev = _limpa(ev.get("descricaoTipo"))
+        tipo_ev = base["reuniao"]
         linhas = [_limpa(l) for l in str(ev.get("descricao") or "").splitlines() if _limpa(l)]
 
         if not pauta:
@@ -223,7 +253,7 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
                 relator = f"{r['nome']} ({part}/{uf})" if part else r["nome"]
             if p.get("textoParecer"):
                 # "Parecer do Relator, Dep. X (P-UF), pela ..." e "Parecer às Emendas ... Dep. X (P-UF) pela: ..."
-                parecer = re.sub(r"^Parecer\b.*?Dep\.\s*[^()]+\([^)]*\)[,:]?\s*", "", _limpa(p["textoParecer"]))
+                parecer = _maiuscula(re.sub(r"^Parecer\b.*?Dep\.\s*[^()]+\([^)]*\)[,:]?\s*", "", _limpa(p["textoParecer"])))
                 parecer_link = (prls.get(prop.get("id")) or {}).get("urlInteiroTeor") or ""
             itens.append({**base, "id": f"CD-{ev['id']}-{n}", "tipo": "materia", "rotulo": rotulo,
                           "titulo": titulo, "ementa": _limpa(alvo.get("ementa")),
@@ -237,7 +267,7 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
 
 def _parecer_senado(txt: str) -> str:
     t = _limpa(txt).rstrip(".")
-    return (t[:1].lower() + t[1:] + ".") if t else ""
+    return _maiuscula(t) + "." if t else ""
 
 
 def _convidado_senado(c: dict) -> str:
@@ -266,6 +296,7 @@ def coletar_senado_comissoes(ini: dt.date, fim: dt.date) -> list[dict]:
             "colegiado": f"{_limpa(col.get('nome')).rstrip('.').upper()} ({sigla})",
             "reuniaoLink": f"https://legis.senado.leg.br/atividade/comissoes/comissao/{col.get('codigo')}/reuniao/{reu.get('codigo')}",
         }
+        base["reuniao"] = f"Reunião {_limpa((reu.get('tipo') or {}).get('descricao'))}".strip()
         partes = _lista(reu.get("partes"))
         if not partes:
             itens.append({**base, "id": f"SF-{reu.get('codigo')}", "tipo": "evento",
@@ -278,7 +309,7 @@ def coletar_senado_comissoes(ini: dt.date, fim: dt.date) -> list[dict]:
             if ev:
                 tipo = "audiencia" if "audiência" in rotulo.lower() or "seminário" in rotulo.lower() else "evento"
                 itens.append({**base, "id": f"SF-{reu.get('codigo')}-{parte.get('codigo')}", "tipo": tipo,
-                              "rotulo": rotulo, "titulo": rotulo, "tituloLink": base["reuniaoLink"],
+                              "reuniao": rotulo, "rotulo": rotulo, "titulo": rotulo, "tituloLink": base["reuniaoLink"],
                               "ementa": _limpa(ev.get("finalidade")),
                               "convidados": [_convidado_senado(c) for c in _lista(ev.get("convidados"))]})
             for it in _lista(parte.get("itens")):
@@ -325,6 +356,7 @@ def coletar_senado_plenario(ini: dt.date, fim: dt.date) -> list[dict]:
                 "reuniaoLink": f"https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/{cod}",
             }
             tipo_sessao = _limpa(s.get("TipoSessao")).capitalize()
+            base["reuniao"] = tipo_sessao
             ev = s.get("Evento") or {}
             if ev.get("DescricaoEvento"):
                 titulo = _limpa(ev.get("DescricaoTipoEvento")).capitalize() or tipo_sessao
@@ -358,16 +390,18 @@ def coletar_semana(ini: dt.date, fim: dt.date) -> dict:
 
 
 # ─── Word ────────────────────────────────────────────────────────────────────
-# Porta do gerar_agenda.py do projeto Agenda (Lívia): mesma formatação do modelo
-# "Agenda da Semana - IEPS (01.06 a05.06).docx".
+# Segue o modelo "Modelo - AGENDA SEMANAL - Saúde.docx" (out/2026): tabela com uma
+# faixa vinho por dia; dentro, Casa, colegiado, tipo da reunião com a hora e as
+# matérias em lista com Autoria, Relatoria e Parecer recuados embaixo.
 
 F = '<w:rFonts w:ascii="Montserrat" w:cs="Montserrat" w:eastAsia="Montserrat" w:hAnsi="Montserrat"/>'
 S9 = '<w:sz w:val="18"/><w:szCs w:val="18"/>'
 B = '<w:b w:val="1"/><w:bCs w:val="1"/>'
 LINK = '<w:color w:val="1155cc"/>'
 U = '<w:u w:val="single"/>'
-CINZA = '<w:color w:val="333333"/>'
 CASAS = [("CD", "Câmara dos Deputados"), ("SF", "Senado Federal"), ("EX", "Poder Executivo")]
+PPR = '<w:widowControl w:val="0"/><w:spacing w:line="240" w:lineRule="auto"/>'
+NUM_MATERIA, NUM_CONVIDADO = 5, 6   # listas com marcador do modelo
 
 
 class _Doc:
@@ -390,13 +424,20 @@ class _Doc:
                 + self.run(text, F + (B if bold else "") + LINK + S9 + U) + "</w:hyperlink>")
 
     @staticmethod
-    def p(runs: str = "", ppr: str = '<w:jc w:val="both"/>') -> str:
-        return f"<w:p><w:pPr>{ppr}<w:rPr>{F}{S9}</w:rPr></w:pPr>{runs}</w:p>"
+    def p(runs: str = "", extra: str = "") -> str:
+        return f'<w:p><w:pPr>{PPR}{extra}<w:jc w:val="both"/><w:rPr>{F}{S9}</w:rPr></w:pPr>{runs}</w:p>'
 
     @staticmethod
-    def bullet(runs: str) -> str:
-        return _Doc.p(runs, '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="3"/></w:numPr>'
-                            '<w:ind w:left="720" w:hanging="360"/><w:jc w:val="both"/>')
+    def bullet(runs: str, num: int) -> str:
+        return _Doc.p(runs, f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{num}"/></w:numPr>'
+                            '<w:ind w:left="720" w:hanging="360"/>')
+
+    @staticmethod
+    def recuo(runs: str = "") -> str:
+        return _Doc.p(runs, '<w:ind w:left="720" w:firstLine="0"/>')
+
+    def negrito(self, text: str) -> str:
+        return self.p(self.run(text, F + B + S9))
 
 
 def _cell(content: str, header: bool = False) -> str:
@@ -408,40 +449,42 @@ def _cell(content: str, header: bool = False) -> str:
             f'<w:vAlign w:val="top"/></w:tcPr>{content}</w:tc></w:tr>')
 
 
+def _rotulado(d: _Doc, rotulo: str, valor: str, url: str = "") -> str:
+    return d.recuo(d.run(f"{rotulo}: ", F + B + S9) + (d.link(valor, url) if url else d.run(valor)))
+
+
 def _item_xml(d: _Doc, it: dict) -> list[str]:
-    out = []
     t = it.get("tipo")
     if t == "materia":
-        out.append(d.p(d.link(it["titulo"], it.get("tituloLink"), bold=True)
-                       + d.run(" - " + (it.get("ementa") or ""), F + CINZA + S9)))
+        out = [d.bullet(d.link(f'{it["titulo"]}:', it.get("tituloLink"), bold=True)
+                        + d.run(" " + (it.get("ementa") or "")), NUM_MATERIA)]
         if it.get("autor"):
-            out.append(d.p(d.run("Autoria: ", F + B + S9) + d.run(it["autor"])))
+            out.append(_rotulado(d, "Autoria", it["autor"]))
         if it.get("relator"):
-            out.append(d.p(d.run("Relatoria: ", F + B + S9) + d.run(it["relator"])))
+            out.append(_rotulado(d, "Relatoria", it["relator"]))
         if it.get("parecer"):
-            out.append(d.p(d.run("Parecer do Relator", F + B + S9) + d.run(": ", F + CINZA + S9)
-                               + d.link(it["parecer"], it.get("parecerLink"))))
-    elif t == "audiencia":
-        rot = "Seminário:" if it.get("rotulo") == "Seminário" else "Audiência Pública:"
-        out.append(d.p(d.link(rot, it.get("tituloLink") or it.get("reuniaoLink"), bold=True)
-                       + d.run(" " + (it.get("ementa") or ""))))
+            out.append(_rotulado(d, "Parecer", it["parecer"], it.get("parecerLink")))
+        return out
+    if t == "audiencia":
+        out = [d.p(d.run(it.get("ementa") or it.get("titulo") or ""))]
     else:
         txt = d.link(it["titulo"], it.get("tituloLink"), bold=True)
-        if it.get("ementa"):
+        if it.get("ementa") and it["ementa"] != it["titulo"]:
             txt += d.run(" - " + it["ementa"])
-        out.append(d.p(txt))
-    if it.get("convidados"):
-        out += [d.p(), d.p(d.run("Convidados:"))]
-        conv = it["convidados"]
+        out = [d.p(txt)]
+    conv = it.get("convidados") or []
+    if conv:
+        out += [d.p(), d.negrito("Convidados:")]
         for i, c in enumerate(conv):
-            out.append(d.bullet(d.run(c + (";" if i < len(conv) - 1 else "."))))
+            fim = "." if i == len(conv) - 1 else ("; e" if i == len(conv) - 2 else ";")
+            out.append(d.bullet(d.run(c + fim), NUM_CONVIDADO))
     return out
 
 
 def _heading(text: str) -> str:
     rpr = F + B + '<w:color w:val="962e4d"/><w:sz w:val="20"/><w:szCs w:val="20"/>'
-    return (f'<w:p><w:pPr><w:widowControl w:val="0"/><w:spacing w:line="240" w:lineRule="auto"/><w:jc w:val="both"/>'
-            f'<w:rPr>{rpr}</w:rPr></w:pPr><w:r><w:rPr>{rpr}</w:rPr><w:t xml:space="preserve">{escape(text)}</w:t></w:r></w:p>')
+    return (f'<w:p><w:pPr>{PPR}<w:jc w:val="both"/><w:rPr>{F}{S9}</w:rPr></w:pPr>'
+            f'<w:r><w:rPr>{rpr}</w:rPr><w:t xml:space="preserve">{escape(text)}</w:t></w:r></w:p>')
 
 
 def _tabela(d: _Doc, modelo_doc: str, dias: list[str], itens: list[dict]) -> str:
@@ -450,34 +493,39 @@ def _tabela(d: _Doc, modelo_doc: str, dias: list[str], itens: list[dict]) -> str
         data = dt.date.fromisoformat(iso)
         nome = DIAS_SEMANA[data.weekday()]
         hrpr = F + B + '<w:color w:val="ffffff"/><w:sz w:val="24"/><w:szCs w:val="24"/>'
-        rows.append(_cell(f'<w:p><w:pPr><w:widowControl w:val="0"/><w:spacing w:line="240" w:lineRule="auto"/>'
-                          f'<w:jc w:val="both"/></w:pPr><w:r><w:rPr>{hrpr}</w:rPr><w:t xml:space="preserve">'
-                          f'{nome} ({data:%d.%m})</w:t></w:r></w:p>', header=True))
+        rows.append(_cell(f'<w:p><w:pPr>{PPR}<w:jc w:val="both"/></w:pPr><w:r><w:rPr>{hrpr}</w:rPr>'
+                          f'<w:t xml:space="preserve">{nome} ({data:%d.%m})</w:t></w:r></w:p>', header=True))
         body = []
-        sem = _Doc.p(d.run(f"Sem destaques para {nome.lower()}."))
         for casa, casa_nome in CASAS:
             if body:
                 body.append(_Doc.p())
             body += [_heading(casa_nome), _Doc.p()]
             do_dia = [i for i in itens if i["dia"] == iso and i["casa"] == casa]
             if not do_dia:
-                body.append(sem)
+                body.append(_Doc.p(d.run(f"Sem destaques para a {nome.lower()}.")))
                 continue
             grupos: dict[tuple, list] = {}
             for i in do_dia:
                 grupos.setdefault((i.get("ordem", ""), i["reuniaoLink"]), []).append(i)
+            colegiado_ant = None
             for k, (_, gi) in enumerate(sorted(grupos.items(), key=lambda kv: kv[0])):
+                g = gi[0]
                 if k:
                     body.append(_Doc.p())
-                g = gi[0]
-                hora = f' - {g["hora"]}' if g.get("hora") else ""
-                body += [_Doc.p(d.run(g["colegiado"] + hora, F + B + S9), '<w:jc w:val="left"/>'), _Doc.p()]
+                if g["colegiado"] != colegiado_ant:
+                    body += [d.negrito(nome_colegiado(g["colegiado"])), _Doc.p()]
+                    colegiado_ant = g["colegiado"]
+                reuniao = g.get("reuniao") or g.get("rotulo") or ""
+                hora = g.get("hora") or ""
+                linha = f"{reuniao} - {hora}" if reuniao and hora else (reuniao or hora)
+                if linha:
+                    body += [d.negrito(linha), _Doc.p()]
                 for j, it in enumerate(gi):
                     if j:
-                        body.append(_Doc.p())
+                        body.append(_Doc.recuo() if it.get("tipo") == "materia" else _Doc.p())
                     body += _item_xml(d, it)
         rows.append(_cell("".join(body)))
-    tblpr = re.search(r"<w:tblPr>.*?(?=<w:tr>)", modelo_doc, re.S).group(0)
+    tblpr = re.search(r"<w:tblPr>.*?(?=<w:tr[ >])", modelo_doc, re.S).group(0)
     return f"<w:tbl>{tblpr}{''.join(rows)}</w:tbl>"
 
 
@@ -493,11 +541,10 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, dias: list[str], itens
     rels = re.sub(r'<Relationship [^>]*TargetMode="External"[^>]*/>', "", rels)
     rels = re.sub(r'<Relationship [^>]*relationships/hyperlink"[^>]*/>', "", rels)
     d = _Doc()
-    titulo_rpr = ('<w:rFonts w:ascii="Montserrat Black" w:cs="Montserrat Black" w:eastAsia="Montserrat Black" '
-                  'w:hAnsi="Montserrat Black"/><w:sz w:val="28"/><w:szCs w:val="28"/>')
-    novo = re.sub(r"(<w:body><w:p[ >].*?)<w:r[ >].*?</w:p>",
-                  lambda m: m.group(1) + d.run(f"{cliente} | {periodo}", titulo_rpr) + "</w:p>",
-                  doc, count=1, flags=re.S)
+    corte = doc.index("<w:tbl>")
+    titulo = escape(f"{cliente} | {periodo}")
+    novo = re.sub(r"(<w:t(?: [^>]*)?>)[^<]*\|[^<]*(</w:t>)", lambda m: m.group(1) + titulo + m.group(2),
+                  doc[:corte], count=1) + doc[corte:]
     tbl = _tabela(d, doc, dias, itens)
     novo = re.sub(r"<w:tbl>.*</w:tbl>", lambda m: tbl, novo, count=1, flags=re.S)
     extra = "".join(f'<Relationship Id="{r}" Type="http://schemas.openxmlformats.org/officeDocument/2006/'

@@ -15,6 +15,7 @@
    "ordem": "09:30",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83092",
+   "reuniao": "Mesa Redonda",
    "id": "CD-83092",
    "tipo": "audiencia",
    "rotulo": "Mesa Redonda",
@@ -30,6 +31,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE DESENVOLVIMENTO ECONÔMICO (CDE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83060",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83060",
    "tipo": "evento",
    "rotulo": "Reunião Deliberativa",
@@ -45,6 +47,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-1",
    "tipo": "materia",
    "rotulo": "Requerimento",
@@ -63,6 +66,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-2",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -81,6 +85,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-3",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -89,7 +94,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2625561",
    "autor": "Ana Paula Lima (PT/SC)",
    "relator": "Benes Leocádio (UNIÃO/RN)",
-   "parecer": "pela aprovação, com emendas.",
+   "parecer": "Pela aprovação, com emendas.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3173546"
   },
   {
@@ -99,6 +104,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-4",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -107,7 +113,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2198723",
    "autor": "Pastor Eurico (PSDB/PE)",
    "relator": "Carol Dartora (PT/PR)",
-   "parecer": "pela aprovação.",
+   "parecer": "Pela aprovação.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3126851"
   },
   {
@@ -117,6 +123,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-5",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -125,7 +132,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2274386",
    "autor": "Edna Henrique (REPUBLICANOS/PB)",
    "relator": "Diego Garcia (UNIÃO/PR)",
-   "parecer": "pela aprovação deste, do Substitutivo da Comissão de Defesa dos Direitos das Pessoas com Deficiência, e do PL 3985/2021, apensado, com subemenda.",
+   "parecer": "Pela aprovação deste, do Substitutivo da Comissão de Defesa dos Direitos das Pessoas com Deficiência, e do PL 3985/2021, apensado, com subemenda.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3107159"
   },
   {
@@ -135,6 +142,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-6",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -143,7 +151,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2333333",
    "autor": "Arthur Oliveira Maia (UNIÃO/BA)",
    "relator": "Diego Garcia (UNIÃO/PR)",
-   "parecer": "pela rejeição.",
+   "parecer": "Pela rejeição.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=2425880"
   },
   {
@@ -153,6 +161,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-7",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -161,7 +170,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2483184",
    "autor": "Rosangela Moro (PL/SP)",
    "relator": "Tabata Amaral (PSB/SP)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3154742"
   },
   {
@@ -171,6 +180,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-8",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -179,7 +189,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2537559",
    "autor": "Dr. Fernando Máximo (PL/RO)",
    "relator": "AJ Albuquerque (PP/CE)",
-   "parecer": "pela aprovação, com emenda.",
+   "parecer": "Pela aprovação, com emenda.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3157923"
   },
   {
@@ -189,6 +199,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-9",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -197,7 +208,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2537685",
    "autor": "Amom Mandel (REPUBLICANOS/AM)",
    "relator": "Prof. Reginaldo Veras (PV/DF)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3147636"
   },
   {
@@ -207,6 +218,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-10",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -215,7 +227,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2565636",
    "autor": "Luiz Carlos Hauly (PODE/PR)",
    "relator": "Prof. Reginaldo Veras (PV/DF)",
-   "parecer": "pela rejeição.",
+   "parecer": "Pela rejeição.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3162826"
   },
   {
@@ -225,6 +237,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-11",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -233,7 +246,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2572437",
    "autor": "Fatima Pelaes (REPUBLICANOS/AP)",
    "relator": "Professor Alcides (PSDB/GO)",
-   "parecer": "pela rejeição, com proposta de Indicação ao Poder Executivo.",
+   "parecer": "Pela rejeição, com proposta de Indicação ao Poder Executivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3146825"
   },
   {
@@ -243,6 +256,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-12",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -251,7 +265,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2572618",
    "autor": "Rafael Brito (MDB/AL)",
    "relator": "Socorro Neri (PP/AC)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3161909"
   },
   {
@@ -261,6 +275,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-13",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -269,7 +284,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2598490",
    "autor": "Capitão Augusto (PL/SP)",
    "relator": "Otoni de Paula (PSD/RJ)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3142008"
   },
   {
@@ -279,6 +294,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-14",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -287,7 +303,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2601198",
    "autor": "Lincoln Portela (PL/MG)",
    "relator": "Pastor Gil (PL/MA)",
-   "parecer": "pela aprovação, com emenda.",
+   "parecer": "Pela aprovação, com emenda.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3160082"
   },
   {
@@ -297,6 +313,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-15",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -305,7 +322,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2606862",
    "autor": "Murilo Galdino (REPUBLICANOS/PB)",
    "relator": "Socorro Neri (PP/AC)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3156603"
   },
   {
@@ -315,6 +332,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-16",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -323,7 +341,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2614628",
    "autor": "Delegada Katarina (PSD/SE)",
    "relator": "Socorro Neri (PP/AC)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3157297"
   },
   {
@@ -333,6 +351,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-17",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -341,7 +360,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2618550",
    "autor": "Pedro Uczai (PT/SC)",
    "relator": "Pastor Gil (PL/MA)",
-   "parecer": "pela aprovação, com emenda.",
+   "parecer": "Pela aprovação, com emenda.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3162316"
   },
   {
@@ -351,6 +370,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-18",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -359,7 +379,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2618593",
    "autor": "Romero Rodrigues (PODE/PB)",
    "relator": "Socorro Neri (PP/AC)",
-   "parecer": "pela aprovação, com emenda.",
+   "parecer": "Pela aprovação, com emenda.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3167861"
   },
   {
@@ -369,6 +389,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-19",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -377,7 +398,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2620135",
    "autor": "Alberto Fraga (PL/DF)",
    "relator": "Pastor Gil (PL/MA)",
-   "parecer": "pela aprovação.",
+   "parecer": "Pela aprovação.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3167853"
   },
   {
@@ -387,6 +408,7 @@
    "ordem": "10:00",
    "colegiado": "COMISSÃO DE EDUCAÇÃO (CE)",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83091",
+   "reuniao": "Reunião Deliberativa",
    "id": "CD-83091-20",
    "tipo": "materia",
    "rotulo": "Reunião Deliberativa",
@@ -395,7 +417,7 @@
    "tituloLink": "https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=2624049",
    "autor": "Romero Rodrigues (PODE/PB)",
    "relator": "Socorro Neri (PP/AC)",
-   "parecer": "pela aprovação, com substitutivo.",
+   "parecer": "Pela aprovação, com substitutivo.",
    "parecerLink": "https://www.camara.leg.br/proposicoesWeb/prop_mostrarintegra?codteor=3167967"
   },
   {
@@ -405,6 +427,7 @@
    "hora": "14h",
    "colegiado": "COMISSÃO DE TRANSPARÊNCIA, GOVERNANÇA, FISCALIZAÇÃO E CONTROLE E DEFESA DO CONSUMIDOR (CTFC)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1956/reuniao/14903",
+   "reuniao": "Reunião Extraordinária",
    "id": "SF-14903-112228",
    "tipo": "materia",
    "rotulo": "Deliberativa",
@@ -413,7 +436,7 @@
    "ementa": "Proposta de Fiscalização e Controle com o objetivo de apurar, com o auxílio do Tribunal de Contas da União (TCU), possíveis fraudes estruturadas no pagamento de benefícios previdenciários e na contratação de créditos consignados, especialmente no que se refere a eventuais esquemas de desvio de recursos, concessões irregulares, manipulação de cadastros, intermediação indevida junto a órgãos da administração pública federal e movimentações financeiras atípicas associadas a operadores privados eventualmente vinculados ao esquema.",
    "autor": "Marcio Bittar (PL/AC)",
    "relator": "Eduardo Girão (NOVO/CE)",
-   "parecer": "pela admissibilidade e aprovação da matéria com o plano de execução e a metodologia de avaliação apresentados.",
+   "parecer": "Pela admissibilidade e aprovação da matéria com o plano de execução e a metodologia de avaliação apresentados.",
    "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento?dm=10236095"
   },
   {
@@ -423,6 +446,7 @@
    "hora": "14h",
    "colegiado": "COMISSÃO DE TRANSPARÊNCIA, GOVERNANÇA, FISCALIZAÇÃO E CONTROLE E DEFESA DO CONSUMIDOR (CTFC)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1956/reuniao/14903",
+   "reuniao": "Reunião Extraordinária",
    "id": "SF-14903-112577",
    "tipo": "materia",
    "rotulo": "Deliberativa",
@@ -431,7 +455,7 @@
    "ementa": "Altera a Lei nº 8.078, de 11 de setembro de 1990 (Código de Defesa do Consumidor), para coibir a chamada “obsolescência programada” e regular o direito ao reparo.",
    "autor": "Ciro Nogueira (PP/PI)",
    "relator": "Dr. Hiran (PP/RR)",
-   "parecer": "pela aprovação com as emendas 1 a 4 da CCT.",
+   "parecer": "Pela aprovação com as emendas 1 a 4 da CCT.",
    "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento?dm=10325531"
   },
   {
@@ -441,6 +465,7 @@
    "hora": "14h",
    "colegiado": "COMISSÃO DE TRANSPARÊNCIA, GOVERNANÇA, FISCALIZAÇÃO E CONTROLE E DEFESA DO CONSUMIDOR (CTFC)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1956/reuniao/14903",
+   "reuniao": "Reunião Extraordinária",
    "id": "SF-14903-112230",
    "tipo": "materia",
    "rotulo": "Deliberativa",
@@ -459,6 +484,7 @@
    "hora": "14h",
    "colegiado": "COMISSÃO DE TRANSPARÊNCIA, GOVERNANÇA, FISCALIZAÇÃO E CONTROLE E DEFESA DO CONSUMIDOR (CTFC)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1956/reuniao/14903",
+   "reuniao": "Reunião Extraordinária",
    "id": "SF-14903-112354",
    "tipo": "materia",
    "rotulo": "Deliberativa",
@@ -477,6 +503,7 @@
    "hora": "logo após a 8ª reunião da CTFC",
    "colegiado": "COMISSÃO DE TRANSPARÊNCIA, GOVERNANÇA, FISCALIZAÇÃO E CONTROLE E DEFESA DO CONSUMIDOR (CTFC)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1956/reuniao/14998",
+   "reuniao": "Audiência Pública Interativa",
    "id": "SF-14998-19319",
    "tipo": "audiencia",
    "rotulo": "Audiência Pública Interativa",
@@ -503,6 +530,7 @@
    "ordem": "08:00",
    "colegiado": "EVENTOS DA CÂMARA",
    "reuniaoLink": "https://www.camara.leg.br/evento-legislativo/83018",
+   "reuniao": "Reunião Técnica",
    "id": "CD-83018",
    "tipo": "evento",
    "rotulo": "Reunião Técnica",
@@ -513,5 +541,5 @@
   }
  ],
  "erros": [],
- "coletadoEm": "22/10 11:55"
+ "coletadoEm": "22/10 12:13"
 }
