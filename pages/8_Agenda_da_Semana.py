@@ -48,6 +48,11 @@ footer { display: none !important; }
 }
 [data-testid="stButton"] > button:hover, [data-testid="stFormSubmitButton"] > button:hover,
 [data-testid="stDownloadButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
+/* ação principal (gerar e baixar) cheia, como o download do Gerador de Gráficos */
+[data-testid="stFormSubmitButton"] > button[kind="primaryFormSubmit"], [data-testid="stDownloadButton"] > button {
+    background: #962E4D !important; color: #fff !important; font-weight: 700 !important; }
+[data-testid="stFormSubmitButton"] > button[kind="primaryFormSubmit"]:hover,
+[data-testid="stDownloadButton"] > button:hover { background: #7A2640 !important; border-color: #7A2640 !important; }
 [data-testid="stSelectbox"] > label {
     font-size: 11px !important; font-weight: 700 !important;
     letter-spacing: 0.1em !important; text-transform: uppercase !important; color: #767672 !important;
@@ -77,11 +82,13 @@ footer { display: none !important; }
 .ag-resumo { font-size: 14px; color: #111; line-height: 1.7; margin: 4px 0 2px; }
 .ag-resumo b { font-weight: 700; }
 .ag-sub { font-size: 12.5px; color: #767672; margin: 0 0 8px; }
-.ag-org { font-size: 15px; font-weight: 700; color: #192D4E; margin: 22px 0 2px; }
+.ag-org { font-size: 16px; font-weight: 700; color: #192D4E; margin: 34px 0 6px; line-height: 1.4; }
+.ag-org.ag-primeira { margin-top: 14px; }
 .ag-org a { color: #192D4E; text-decoration: none; }
 .ag-org a:hover { text-decoration: underline; }
 .ag-org span { font-weight: 500; color: #767672; font-size: 13px; }
-.ag-tit { font-size: 14px; font-weight: 700; margin: 0; line-height: 1.45; }
+.ag-tit { font-size: 14px; font-weight: 700; margin: 0; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ag-tit a { color: #962E4D; text-decoration: none; }
 .ag-tit a:hover { text-decoration: underline; }
 .ag-ementa { font-size: 13px; color: #333; margin: 3px 0 0; line-height: 1.5;
@@ -406,15 +413,19 @@ if st.session_state.get("ag_pacote") and st.session_state["ag_pacote"][0] == sid
 
 
 # ── seleção ──────────────────────────────────────────────────────────────────
-def _item(it: dict) -> None:
+def _item(it: dict, fio: bool) -> None:
     texto, escolha = st.columns([3, 2], gap="large")
     with texto:
         meta = [f"<b>{r}:</b> {_html.escape(it[k])}" for r, k in (("Autoria", "autor"), ("Relatoria", "relator")) if it.get(k)]
-        ementa = it.get("ementa") if it.get("ementa") and it["ementa"] != it["titulo"] else ""
+        titulo = it["titulo"]
+        ementa = it.get("ementa") if it.get("ementa") and it["ementa"] != titulo else ""
+        if ementa and titulo in (it.get("reuniao"), it.get("rotulo")):
+            # audiência do Senado: o título repetia o tipo da reunião, que já está no cabeçalho
+            titulo, ementa = ementa, ""
         conv = "; ".join(it.get("convidados") or [])
         st.markdown(
             f'<div class="{"ag-fora" if it.get("situacao") else ""}">'
-            f'<p class="ag-tit">{_a(it["titulo"], it.get("tituloLink"))}</p>'
+            f'<p class="ag-tit" title="{_html.escape(titulo)}">{_a(titulo, it.get("tituloLink"))}</p>'
             + (f'<p class="ag-ementa" title="{_html.escape(ementa)}">{_html.escape(ementa)}</p>' if ementa else "")
             + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else "")
             + (f'<p class="ag-conv" title="{_html.escape(conv)}"><b>Convidados:</b> {_html.escape(conv)}</p>' if conv else "")
@@ -432,14 +443,15 @@ def _item(it: dict) -> None:
         else:
             st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
                      label_visibility="collapsed")
-    st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
+    if fio:
+        st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
 
 
 # Tudo dentro de um formulário: marcar um cliente não recarrega a página.
 with st.form("ag_form", border=False):
     a1, a2, _ = st.columns([1, 1, 2])
     salvar = a1.form_submit_button("Salvar seleção", use_container_width=True)
-    gerar = a2.form_submit_button("Salvar e gerar Word", use_container_width=True)
+    gerar = a2.form_submit_button("Salvar e gerar Word", use_container_width=True, type="primary")
 
     abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in itens if i['dia'] == d)}" for d in dias_com])
     for aba, dia in zip(abas, dias_com):
@@ -451,21 +463,25 @@ with st.form("ag_form", border=False):
                     continue
                 st.markdown(f'<div class="ge-rule">{casa_nome}</div>', unsafe_allow_html=True)
                 reuniao = None
-                for it in da_casa:
+                for k, it in enumerate(da_casa):
                     if it["reuniaoLink"] != reuniao:
+                        primeira = reuniao is None
                         reuniao = it["reuniaoLink"]
                         detalhe = " · ".join(x for x in (it.get("reuniao") or it.get("rotulo"), it.get("hora")) if x)
                         tag = f'<span class="ag-tag">{it["situacao"]}</span>' if it.get("situacao") else ""
                         st.markdown(
-                            f'<div class="ag-org">{_a(ag.nome_colegiado(it["colegiado"]), reuniao)}'
+                            f'<div class="ag-org{" ag-primeira" if primeira else ""}">{_a(ag.nome_colegiado(it["colegiado"]), reuniao)}'
                             f' <span>· {_html.escape(detalhe)}</span>{tag}</div>',
                             unsafe_allow_html=True,
                         )
-                    _item(it)
+                    # fio só entre itens da mesma reunião; entre reuniões, o espaço separa
+                    proximo = da_casa[k + 1] if k + 1 < len(da_casa) else None
+                    _item(it, fio=bool(proximo) and proximo["reuniaoLink"] == it["reuniaoLink"])
 
     b1, b2, _ = st.columns([1, 1, 2])
     salvar = b1.form_submit_button("Salvar seleção", use_container_width=True, key="ag_salvar_fim") or salvar
-    gerar = b2.form_submit_button("Salvar e gerar Word", use_container_width=True, key="ag_gerar_fim") or gerar
+    gerar = b2.form_submit_button("Salvar e gerar Word", use_container_width=True, type="primary",
+                                  key="ag_gerar_fim") or gerar
 
 if salvar or gerar:
     msgs = []
