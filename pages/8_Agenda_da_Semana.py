@@ -87,6 +87,14 @@ footer { display: none !important; }
 .ag-ementa { font-size: 13px; color: #333; margin: 3px 0 0; line-height: 1.5;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .ag-meta { font-size: 12px; color: #767672; margin: 4px 0 0; }
+.ag-conv { font-size: 12px; color: #767672; margin: 4px 0 0; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ag-conv b, .ag-meta b { font-weight: 600; color: #333; }
+.ag-org span.ag-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #fff; background: #962E4D; border-radius: 3px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+.ag-fora .ag-tit a, .ag-fora .ag-tit { color: #9A9A95; text-decoration: line-through; }
+.ag-fora .ag-ementa { color: #9A9A95; }
+.ag-nota { font-size: 12.5px; color: #767672; margin: 4px 0 0; }
 .ag-fio { border-bottom: 1px solid #DADAD4; margin: 10px 0 12px; }
 </style>""", unsafe_allow_html=True)
 
@@ -236,9 +244,14 @@ def _marcar_caixas(sid: str, itens: list[dict], selecao: dict) -> None:
         st.session_state[_chave(sid, it["id"])] = list(selecao.get(it["id"], []))
 
 
-def _selecao_na_tela(sid: str, itens: list[dict]) -> dict[str, list[str]]:
+def _selecao_na_tela(sid: str, itens: list[dict], base: dict) -> dict[str, list[str]]:
     out = {}
     for it in itens:
+        if it.get("situacao"):
+            # reunião cancelada não tem botão; fica o que estava salvo, para não apagar o registro
+            if base.get(it["id"]):
+                out[it["id"]] = list(base[it["id"]])
+            continue
         marcados = [c for c in ag.CLIENTES if c in (st.session_state.get(_chave(sid, it["id"])) or [])]
         if marcados:
             out[it["id"]] = marcados
@@ -365,8 +378,11 @@ def _curto(iso: str) -> str:
     return ag.DIAS_SEMANA[dt.date.fromisoformat(iso).weekday()].split("-")[0].lower()
 
 
+ativos = [i for i in itens if not i.get("situacao")]
+fora = len(itens) - len(ativos)
 st.markdown(
-    f'<p class="ag-resumo"><b>{len(itens)} itens</b> na pauta'
+    f'<p class="ag-resumo"><b>{len(ativos)} itens</b> na pauta'
+    + (f' e {fora} em reunião cancelada ou adiada' if fora else "")
     + (f', sem pauta na {_lista_e([_curto(d) for d in dias_sem])}' if dias_sem else "")
     + f'. Seleção da equipe: {marcados}.</p>'
     f'<p class="ag-sub">Pauta coletada em {semana.get("coletadoEm", "")}.</p>',
@@ -393,17 +409,29 @@ if st.session_state.get("ag_pacote") and st.session_state["ag_pacote"][0] == sid
 def _item(it: dict) -> None:
     texto, escolha = st.columns([3, 2], gap="large")
     with texto:
-        meta = [f"{r}: {_html.escape(it[k])}" for r, k in (("Autoria", "autor"), ("Relatoria", "relator")) if it.get(k)]
+        meta = [f"<b>{r}:</b> {_html.escape(it[k])}" for r, k in (("Autoria", "autor"), ("Relatoria", "relator")) if it.get(k)]
         ementa = it.get("ementa") if it.get("ementa") and it["ementa"] != it["titulo"] else ""
+        conv = "; ".join(it.get("convidados") or [])
         st.markdown(
+            f'<div class="{"ag-fora" if it.get("situacao") else ""}">'
             f'<p class="ag-tit">{_a(it["titulo"], it.get("tituloLink"))}</p>'
             + (f'<p class="ag-ementa" title="{_html.escape(ementa)}">{_html.escape(ementa)}</p>' if ementa else "")
-            + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else ""),
+            + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else "")
+            + (f'<p class="ag-conv" title="{_html.escape(conv)}"><b>Convidados:</b> {_html.escape(conv)}</p>' if conv else "")
+            + "</div>",
             unsafe_allow_html=True,
         )
     with escolha:
-        st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
-                 label_visibility="collapsed")
+        if it.get("situacao"):
+            antes = base.get(it["id"]) or []
+            st.markdown(
+                f'<p class="ag-nota">Reunião {it["situacao"].lower()}, fica fora do Word.'
+                + (f' Estava marcada para {_html.escape(_lista_e(antes))}.' if antes else "") + "</p>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
+                     label_visibility="collapsed")
     st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
 
 
@@ -427,9 +455,10 @@ with st.form("ag_form", border=False):
                     if it["reuniaoLink"] != reuniao:
                         reuniao = it["reuniaoLink"]
                         detalhe = " · ".join(x for x in (it.get("reuniao") or it.get("rotulo"), it.get("hora")) if x)
+                        tag = f'<span class="ag-tag">{it["situacao"]}</span>' if it.get("situacao") else ""
                         st.markdown(
                             f'<div class="ag-org">{_a(ag.nome_colegiado(it["colegiado"]), reuniao)}'
-                            f' <span>· {_html.escape(detalhe)}</span></div>',
+                            f' <span>· {_html.escape(detalhe)}</span>{tag}</div>',
                             unsafe_allow_html=True,
                         )
                     _item(it)
@@ -440,7 +469,7 @@ with st.form("ag_form", border=False):
 
 if salvar or gerar:
     msgs = []
-    atual = _selecao_na_tela(sid, itens)
+    atual = _selecao_na_tela(sid, itens, st.session_state.get(chave_base, {}))
     try:
         selecao = _salvar_selecao(sid, semana, st.session_state.get(chave_base, {}), atual,
                                   st.session_state.get("name") or st.session_state.get("username") or "")
@@ -456,7 +485,13 @@ if salvar or gerar:
             msgs.append(("error", "O modelo do Word não está no repositório."))
         else:
             pacote, contagem = ag.gerar_pacote(MODELO.read_bytes(), semana, selecao)
-            st.session_state["ag_pacote"] = (sid, pacote, contagem)
+            if contagem:
+                st.session_state["ag_pacote"] = (sid, pacote, contagem)
+            sairam = [i["titulo"] for i in itens if i.get("situacao") and selecao.get(i["id"])]
+            if sairam:
+                msgs.append(("info", f"Ficaram fora do Word por reunião cancelada ou adiada: {_lista_e(sairam)}."))
+            if not contagem:
+                msgs.append(("warning", "Todos os itens marcados são de reunião cancelada ou adiada."))
     st.session_state["ag_aplicar"] = (sid, selecao)
     st.session_state["ag_msg"] = msgs
     st.rerun()

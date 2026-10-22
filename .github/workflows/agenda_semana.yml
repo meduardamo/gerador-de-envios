@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install requests
+      - run: pip install requests PyMuPDF==1.24.14
       - run: python agenda_semana_coleta.py "${{ github.event.inputs.semana }}"
       - name: Grava a pauta no repositório
         run: |

@@ -5,10 +5,14 @@ um dict no formato que a página de seleção e o gerador de Word entendem:
 
     id, dia (iso), hora ("14h", "10h30"), ordem ("HH:MM"), casa ("CD"|"SF"),
     colegiado, reuniaoLink, tipo ("materia"|"audiencia"|"evento"), rotulo,
-    titulo, tituloLink, ementa, autor, relator, parecer, parecerLink, convidados
+    titulo, tituloLink, ementa, autor, relator, parecer, parecerLink, convidados,
+    situacao ("Cancelada"|"Adiada", só quando a reunião não vai acontecer)
 
 Regra de conteúdo (da Lívia): tudo o que está na pauta entra, haja ou não matéria
 para votar. Quem decide o que é relevante é quem marca os clientes na página.
+Reunião cancelada também entra, marcada, para a equipe saber se o cliente perguntar;
+ela não vai para o Word. Em requerimento de audiência, os convidados saem do texto
+do requerimento (PDF).
 """
 from __future__ import annotations
 
@@ -22,7 +26,7 @@ from xml.sax.saxutils import escape
 
 import requests
 
-CLIENTES = ["IEPS", "Vital", "Infinis", "IDEC", "Umane", "Coletivo"]
+CLIENTES = ["IEPS", "Vital", "Umane", "IDEC", "Infinis", "UNFPA", "Coletivo"]
 DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
 MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
          "agosto", "setembro", "outubro", "novembro", "dezembro"]
@@ -108,6 +112,12 @@ def nome_colegiado(s: str) -> str:
     return " ".join(palavras) + (f" ({sigla})" if sigla else "")
 
 
+def _situacao(txt) -> str:
+    """'Cancelada' ou 'Adiada' quando a reunião não vai acontecer; vazio no resto."""
+    t = _limpa(txt).lower()
+    return "Cancelada" if "cancelad" in t else ("Adiada" if "adiad" in t else "")
+
+
 def periodo_extenso(ini: dt.date, fim: dt.date) -> str:
     if ini.month == fim.month:
         return f"{ini.day} a {fim.day} de {MESES[fim.month - 1]} de {fim.year}"
@@ -160,8 +170,7 @@ def _eventos_camara(ini: dt.date, fim: dt.date) -> list[dict]:
         url = next((l["href"] for l in d.get("links", []) if l.get("rel") == "next"), None)
         params = None
     # sessão do Congresso aparece também na agenda do Senado, que traz os requerentes
-    return [e for e in eventos if "cancelad" not in (e.get("situacao") or "").lower()
-            and (e.get("orgaos") or [{}])[0].get("sigla") != "CN"]
+    return [e for e in eventos if (e.get("orgaos") or [{}])[0].get("sigla") != "CN"]
 
 
 def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
@@ -211,7 +220,7 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
                 nome += f" ({p}/{u})"
         return nome
 
-    itens = []
+    itens, reqs = [], []
     for ev, pauta in zip(eventos, pautas):
         inicio = ev["dataHoraInicio"]
         orgao = (ev.get("orgaos") or [{}])[0]
@@ -220,6 +229,7 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
             "colegiado": _colegiado_camara(orgao),
             "reuniaoLink": f"https://www.camara.leg.br/evento-legislativo/{ev['id']}",
             "reuniao": _limpa(ev.get("descricaoTipo")),
+            "situacao": _situacao(ev.get("situacao")),
         }
         tipo_ev = base["reuniao"]
         linhas = [_limpa(l) for l in str(ev.get("descricao") or "").splitlines() if _limpa(l)]
@@ -260,7 +270,135 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
                           "tituloLink": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={alvo.get('id')}",
                           "autor": autoria(alvo.get("id")), "relator": relator,
                           "parecer": parecer, "parecerLink": parecer_link})
+            if prop.get("siglaTipo") == "REQ" and _pede_audiencia(itens[-1]["ementa"]):
+                reqs.append((itens[-1], lambda i=prop.get("id"): ((_get(f"{CAMARA}/proposicoes/{i}") or {})
+                                                                  .get("dados") or {}).get("urlInteiroTeor")))
+    _anexar_convidados(reqs)
     return itens
+
+
+# ─── Convidados de requerimento de audiência ─────────────────────────────────
+# A pauta só traz a ementa; os nomes estão no texto do requerimento, numa lista
+# depois de "seguintes convidados:". Se a lista não sai limpa, o item fica sem
+# convidados (melhor vazio do que nome errado).
+
+_RE_PEDE_AUDIENCIA = re.compile(r"audiência|seminário|mesa redonda|convidad|palestr|debate", re.I)
+_RE_INICIO_LISTA = re.compile(r"convidad|participantes|palestrantes|expositores|debatedores"
+                              r"|seguintes\s+(?:e\s+)?(?:entidades|instituições|autoridades|nomes|especialistas"
+                              r"|representantes|pessoas|órgãos|organizações|associações)", re.I)
+_RE_FIM_LISTA = re.compile(r"^\s*(?:JUSTIFI|Sala d[ae]s? |Sala das|Plenário d|Brasília,|Novos participantes"
+                           r"|Outros (?:convidados|participantes) poderão)", re.I | re.M)
+# cabeçalho, rodapé e carimbo de assinatura que o PDF intercala no meio da lista
+_RE_LIXO_PDF = re.compile(r"^(?:\*CD\d+\*|Apresentação:|Assinado eletronicamente"
+                          r"|SF/\d|Gabinete d|Página \d|REQ n\.|Câmara dos Deputados|Praça dos Três Poderes|\d{1,3}$)"
+                          r"|Para verificar a|DEPUTAD[OA] FEDERAL|Anexo IV|Gabinete:? ?\d|@camara\.leg\.br|CEP:? ?\d|Tel(?:efone)?:? ?\(", re.I)
+_RE_MARCADOR = re.compile(r"^(?:(?:[•\uf0b7\uf0a7\uf076▪●◦○■–-]|\d{1,2}\s*[.)ºª–-]|[a-z]\)|[IVX]{1,5}\s*[.)–-])\s*)+")
+_RE_SO_SIGLA = re.compile(r"^[–-]\s*[A-ZÀ-Ý0-9/]{2,15}[;.]?$")   # "- CONASEMS" quebrado da linha de cima
+
+
+def _pede_audiencia(ementa: str) -> bool:
+    return bool(_RE_PEDE_AUDIENCIA.search(ementa or ""))
+
+
+def _url_requerimento_senado(cod_materia) -> str:
+    docs = _get(f"{SENADO}/processo/documento", {"codigoMateria": cod_materia}) or []
+    return next((d.get("urlDocumento") for d in _lista(docs) if d.get("siglaTipo") == "REQUERIMENTO"), "")
+
+
+def _texto_pdf(url: str) -> str:
+    import pymupdf
+    r = requests.get(url, timeout=40, headers={"User-Agent": "Mozilla/5.0"})
+    if r.status_code != 200 or not r.content.startswith(b"%PDF"):
+        return ""
+    with pymupdf.open(stream=r.content, filetype="pdf") as pdf:
+        return "\n".join(p.get_text() for p in pdf)
+
+
+def convidados_do_requerimento(texto: str) -> list[str]:
+    # "convidados" aparece também no título ("para inclusão de convidados"); vale a
+    # primeira ocorrência que abre uma lista
+    for m in _RE_INICIO_LISTA.finditer(texto or ""):
+        out = _lista_apos(texto[m.end():])
+        if out:
+            return out
+    return []
+
+
+def _lista_apos(resto: str) -> list[str]:
+    abre = re.match(r"\w*\s*\.\s*\n", resto)        # "o seguinte convidado." e a lista embaixo
+    if abre:
+        corpo = resto[abre.end():]
+    else:
+        dois_pontos = resto.find(":")
+        if dois_pontos < 0 or dois_pontos > 200:
+            return []
+        corpo = resto[dois_pontos + 1:]
+    fim = _RE_FIM_LISTA.search(corpo)
+    if fim:
+        corpo = corpo[:fim.start()]
+    # blocos separados por linha em branco (alguns PDFs listam assim, sem marcador)
+    blocos, atual = [], []
+    for l in corpo.splitlines():
+        l = _limpa(l)
+        if not l:
+            if atual:
+                blocos.append(atual)
+                atual = []
+        elif not _RE_LIXO_PDF.search(l):
+            atual.append(l)
+    if atual:
+        blocos.append(atual)
+    linhas = [l for b in blocos for l in b]
+    entradas: list[str] = []
+    if any(_RE_MARCADOR.match(l) for l in linhas):
+        for l in linhas:
+            if _RE_SO_SIGLA.match(l) and entradas:
+                entradas[-1] = _limpa(entradas[-1] + " " + l)
+            elif _RE_MARCADOR.match(l):
+                entradas.append(_RE_MARCADOR.sub("", l, count=1))
+            elif entradas and not entradas[-1].endswith((".", ";")):
+                entradas[-1] = _limpa(entradas[-1] + " " + l)
+            elif entradas:
+                break   # linha sem marcador depois de item fechado: a lista acabou
+    else:
+        # sem marcador: itens separados por ";" ou por linha em branco, até o ponto final
+        bloco = []
+        for b in blocos:
+            bloco.append(" ".join(b))
+            if bloco[-1].endswith("."):
+                break
+        entradas = [e for b in bloco for e in re.split(r";\s*(?:e\s+)?", b)]
+        if len(entradas) == 1 and len(linhas) > 1 and len(bloco) == 1:
+            return []   # várias linhas sem separador: não dá para saber onde cada nome termina
+        if any(re.match(r"(?:da|do|das|dos|de)\s", _limpa(e)) for e in entradas[1:]):
+            return []   # frase corrida ("os Ministros X; da Fazenda, Y"), não é lista
+    out = []
+    for e in entradas:
+        e = re.sub(r"(?:;\s*e|;|,\s*e|\.)$", "", _limpa(e)).strip(" ;,")
+        if len(e) > 2:
+            out.append(e)
+    if not out or len(out) > 40 or any(len(e) > 300 for e in out):
+        return []
+    return out
+
+
+def _anexar_convidados(pares: list[tuple[dict, callable]]) -> None:
+    """Para cada (item, função que acha a URL do texto), lê o PDF e grava item['convidados']."""
+    def um(par):
+        item, achar_url = par
+        try:
+            url = achar_url()
+            conv = convidados_do_requerimento(_texto_pdf(url)) if url else []
+        except Exception:
+            return
+        if conv:
+            item["convidados"] = conv
+            # a ementa da Câmara às vezes repete a lista; fica só a frase de abertura
+            corte = re.search(r"\s*[•\uf0b7]", item.get("ementa") or "")
+            if corte:
+                item["ementa"] = re.sub(r":$", ".", item["ementa"][:corte.start()].rstrip())
+    with ThreadPoolExecutor(PARALELO) as ex:
+        list(ex.map(um, pares))
 
 
 # ─── Senado ──────────────────────────────────────────────────────────────────
@@ -282,10 +420,8 @@ def _convidado_senado(c: dict) -> str:
 def coletar_senado_comissoes(ini: dt.date, fim: dt.date) -> list[dict]:
     d = _get(f"{SENADO}/comissao/agenda/{ini:%Y%m%d}/{fim:%Y%m%d}.json") or {}
     reunioes = _lista(((d.get("AgendaReuniao") or {}).get("reunioes") or {}).get("reuniao"))
-    itens = []
+    itens, reqs = [], []
     for reu in reunioes:
-        if "cancelad" in (reu.get("situacao") or "").lower():
-            continue
         col = reu.get("colegiadoCriador") or {}
         sigla = col.get("sigla", "")
         inicio = reu.get("dataInicio") or ""
@@ -295,6 +431,7 @@ def coletar_senado_comissoes(ini: dt.date, fim: dt.date) -> list[dict]:
             "hora": (obs[:1].lower() + obs[1:]) if obs else _hora(inicio[11:16]),
             "colegiado": f"{_limpa(col.get('nome')).rstrip('.').upper()} ({sigla})",
             "reuniaoLink": f"https://legis.senado.leg.br/atividade/comissoes/comissao/{col.get('codigo')}/reuniao/{reu.get('codigo')}",
+            "situacao": _situacao(reu.get("situacao")),
         }
         base["reuniao"] = f"Reunião {_limpa((reu.get('tipo') or {}).get('descricao'))}".strip()
         partes = _lista(reu.get("partes"))
@@ -337,6 +474,9 @@ def coletar_senado_comissoes(ini: dt.date, fim: dt.date) -> list[dict]:
                               "ementa": _limpa(doma.get("ementa")), "autor": autoria, "relator": relator,
                               "parecer": _parecer_senado(it.get("relatorio")),
                               "parecerLink": parecer_link if it.get("relatorio") else ""})
+                if cod and _limpa(it.get("nome")).startswith("REQ") and _pede_audiencia(itens[-1]["ementa"]):
+                    reqs.append((itens[-1], lambda c=cod: _url_requerimento_senado(c)))
+    _anexar_convidados(reqs)
     return itens
 
 
@@ -347,13 +487,12 @@ def coletar_senado_plenario(ini: dt.date, fim: dt.date) -> list[dict]:
     itens = []
     for ag in agendas:
         for s in _lista(((ag.get("AgendaPlenario") or {}).get("Sessoes") or {}).get("Sessao")):
-            if "cancelad" in (s.get("SituacaoSessao") or "").lower():
-                continue
             cod = s.get("CodigoSessao")
             base = {
                 "casa": "SF", "dia": s.get("Data"), "ordem": s.get("Hora") or "", "hora": _hora(s.get("Hora") or "00:00"),
                 "colegiado": "PLENÁRIO (CONGRESSO NACIONAL)" if s.get("Casa") == "CN" else "PLENÁRIO",
                 "reuniaoLink": f"https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/{cod}",
+                "situacao": _situacao(s.get("SituacaoSessao")),
             }
             tipo_sessao = _limpa(s.get("TipoSessao")).capitalize()
             base["reuniao"] = tipo_sessao
@@ -464,6 +603,9 @@ def _item_xml(d: _Doc, it: dict) -> list[str]:
             out.append(_rotulado(d, "Relatoria", it["relator"]))
         if it.get("parecer"):
             out.append(_rotulado(d, "Parecer", it["parecer"], it.get("parecerLink")))
+        if it.get("convidados"):
+            out.append(d.recuo(d.run("Convidados:", F + B + S9)))
+            out += _lista_convidados(d, it["convidados"])
         return out
     if t == "audiencia":
         out = [d.p(d.run(it.get("ementa") or it.get("titulo") or ""))]
@@ -472,13 +614,15 @@ def _item_xml(d: _Doc, it: dict) -> list[str]:
         if it.get("ementa") and it["ementa"] != it["titulo"]:
             txt += d.run(" - " + it["ementa"])
         out = [d.p(txt)]
-    conv = it.get("convidados") or []
-    if conv:
-        out += [d.p(), d.negrito("Convidados:")]
-        for i, c in enumerate(conv):
-            fim = "." if i == len(conv) - 1 else ("; e" if i == len(conv) - 2 else ";")
-            out.append(d.bullet(d.run(c + fim), NUM_CONVIDADO))
+    if it.get("convidados"):
+        out += [d.p(), d.negrito("Participantes confirmados:")]
+        out += _lista_convidados(d, it["convidados"])
     return out
+
+
+def _lista_convidados(d: _Doc, conv: list[str]) -> list[str]:
+    fins = ["." if i == len(conv) - 1 else ("; e" if i == len(conv) - 2 else ";") for i in range(len(conv))]
+    return [d.bullet(d.run(c + f), NUM_CONVIDADO) for c, f in zip(conv, fins)]
 
 
 def _heading(text: str) -> str:
@@ -569,7 +713,7 @@ def gerar_pacote(modelo: bytes, semana: dict, selecao: dict[str, list[str]]) -> 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for cli in CLIENTES:
-            itens = [i for i in semana["itens"] if cli in selecao.get(i["id"], [])]
+            itens = [i for i in semana["itens"] if cli in selecao.get(i["id"], []) and not i.get("situacao")]
             if not itens:
                 continue
             contagem[cli] = len(itens)
