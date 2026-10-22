@@ -102,6 +102,7 @@ footer { display: none !important; }
 .ag-fora .ag-tit a, .ag-fora .ag-tit { color: #9A9A95; text-decoration: line-through; }
 .ag-fora .ag-ementa { color: #9A9A95; }
 .ag-nota { font-size: 12.5px; color: #767672; margin: 4px 0 0; }
+.ag-fim { border-top: 1px solid #DADAD4; margin: 36px 0 18px; }
 .ag-fio { border-bottom: 1px solid #DADAD4; margin: 10px 0 12px; }
 </style>""", unsafe_allow_html=True)
 
@@ -478,6 +479,7 @@ with st.form("ag_form", border=False):
                     proximo = da_casa[k + 1] if k + 1 < len(da_casa) else None
                     _item(it, fio=bool(proximo) and proximo["reuniaoLink"] == it["reuniaoLink"])
 
+    st.markdown('<div class="ag-fim"></div>', unsafe_allow_html=True)
     b1, b2, _ = st.columns([1, 1, 2])
     salvar = b1.form_submit_button("Salvar seleção", use_container_width=True, key="ag_salvar_fim") or salvar
     gerar = b2.form_submit_button("Salvar e gerar Word", use_container_width=True, type="primary",
