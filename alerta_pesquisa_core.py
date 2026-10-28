@@ -585,9 +585,10 @@ def gerar_texto_alerta_pesquisa(payload: dict, cenario: dict, *, gerar_conteudo,
 
 
 def compilar_alerta_pesquisa(texto: str, titulo: str, uf: str = "",
-                             link: str = "", data_envio: str = "") -> str:
+                             link: str = "", data_envio: str = "",
+                             area: str = "Transição") -> str:
     """Fecha o formato de WhatsApp da casa: cabeçalho, data, título, corpo, link."""
-    cabecalho = "Alerta | EixoGov | Eleições"
+    cabecalho = f"Alerta | EixoGov | {area}"
     if (uf or "").strip().upper() not in ("", "BR"):
         cabecalho += f" | Subnacional | {uf.strip().upper()}"
     partes = [f"*{cabecalho}*"]

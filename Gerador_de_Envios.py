@@ -286,7 +286,7 @@ GEMINI_MODEL   = "gemini-3.6-flash"   # 2.5-flash dá 404 para a chave do projet
 SHEET_ID       = st.secrets.get("SHEET_ID") or os.getenv("SHEET_ID", "")
 
 AREAS = [
-    "Eleições",
+    "Transição",
     "Política", "Economia", "Orçamento", "Tributação", "Energia", "Infraestrutura",
     "Meio Ambiente", "Agricultura", "Indústria e Comércio", "Trabalho e Renda",
     "Assistência Social", "Segurança Pública", "Educação", "Primeira Infância",
@@ -295,6 +295,7 @@ AREAS = [
     "Relações Internacionais", "Câmara dos Deputados", "Senado Federal",
     "Congresso Nacional", "Poder Executivo", "Agências Reguladoras",
     "ANS", "ANVISA",
+    "Eleições",
 ]
 
 UFS = [
