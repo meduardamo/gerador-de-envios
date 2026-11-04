@@ -448,7 +448,7 @@ novos = ag.novos_desde_segunda(semana)
 so_novos = False
 if novos:
     so_novos = st.container(key="ag_novos").toggle(
-        f"Só os {len(novos)} {'item novo' if len(novos) == 1 else 'itens novos'} desde a coleta de "
+        f"Só {'o item novo' if len(novos) == 1 else f'os {len(novos)} itens novos'} desde a coleta de "
         f"{semana.get('coletadoSegunda', 'segunda')}",
         key=f"ag_so_novos_{sid}",
         help="Mostra só o que entrou na pauta depois de segunda. O Word sai só com esses itens, "
