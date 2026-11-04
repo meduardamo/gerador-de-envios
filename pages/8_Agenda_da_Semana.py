@@ -225,23 +225,48 @@ def _ler_selecao(sid: str) -> dict[str, list[str]]:
     return {k: [c for c in ag.CLIENTES if c in v] for k, v in salvo.items() if v}
 
 
-def _salvar_selecao(sid: str, semana: dict, base: dict, atual: dict, quem: str) -> dict[str, list[str]]:
-    """Grava o que mudou desde `base` e devolve a seleção da equipe já mesclada."""
+HISTORICO_ABA = "Histórico"
+HISTORICO_CAB = ["Semana", "Item", "Dia", "Colegiado", "Proposição ou evento", "Antes", "Depois",
+                 "Marcou", "Desmarcou", "Salvo por", "Salvo em"]
+
+
+@st.cache_resource
+def _aba_historico():
+    planilha = _aba_selecao().spreadsheet
+    try:
+        return planilha.worksheet(HISTORICO_ABA)
+    except gspread.WorksheetNotFound:
+        ws = planilha.add_worksheet(HISTORICO_ABA, rows=1000, cols=len(HISTORICO_CAB))
+        ws.append_row(HISTORICO_CAB, value_input_option="RAW")
+        return ws
+
+
+def _ord(clientes: set[str]) -> str:
+    return ", ".join(c for c in ag.CLIENTES if c in clientes)
+
+
+def _salvar_selecao(sid: str, semana: dict, base: dict, atual: dict, quem: str) -> tuple[dict[str, list[str]], list[str]]:
+    """Grava o que mudou desde `base`; devolve a seleção da equipe já mesclada e os itens desmarcados."""
     salvo, linha_de = _ler_planilha(sid)
     por_id = {i["id"]: i for i in semana["itens"]}
     agora = dt.datetime.now(ZoneInfo("America/Recife")).strftime("%d/%m/%Y %H:%M")
-    trocas, novas = [], []
+    trocas, novas, historico, desmarcados = [], [], [], []
     for iid in set(base) | set(atual):
         antes, depois = set(base.get(iid, [])), set(atual.get(iid, []))
         if antes == depois:
             continue
         # tira o que esta pessoa desmarcou e soma o que marcou; o resto é de quem salvou antes
-        final = (salvo.get(iid, set()) - (antes - depois)) | (depois - antes)
+        anterior = set(salvo.get(iid, set()))
+        final = (anterior - (antes - depois)) | (depois - antes)
         salvo[iid] = final
         it = por_id.get(iid, {})
         dia = dt.date.fromisoformat(it["dia"]).strftime("%d/%m/%Y") if it.get("dia") else ""
         linha = [sid, iid, dia, ag.nome_colegiado(it.get("colegiado", "")), it.get("titulo", ""),
                  ", ".join(c for c in ag.CLIENTES if c in final), quem, agora]
+        historico.append(linha[:5] + [_ord(anterior), _ord(final), _ord(depois - antes), _ord(antes - depois),
+                                      quem, agora])
+        if antes - depois:
+            desmarcados.append(f'{it.get("titulo") or iid} ({_ord(antes - depois)})')
         if iid in linha_de:
             trocas.append({"range": f"A{linha_de[iid]}:H{linha_de[iid]}", "values": [linha]})
         else:
@@ -251,7 +276,12 @@ def _salvar_selecao(sid: str, semana: dict, base: dict, atual: dict, quem: str) 
         ws.batch_update(trocas, value_input_option="RAW")
     if novas:
         ws.append_rows(novas, value_input_option="RAW")
-    return {k: [c for c in ag.CLIENTES if c in v] for k, v in salvo.items() if v}
+    if historico:
+        try:
+            _aba_historico().append_rows(historico, value_input_option="RAW")
+        except Exception:
+            pass  # o histórico não pode impedir a seleção de ser salva
+    return {k: [c for c in ag.CLIENTES if c in v] for k, v in salvo.items() if v}, desmarcados
 
 
 def _chave(sid: str, item_id: str) -> str:
@@ -266,11 +296,6 @@ def _marcar_caixas(sid: str, itens: list[dict], selecao: dict) -> None:
 def _selecao_na_tela(sid: str, itens: list[dict], base: dict) -> dict[str, list[str]]:
     out = {}
     for it in itens:
-        if it.get("situacao"):
-            # reunião cancelada não tem botão; fica o que estava salvo, para não apagar o registro
-            if base.get(it["id"]):
-                out[it["id"]] = list(base[it["id"]])
-            continue
         marcados = [c for c in ag.CLIENTES if c in (st.session_state.get(_chave(sid, it["id"])) or [])]
         if marcados:
             out[it["id"]] = marcados
@@ -326,6 +351,8 @@ with st.sidebar:
                            help="Traz o que a equipe salvou desde que você abriu a página. "
                                 "Marcações suas ainda não salvas são descartadas.")
     st.markdown("---")
+    st.text_input("Seu nome", key="ag_quem", placeholder="quem está marcando",
+                  help="O login é da equipe. O nome entra no histórico de cada salvamento.")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
 
@@ -348,7 +375,9 @@ if atualizar:
         viva = {**ag.coletar_semana(ini, ini + dt.timedelta(days=4)),
                 "coletadoEm": dt.datetime.now(ZoneInfo("America/Recife")).strftime("%d/%m %H:%M")}
         hoje = dt.datetime.now(ZoneInfo("America/Recife")).date()
-        vivas[sid] = {**viva, **ag.foto_segunda(viva, _ler_semana(sid) if sid in semanas else None, hoje <= ini)}
+        anterior = _ler_semana(sid) if sid in semanas else None
+        viva = ag.preservar_fontes_com_erro(viva, anterior)
+        vivas[sid] = {**viva, **ag.foto_segunda(viva, anterior, hoje <= ini)}
     st.session_state.pop("ag_pacote", None)
 
 if sid in vivas:
@@ -374,7 +403,7 @@ aplicar = st.session_state.pop("ag_aplicar", None)
 if aplicar and aplicar[0] == sid:
     st.session_state[chave_base] = aplicar[1]
     _marcar_caixas(sid, itens, aplicar[1])
-elif chave_base not in st.session_state or recarregar:
+elif chave_base not in st.session_state or recarregar or atualizar:
     try:
         salvo = _ler_selecao(sid)
     except Exception as e:
@@ -421,6 +450,9 @@ if novos:
         help="Mostra só o que entrou na pauta depois de segunda. O Word sai só com esses itens, "
              "num arquivo de atualização.",
     )
+    if so_novos:
+        st.info("Com a chave ligada, a tela e o Word mostram só os itens novos. Os outros continuam marcados; "
+                "para ver ou gerar a agenda completa, desligue a chave.")
 
 for tipo, msg in st.session_state.pop("ag_msg", []):
     getattr(st, tipo)(msg)
@@ -469,16 +501,14 @@ def _item(it: dict, fio: bool) -> None:
             unsafe_allow_html=True,
         )
     with escolha:
+        st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
+                 label_visibility="collapsed")
         if it.get("situacao"):
-            antes = base.get(it["id"]) or []
             st.markdown(
-                f'<p class="ag-nota">Reunião {it["situacao"].lower()}, fica fora do Word.'
-                + (f' Estava marcada para {_html.escape(_lista_e(antes))}.' if antes else "") + "</p>",
+                f'<p class="ag-nota" style="color:#962E4D;font-weight:600;margin:2px 0 0;">'
+                f'Reunião {it["situacao"].lower()}, fica fora do Word.</p>',
                 unsafe_allow_html=True,
             )
-        else:
-            st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
-                     label_visibility="collapsed")
     if fio:
         st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
 
@@ -535,9 +565,15 @@ if salvar or gerar:
     # item fora da tela fica como estava salvo
     atual = {k: v for k, v in base.items() if k not in ids_vis} | _selecao_na_tela(sid, visiveis, base)
     try:
-        selecao = _salvar_selecao(sid, semana, base, atual,
-                                  st.session_state.get("name") or st.session_state.get("username") or "")
+        login = st.session_state.get("name") or st.session_state.get("username") or ""
+        nome = (st.session_state.get("ag_quem") or "").strip()
+        selecao, desmarcados = _salvar_selecao(sid, semana, base, atual, f"{login} ({nome})" if nome else login)
         msgs.append(("success", "Seleção salva. A tela mostra também o que o resto da equipe salvou."))
+        if desmarcados:
+            msgs.append(("warning", f"Este salvamento desmarcou {len(desmarcados)} "
+                         f"{'item' if len(desmarcados) == 1 else 'itens'}: {'; '.join(desmarcados[:15])}"
+                         + (f" e mais {len(desmarcados) - 15}" if len(desmarcados) > 15 else "")
+                         + ". Se não foi de propósito, marque de novo e salve."))
     except Exception as e:
         selecao = atual
         msgs.append(("error", f"Não consegui salvar na planilha ({e}). Os documentos usam só o que está na sua tela."))

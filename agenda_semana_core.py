@@ -695,12 +695,35 @@ def nome_arquivo(cliente: str, dias: list[str], atualizacao: str = "") -> str:
     return f"Agenda da Semana - {cliente} {ini:%d.%m} a {fim:%d.%m}{extra}.docx"
 
 
+def _fonte(item: dict) -> str:
+    """De qual coleta o item veio, no mesmo nome que `coletar_semana` usa nos erros."""
+    if item.get("casa") == "CD":
+        return "Câmara"
+    return "Senado (plenário)" if str(item.get("id", "")).startswith("SF-PLEN-") else "Senado (comissões)"
+
+
+def preservar_fontes_com_erro(semana: dict, anterior: dict | None) -> dict:
+    """Coleta que falhou não apaga a pauta: os itens daquela fonte ficam como na coleta anterior."""
+    if not anterior or not semana.get("erros"):
+        return semana
+    falhas = {e.split(":", 1)[0] for e in semana["erros"]}
+    ids = {i["id"] for i in semana["itens"]}
+    mantidos = [i for i in anterior.get("itens", []) if _fonte(i) in falhas and i["id"] not in ids]
+    if not mantidos:
+        return semana
+    itens = sorted(semana["itens"] + mantidos,
+                   key=lambda i: (i["dia"], i["casa"], i.get("ordem", ""), i["reuniaoLink"]))
+    erros = [f"{e} (mantida a pauta da coleta de {anterior.get('coletadoEm', 'antes')})" for e in semana["erros"]]
+    return {**semana, "itens": itens, "erros": erros}
+
+
 def foto_segunda(semana: dict, anterior: dict | None, ate_segunda: bool) -> dict:
     """Campos idsSegunda/coletadoSegunda: quais itens já estavam na pauta na coleta de segunda."""
-    if ate_segunda or not anterior or not anterior.get("itens"):
-        return {"idsSegunda": [i["id"] for i in semana["itens"]], "coletadoSegunda": semana.get("coletadoEm", "")}
-    return {"idsSegunda": anterior.get("idsSegunda") or [i["id"] for i in anterior["itens"]],
-            "coletadoSegunda": anterior.get("coletadoSegunda") or anterior.get("coletadoEm", "")}
+    if anterior and anterior.get("idsSegunda"):
+        novos_ids = [i["id"] for i in semana["itens"]] if ate_segunda else []
+        ids = list(dict.fromkeys(anterior["idsSegunda"] + novos_ids))
+        return {"idsSegunda": ids, "coletadoSegunda": anterior.get("coletadoSegunda") or semana.get("coletadoEm", "")}
+    return {"idsSegunda": [i["id"] for i in semana["itens"]], "coletadoSegunda": semana.get("coletadoEm", "")}
 
 
 def novos_desde_segunda(semana: dict) -> set[str]:
