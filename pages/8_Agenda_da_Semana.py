@@ -15,6 +15,10 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 
 import agenda_semana_core as ag
+import importlib
+
+# o Streamlit Cloud às vezes mantém o módulo velho depois de um push; recarrega a cada rodada
+ag = importlib.reload(ag)
 
 
 st.set_page_config(page_title="Agenda da Semana", layout="wide")
