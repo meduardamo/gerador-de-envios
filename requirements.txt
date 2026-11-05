@@ -21,3 +21,8 @@ plotly
 matplotlib==3.11.1
 selenium
 webdriver-manager
+
+# Síntese da Semana
+trafilatura==2.3.1
+python-docx==1.2.0
+xlrd==2.0.1
