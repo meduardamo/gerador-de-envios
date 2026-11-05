@@ -121,6 +121,8 @@ footer { display: none !important; }
 .ag-fio { border-bottom: 1px solid #DADAD4; margin: 10px 0 12px; }
 
 /* bullets da síntese: prévia como sai no Word, edição recolhida */
+.sb-cli { font-size: 14px; font-weight: 700; color: #192D4E; margin: 0; padding: 8px 0;
+    border-bottom: 1px solid #DADAD4; }
 .sb-card { padding: 10px 0 2px; }
 .sb-txt { font-size: 14px; line-height: 1.65; color: #222; margin: 0; }
 .sb-tit { font-weight: 700; color: #962E4D !important; text-decoration: none; }
@@ -394,6 +396,8 @@ for c, tab in zip(abas, tabs):
         st.markdown('<div class="ag-fio"></div><div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
         if not DOU_SHEET_ID:
             st.markdown('<p class="ag-nota">DOU_CLIENTES_SHEET_ID não configurado.</p>', unsafe_allow_html=True)
+        if DOU_SHEET_ID and not atos:
+            st.markdown('<p class="ag-nota">Nenhum ato marcado como alinhado na semana.</p>', unsafe_allow_html=True)
         for j, a in enumerate(atos):
             st.checkbox(f"{a['ato']} ({a.get('orgao', '')}) - {a['resumo'][:150]}", value=True, key=f"sd_{c}_{j}")
 
@@ -427,13 +431,18 @@ arqs = SS.get("sint_arquivos")
 if arqs:
     st.download_button("Baixar tudo (.zip)", ss.pacote_zip(arqs),
                        file_name=f"Sínteses {INI:%d.%m} a {FIM:%d.%m.%Y}.zip", mime="application/zip")
-    st.markdown('<p class="ag-sub">Por cliente: a síntese completa, o anexo (proposições, movimentações e DOU, '
-                'para o PDF do botão) e o corpo do email. Abra o .html no navegador, selecione tudo e cole no Wix: '
-                'os links vão junto.</p>', unsafe_allow_html=True)
+    st.markdown('<p class="ag-sub"><b>Síntese</b>: Word completo · <b>Anexo</b>: proposições, movimentações e DOU, '
+                'para o PDF do botão · <b>Email</b>: abra no navegador, selecione tudo e cole no Wix (os links vão junto).</p>',
+                unsafe_allow_html=True)
+    DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     with st.container(key="ag_por_cliente"):
-        cols = st.columns(3)
-        for k, (nome, dados) in enumerate(arqs.items()):
-            mime = "text/html" if nome.endswith(".html") else \
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            cols[k % 3].download_button(nome.replace("Síntese da Semana - ", ""), dados, file_name=nome,
-                                        mime=mime, key=f"dl_{k}")
+        for k, c in enumerate(abas):
+            nome = ss.nome_arquivo(c, INI, FIM)
+            trio = [("Síntese", nome, DOCX), ("Anexo", nome.replace(".docx", " - anexo.docx"), DOCX),
+                    ("Email", nome.replace(".docx", " - email.html"), "text/html")]
+            c0, c1, c2, c3 = st.columns([0.4, 0.2, 0.2, 0.2], vertical_alignment="center")
+            c0.markdown(f'<p class="sb-cli">{_html.escape(ss.CLIENTES[c]["titulo"])}</p>', unsafe_allow_html=True)
+            for col, (rot, arq_nome, mime) in zip((c1, c2, c3), trio):
+                if arq_nome in arqs:
+                    col.download_button(rot, arqs[arq_nome], file_name=arq_nome, mime=mime,
+                                        key=f"dl_{k}_{rot}", use_container_width=True)
