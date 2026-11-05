@@ -428,7 +428,7 @@ st.markdown('<p class="sx-explica">Escolha os clientes desta rodada.</p>', unsaf
 escolhidos = st.pills("Clientes", CLIS, default=CLIS, selection_mode="multi", label_visibility="collapsed",
                       format_func=lambda c: ss.CLIENTES[c]["titulo"])
 
-if st.button("Ler notícias e gerar bullets", type="primary", icon=":material/auto_awesome:"):
+if st.button("Ler notícias e gerar bullets", type="primary"):
     if not GEMINI_API_KEY:
         st.error("Faltou a GEMINI_API_KEY nos Secrets.")
         _parar()
