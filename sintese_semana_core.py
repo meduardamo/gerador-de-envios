@@ -250,7 +250,8 @@ def _ler_divisao_docx(dados: bytes) -> dict:
                     link = rels[rid].target_ref
             if not cel[idx["PROPOSI"]]:
                 continue
-            props.append({"proposicao": cel[idx["PROPOSI"]], "ementa": cel[idx["EMENTA"]],
+            m_p = _PROP.match(cel[idx["PROPOSI"]])
+            props.append({"proposicao": f"{m_p.group(1)} {m_p.group(2)}/{m_p.group(3)}" if m_p else cel[idx["PROPOSI"]], "ementa": cel[idx["EMENTA"]],
                           "autor": cel[idx["AUTOR"]], "link": link,
                           "clientes": cliente_da_celula(cel[idx["CLIENTE"]])})
     return {"noticias": _dedup(noticias), "proposicoes": props}
@@ -285,8 +286,68 @@ def _ler_divisao_pdf(dados: bytes) -> dict:
         elif ativo and not _IGNORAR_SECAO.search(secao) and _e_noticia(val) and val not in vistos:
             vistos.add(val)
             noticias.append({"secao": secao, "url": val})
-    # a tabela de proposições no PDF: só os links da Câmara/Senado; ementa e cliente pedem o .docx
-    return {"noticias": _dedup(noticias), "proposicoes": []}
+    props = [{**r, "clientes": cliente_da_celula(r.pop("cliente_txt"))} for r in tabela_proposicoes_pdf(doc)]
+    return {"noticias": _dedup(noticias), "proposicoes": props}
+
+
+_PROP = re.compile(r"^([A-Z]{2,6})\s*(\d+)\s*/\s*(\d{4})")
+
+
+def _reguas(pg, larg_min):
+    import fitz as _fitz
+    ys = set()
+    for d in pg.get_drawings():
+        for it in d["items"]:
+            r = _fitz.Rect(it[1], it[2]) if it[0] == "l" else (it[1] if it[0] == "re" else None)
+            if r is not None and r.height < 2 and r.width >= larg_min:
+                ys.add(round(r.y0, 1))
+    return sorted(ys)
+
+
+def _texto(words, x0, x1, y0, y1):
+    ws = [w for w in words if x0 <= w[0] < x1 and y0 < (w[1] + w[3]) / 2 < y1]
+    ws.sort(key=lambda w: (round(w[1]), w[0]))
+    return re.sub(r"\s+", " ", " ".join(w[4] for w in ws)).strip()
+
+
+def tabela_proposicoes_pdf(doc):
+    """Tabela NOVAS PROPOSIÇÕES do PDF: colunas da 1ª página da tabela, linhas pelas réguas horizontais."""
+    import fitz as _fitz
+    # cabeçalho: a tabela (detectada na 1ª página dela) cuja 1ª linha tem PROPOSIÇÃO e CLIENTE
+    xs = None
+    for p_cab, pg in enumerate(doc):
+        if "PROPOSI" not in pg.get_text().upper():
+            continue
+        for t in pg.find_tables().tables:
+            cab = [(x or "").upper() for x in t.extract()[0]]
+            if any("PROPOSI" in c for c in cab) and any("CLIENTE" in c for c in cab) and len(cab) == 4:
+                xs = [c[0] for c in t.rows[0].cells] + [t.bbox[2]]
+                y_cab = t.rows[0].bbox[3]
+                break
+        if xs:
+            break
+    if not xs:
+        return []
+    larg = (xs[-1] - xs[0]) * 0.9
+    out, comecou = [], False
+    for pno in range(p_cab, doc.page_count):
+        pg = doc[pno]
+        words = pg.get_text("words")
+        links = [l for l in pg.get_links() if l.get("uri")]
+        ys = [y for y in _reguas(pg, larg) if pno != p_cab or y > y_cab]
+        for y0, y1 in zip(ys, ys[1:]):
+            cel = [_texto(words, xs[i], xs[i + 1], y0, y1) for i in range(4)]
+            m = _PROP.match(cel[0])
+            if not m:
+                if comecou:
+                    return out
+                continue
+            comecou = True
+            area = _fitz.Rect(xs[0], y0, xs[1], y1)
+            link = next((l["uri"] for l in links if area.intersects(l["from"])), "")
+            out.append({"proposicao": f"{m.group(1)} {m.group(2)}/{m.group(3)}", "ementa": cel[1],
+                        "autor": cel[2], "cliente_txt": cel[3], "link": link})
+    return out
 
 
 def _pedaco_de_url(t: str) -> bool:
@@ -443,6 +504,8 @@ def _limpar(txt: str) -> str:
     for rx, rep in _PROIBIDOS:
         t = rx.sub(rep, t)
     # data com zero à esquerda: 07/03/2026 -> 7/3/2026
+    # parlamentar como (PARTIDO/UF), nunca com hífen
+    t = re.sub(r"\(([A-Za-zÀ-ú ]{2,20})\s*[-–]\s*([A-Z]{2})\)", r"(\1/\2)", t)
     t = re.sub(r"\b0(\d)/(\d{1,2})/(\d{4})\b", r"\1/\2/\3", t)
     t = re.sub(r"\b(\d{1,2})/0(\d)/(\d{4})\b", r"\1/\2/\3", t)
     return re.sub(r"\s{2,}", " ", t)
@@ -549,7 +612,8 @@ def acrescentar_novas(ws, novas: list[dict], atuais: list[dict], hoje: str) -> i
         clis = [cli for cli, _d in p["clientes"] if (cli, p["proposicao"].strip().upper()) not in tem]
         if not clis:
             continue
-        casa, id_ = casa_e_id(p["proposicao"], p.get("ementa", ""))
+        m_id = re.search(r"idProposicao=(\d+)", p.get("link") or "")
+        casa, id_ = ("Câmara dos Deputados", m_id.group(1)) if m_id else casa_e_id(p["proposicao"], p.get("ementa", ""))
         for cli in clis:
             tem.add((cli, p["proposicao"].strip().upper()))
             linhas.append([cli, p["proposicao"].strip(), casa, id_, "Divisão semanal", hoje])

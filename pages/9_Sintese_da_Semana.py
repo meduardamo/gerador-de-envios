@@ -127,8 +127,16 @@ footer { display: none !important; }
 .sb-email h3 { font-size: 15px; color: #192D4E; margin: 14px 0 6px; }
 .sb-card { padding: 0; }
 div[class*="st-key-it_"] { background: #FFFFFF; border: 1px solid #E4E3DD; border-radius: 8px;
-    padding: 16px 20px 30px; margin-bottom: 10px; gap: 0.35rem; }
+    padding: 16px 20px; margin-bottom: 10px; gap: 0.35rem; }
 div[class*="st-key-it_"]:has(input[role="switch"]:not(:checked)) { background: #F9F9F7; }
+.sb-tema { font-size: 10.5px !important; font-weight: 600 !important; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #8A8A85 !important; margin: 0 0 6px !important; }
+.sb-h { font-size: 15px !important; line-height: 1.45 !important; margin: 0 0 4px !important; }
+div[class*="st-key-it_"] [data-testid="stMarkdownContainer"],
+div[class*="st-key-it_"] [data-testid="stMarkdown"] { margin-bottom: 0 !important; }
+div[class*="st-key-ac_"] [data-testid="stPopover"] button { padding: 3px 10px !important; font-size: 10.5px !important;
+    min-height: 0 !important; }
+[data-testid="stPopoverBody"] { width: min(640px, 90vw) !important; max-width: none !important; }
 .sb-ementa { font-size: 13px !important; line-height: 1.55 !important; color: #444 !important; margin: 4px 0 0 !important; }
 .sb-and { font-size: 13px !important; line-height: 1.55 !important; color: #222 !important; margin: 6px 0 0 !important; }
 .sb-and b { color: #192D4E; }
@@ -240,16 +248,18 @@ def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
 
 
 def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
-    """Um bloco branco: conteúdo à esquerda, chave de incluir à direita (mesmo componente em toda seção)."""
+    """Um bloco branco: conteúdo à esquerda; à direita, Editar (quando há) e a chave de incluir."""
     with st.container(key=f"it_{chave}"):
-        col1, col2 = st.columns([0.93, 0.07], vertical_alignment="top")
-        with col2:
+        col1, col2 = st.columns([0.85, 0.15], vertical_alignment="top")
+        with col2, st.container(horizontal=True, horizontal_alignment="right", vertical_alignment="center",
+                                gap="small", key=f"ac_{chave}"):
+            if editar:
+                with st.popover("Editar", icon=":material/edit:"):
+                    editar()
             on = st.toggle("Incluir", value=valor, key=chave, label_visibility="collapsed",
                            help="Desligado, o item não vai para o Word nem para o email")
         with col1:
             st.markdown(f'<div class="sb-card{"" if on else " sb-fora"}">{html_corpo}</div>', unsafe_allow_html=True)
-            if editar:
-                editar()
 
 
 def _a(url: str, txt: str, cls: str = "sb-tit") -> str:
@@ -434,13 +444,14 @@ for c, tab in zip(abas, tabs):
                                for d in b.get("documentos", []))
 
                 def _editar(c=c, i=i, b=b):
-                    with st.expander("Editar", expanded=False):
-                        st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t")
-                        st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=110)
+                    st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t")
+                    st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=140)
 
                 _item(f"sb_{c}_{i}_on",
-                      f'<p class="sb-txt">{_a(b["url"], tit.rstrip(".") + ".")} {_html.escape(txt)}</p>'
-                      f'<p class="sb-meta">{_html.escape(b.get("tema", ""))}{docs}</p>', editar=_editar)
+                      (f'<p class="sb-tema">{_html.escape(b.get("tema", ""))}</p>' if b.get("tema") else "")
+                      + f'<p class="sb-h">{_a(b["url"], tit.rstrip(".") + ".")}</p>'
+                      f'<p class="sb-txt">{_html.escape(txt)}</p>'
+                      + (f'<p class="sb-meta">Documentos{docs}</p>' if docs else ""), editar=_editar)
         if not bullets[c]:
             st.markdown('<p class="ag-nota">Nenhuma notícia da semana com relação direta com os temas do cliente.</p>',
                         unsafe_allow_html=True)
