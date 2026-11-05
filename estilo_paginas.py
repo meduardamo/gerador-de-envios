@@ -74,11 +74,12 @@ span.material-symbols-rounded, span.material-symbols-outlined, span.material-ico
 [data-testid="stMain"] [data-testid="stBaseButton-primary"]:hover, [data-testid="stMain"] [data-testid="stBaseButton-primaryFormSubmit"]:hover {{
     background: #7A2640 !important; border-color: #7A2640 !important; color: #fff !important; }}
 
-/* barra lateral: um fio só, o que fecha o menu; descrição, botões e usuário separados por espaço */
+/* barra lateral: dois fios, o que fecha o menu e o que abre o bloco do usuário; o resto separado por espaço */
 [data-testid="stSidebar"] div[style*="border-left"] {{ border: 0 !important; border-radius: 0 !important; background: transparent !important;
     padding: 4px 0 0 !important; margin: 8px 0 0 !important; }}
 [data-testid="stSidebar"] div[style*="border-left"] p {{ font-size: 12.5px !important; line-height: 1.65 !important; color: #222 !important; }}
 [data-testid="stSidebar"] div[style*="border-left"] strong {{ color: {MARINHO}; }}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {{ border-top: 1px solid {BORDA}; padding-top: 14px; }}
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{ font-size: 12px !important; color: {MUDO} !important; }}
 [data-testid="stSidebar"] hr {{ margin: 8px 0 !important; height: 0 !important; border: 0 !important; background: none !important; }}
 
