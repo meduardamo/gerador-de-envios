@@ -11,6 +11,10 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
+# O Streamlit Cloud guarda o ui_login da versão anterior entre deploys; sem
+# recarregar, um nome novo nele derruba a página com ImportError até um Reboot.
+import importlib as _il_ul, ui_login as _ul_reload
+_il_ul.reload(_ul_reload)
 from ui_login import CAMPOS_LOGIN, CSS_LOGIN, ICONE, css_tela_login
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
