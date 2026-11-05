@@ -117,7 +117,7 @@ def css_tela_login(rotulo: str, topo: str = "9vh") -> str:
     rotulo = rotulo.replace("\\", "").replace('"', "'")
     f = '[data-testid="stForm"]:has(input[type="password"])'
     regras = [
-        f'{f} {{ max-width: 420px; margin: {topo} auto 0 !important; padding: 30px 32px 26px !important; background: #fff !important; }}',
+        f'{f} {{ width: 100% !important; max-width: 420px; margin: {topo} auto 0 !important; padding: 30px 32px 26px !important; background: #fff !important; }}',
         f'{f} h3 {{ color: #192D4E !important; font-weight: 800 !important; font-size: 28px !important; padding: 0 0 6px !important; }}',
         f'{f} h3::before {{ content: "{rotulo}"; display: block; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: {VINHO}; margin-bottom: 4px; }}',
         f'{f} [data-testid="stTextInput"] > label, {f} [data-testid="stTextInput"] > label p {{ font-size: 0.72rem !important; font-weight: 600 !important; letter-spacing: .04em !important; text-transform: uppercase !important; color: #4E5A6E !important; }}',
