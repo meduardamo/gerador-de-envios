@@ -105,6 +105,8 @@ label:has(input[role="switch"]:checked) > div:first-of-type {{ background-color:
 [data-testid="stAppViewContainer"] :is([data-testid="stTextAreaRootElement"], [data-testid="stTextInputRootElement"], [data-testid="stNumberInputContainer"], [data-testid="stSelectbox"] [role="group"], [data-testid="stMultiSelect"] [role="group"], [data-testid="stDateInput"] [role="group"]):not(:focus-within) {{ border-color: {BORDA} !important; }}
 [data-testid="stAppViewContainer"] [data-testid="stButtonGroup"] [data-testid="stTooltipIcon"] button {{ border: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 0 !important; }}
 [data-testid="stMain"] [data-testid="stButtonGroup"] div:has(> button) {{ column-gap: 6px !important; }}
+[data-testid="stAppViewContainer"] [data-testid="stButtonGroup"] button {{ min-width: max-content !important; }}
+[data-testid="stAppViewContainer"] [data-testid="stButtonGroup"] button p {{ overflow: visible !important; text-overflow: clip !important; white-space: nowrap !important; }}
 [data-testid="stMultiSelect"] span[role="button"] {{ background: {MARINHO} !important; color: #fff !important; border-radius: 6px !important; }}
 /* peças de página (as mesmas da Síntese da Semana) */
 .eg-cab {{ padding: 0 0 14px; border-bottom: 1px solid {BORDA}; margin: 0 0 18px; }}

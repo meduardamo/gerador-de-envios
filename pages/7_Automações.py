@@ -44,8 +44,10 @@ span.material-symbols-rounded, span.material-symbols-outlined, span.material-ico
     letter-spacing: normal !important; text-transform: none !important; }}
 footer, #MainMenu {{ display: none !important; }}
 [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
-div[class*="st-key-at_filtros_"] {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 14px 18px 8px; margin: 14px 0 4px; }}
-div[class*="st-key-at_res_"] .eg-resumo {{ margin: 0; }}
+div[class*="st-key-at_filtros_"] {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 14px 18px 18px; margin: 14px 0 4px; }}
+div[class*="st-key-at_res_"] .eg-resumo {{ margin: 0; height: 48px; padding-top: 0; padding-bottom: 0; flex-wrap: nowrap; overflow: hidden; }}
+div[class*="st-key-at_res_"] [data-testid="stMarkdownContainer"], div[class*="st-key-at_res_"] [data-testid="stMarkdown"] {{ margin-bottom: 0 !important; }}
+div[class*="st-key-at_res_"] [data-testid="stDownloadButton"] button {{ height: 48px !important; min-height: 48px !important; }}
 .at-wrap {{ width: 100%; background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; overflow: auto; max-height: 75vh; margin-top: 8px; }}
 .at-table {{ width: 100%; border-collapse: collapse; font-family: 'Montserrat', sans-serif; font-size: 12.5px; }}
 .at-table thead th {{ position: sticky; top: 0; z-index: 1; background: #fff; color: {EIXO["marinho"]}; font-size: 11px; font-weight: 700;

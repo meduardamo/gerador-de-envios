@@ -85,7 +85,7 @@ footer, #MainMenu { display: none !important; }
 .gg-teste { vertical-align: middle; margin-left: 12px; font-size: 12px !important; letter-spacing: 0; position: relative; top: -4px; }
 .st-key-gg_cx_fonte, .st-key-gg_cx_ctl, .st-key-gg_cx_baixar { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 18px; gap: .6rem; }
 .st-key-gg_cx_ctl .eg-secao, .st-key-gg_cx_baixar .eg-secao { margin: 10px 0 2px; }
-.gg-forma { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 11px 16px; font-size: 13px; line-height: 1.6; color: #4A4A4A; margin: 4px 0 0; }
+.gg-forma { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 11px 16px; font-size: 13px; line-height: 1.6; color: #4A4A4A; margin: 4px 0 12px; }
 .gg-forma b { color: #192D4E; font-weight: 700; }
 [data-baseweb="tag"] { background: #192D4E !important; border-radius: 6px !important; }
 [data-testid="stColumn"]:has(.gg-previa) { position: sticky; top: 1rem; align-self: flex-start; }
