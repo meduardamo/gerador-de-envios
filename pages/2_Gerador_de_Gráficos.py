@@ -62,9 +62,9 @@ from gerador_graficos_extracao import (
     numeros_fora_da_fonte,
 )
 from polling_extracao_core import definir_api_key
-from estilo_paginas import MARINHO, esc, explica, resumo, secao, vazio
+from estilo_paginas import MARINHO, cabecalho, esc, explica, resumo, secao, vazio
 
-st.set_page_config(page_title="Gerador de Gráficos (em teste)", layout="wide")
+st.set_page_config(page_title="Gerador de Gráficos", layout="wide")
 
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
@@ -82,7 +82,6 @@ span.material-symbols-rounded, span.material-symbols-outlined, span.material-ico
     letter-spacing: normal !important; text-transform: none !important; }
 footer, #MainMenu { display: none !important; }
 [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
-.gg-teste { vertical-align: middle; margin-left: 12px; font-size: 12px !important; letter-spacing: 0; position: relative; top: -4px; }
 .st-key-gg_cx_fonte, .st-key-gg_cx_ctl, .st-key-gg_cx_baixar { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 18px; gap: .6rem; }
 .st-key-gg_cx_ctl .eg-secao, .st-key-gg_cx_baixar .eg-secao { margin: 10px 0 2px; }
 .gg-forma { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 11px 16px; font-size: 13px; line-height: 1.6; color: #4A4A4A; margin: 4px 0 12px; }
@@ -628,12 +627,8 @@ def _parar(problema: str = "") -> None:
     st.stop()
 
 
-st.markdown(
-    '<div class="eg-cab"><div class="k">Eixo · gerador de envios</div>'
-    '<div class="tit">Gerador de Gráficos<span class="eg-chip alerta gg-teste">Em teste</span></div>'
-    '<div class="sub">Traga uma tabela e baixe gráfico ou tabela na identidade da EixoGov, em PNG ou SVG. '
-    'Página em teste: confira a peça antes de usar em material de cliente.</div></div>',
-    unsafe_allow_html=True)
+cabecalho("Gerador de Gráficos",
+          "Traga uma tabela e baixe gráfico ou tabela na identidade da EixoGov, em PNG ou SVG.")
 
 # Mesma lateral das outras páginas: logo, o que a página faz, usuário e sair.
 with st.sidebar:
