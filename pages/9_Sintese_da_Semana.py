@@ -119,6 +119,23 @@ footer { display: none !important; }
 .st-key-ag_por_cliente [data-testid="stDownloadButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
 .ag-fim { border-top: 1px solid #DADAD4; margin: 36px 0 18px; }
 .ag-fio { border-bottom: 1px solid #DADAD4; margin: 10px 0 12px; }
+
+/* bullets da síntese: prévia como sai no Word, edição recolhida */
+.sb-card { padding: 10px 0 2px; }
+.sb-txt { font-size: 14px; line-height: 1.65; color: #222; margin: 0; }
+.sb-tit { font-weight: 700; color: #962E4D !important; text-decoration: none; }
+.sb-tit:hover { text-decoration: underline; }
+.sb-meta { font-size: 12px; color: #767672; margin: 4px 0 0; }
+.sb-meta a { color: #767672 !important; }
+.sb-fora .sb-txt, .sb-fora .sb-tit { color: #A9A9A4 !important; text-decoration: line-through; }
+[data-testid="stExpander"] details { border: none !important; background: transparent !important; }
+[data-testid="stExpander"] summary { padding: 0 !important; font-size: 11px !important; color: #767672 !important;
+    letter-spacing: 0.08em; text-transform: uppercase; }
+[data-testid="stExpander"] summary p { font-size: 11px !important; }
+label:has(input[role="switch"]:checked) > div:first-of-type,
+[data-testid="stCheckbox"] label:has(input:checked) > span { background-color: #962E4D !important; border-color: #962E4D !important; }
+[data-testid="stButton"] button[kind="primary"] { background: #962E4D !important; color: #fff !important; font-weight: 700 !important; }
+[data-testid="stButton"] button[kind="primary"]:hover { background: #7A2640 !important; border-color: #7A2640 !important; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -325,30 +342,37 @@ for c, tab in zip(abas, tabs):
             rot = sec if c == "IDEC" else f"Destaques {sec}"
             st.markdown(f'<div class="ag-org">{_html.escape(rot)}</div>', unsafe_allow_html=True)
             for i, b in doses:
-                col1, col2 = st.columns([0.06, 0.94])
+                on = SS.get(f"sb_{c}_{i}_on", True)
+                tit = SS.get(f"sb_{c}_{i}_t", b["titulo"])
+                txt = SS.get(f"sb_{c}_{i}_x", b["texto"])
+                docs = "".join(f' · <a href="{_html.escape(d["url"])}" target="_blank">{_html.escape(d["nome"])}</a>'
+                               for d in b.get("documentos", []))
+                col1, col2 = st.columns([0.92, 0.08], vertical_alignment="top")
                 with col1:
-                    st.checkbox("incluir", value=True, key=f"sb_{c}_{i}_on", label_visibility="collapsed")
+                    st.markdown(
+                        f'<div class="sb-card{"" if on else " sb-fora"}">'
+                        f'<p class="sb-txt"><a class="sb-tit" href="{_html.escape(b["url"])}" target="_blank">'
+                        f'{_html.escape(tit.rstrip("."))}.</a> {_html.escape(txt)}</p>'
+                        f'<p class="sb-meta">{_html.escape(b.get("tema", ""))}{docs}</p></div>',
+                        unsafe_allow_html=True)
+                    with st.expander("Editar", expanded=False):
+                        st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t")
+                        st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=110)
                 with col2:
-                    st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t", label_visibility="collapsed")
-                    st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=90,
-                                 label_visibility="collapsed")
-                    docs = "".join(f' · <a href="{_html.escape(d["url"])}">{_html.escape(d["nome"])}</a>'
-                                   for d in b.get("documentos", []))
-                    st.markdown(f'<p class="ag-meta"><a href="{_html.escape(b["url"])}">fonte</a> · '
-                                f'{_html.escape(b.get("tema", ""))}{docs}</p>', unsafe_allow_html=True)
+                    st.toggle("Incluir", value=True, key=f"sb_{c}_{i}_on", label_visibility="collapsed")
         if not bullets[c]:
             st.markdown('<p class="ag-nota">Nenhuma notícia da semana com relação direta com os temas do cliente.</p>',
                         unsafe_allow_html=True)
 
         novas = [p for p in div["proposicoes"] if c in [x for x, _ in p["clientes"]]]
         if novas:
-            st.markdown('<div class="ag-org">Novas proposições</div>', unsafe_allow_html=True)
+            st.markdown('<div class="ag-fio"></div><div class="ag-org">Novas proposições</div>', unsafe_allow_html=True)
             for j, p in enumerate(novas):
                 duvida = any(x == c and d for x, d in p["clientes"])
                 st.checkbox(f"{p['proposicao']} - {p['ementa'][:160]}" + ("  (marcado com ?)" if duvida else ""),
                             value=not duvida, key=f"sp_{c}_{j}")
 
-        st.markdown('<div class="ag-org">Movimentações da semana</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ag-fio"></div><div class="ag-org">Movimentações da semana</div>', unsafe_allow_html=True)
         url_m = ss.url_matriz_inteligov(c, INI, FIM)
         if url_m:
             st.markdown(f'<p class="ag-sub">Abra a <a href="{url_m}" target="_blank">Matriz do Inteligov já filtrada</a>, '
@@ -367,7 +391,7 @@ for c, tab in zip(abas, tabs):
                         '<p class="ag-nota">Cliente sem matriz no Inteligov.</p>', unsafe_allow_html=True)
 
         atos = dou_por_cli.get(c, [])
-        st.markdown('<div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ag-fio"></div><div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
         if not DOU_SHEET_ID:
             st.markdown('<p class="ag-nota">DOU_CLIENTES_SHEET_ID não configurado.</p>', unsafe_allow_html=True)
         for j, a in enumerate(atos):
