@@ -218,8 +218,17 @@ def _gc():
     creds = _carregar_google_creds_dict()
     if not creds:
         raise RuntimeError("Credencial do Google não configurada.")
-    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     return gspread.authorize(Credentials.from_service_account_info(creds, scopes=scopes))
+
+
+AGENDA_SHEET_ID = (st.secrets.get("AGENDA_SHEET_ID") or os.getenv("AGENDA_SHEET_ID", "")).strip()
+
+
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
+def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
+    ws = _gc().open_by_key(AGENDA_SHEET_ID).worksheet(ss.ABA_ACOMP)
+    return ss.movimentacoes_semana(ss.ler_acompanhadas(ws), ini, fim)
 
 
 def _segunda(d: dt.date) -> dt.date:
@@ -339,6 +348,21 @@ if DOU_SHEET_ID and "sint_dou" not in SS:
             st.warning(f"Não consegui ler o DOU da raspagem: {e}")
 dou_por_cli = SS.get("sint_dou", {})
 
+movs_por_cli = None
+if AGENDA_SHEET_ID:
+    with st.spinner("Consultando a tramitação na Câmara e no Senado..."):
+        try:
+            if div.get("proposicoes") and not SS.get("sint_acomp_ok"):
+                ws = _gc().open_by_key(AGENDA_SHEET_ID).worksheet(ss.ABA_ACOMP)
+                SS["sint_acomp_n"] = ss.acrescentar_novas(ws, div["proposicoes"], ss.ler_acompanhadas(ws),
+                                                          hoje.strftime("%d/%m/%Y"))
+                SS["sint_acomp_ok"] = True
+            movs_por_cli = _movs_da_semana(INI, FIM, SS.get("sint_acomp_n", 0))
+        except Exception as e:  # noqa: BLE001
+            st.warning(f"Movimentações: {e}")
+if SS.get("sint_acomp_n"):
+    st.caption(f"{SS['sint_acomp_n']} proposição(ões) nova(s) da Divisão entraram na lista de acompanhadas.")
+
 tabs = st.tabs([f"{ss.CLIENTES[c]['titulo']} ({len(bullets[c])})" for c in abas])
 for c, tab in zip(abas, tabs):
     with tab:
@@ -385,22 +409,17 @@ for c, tab in zip(abas, tabs):
                             value=not duvida, key=f"sp_{c}_{j}")
 
         st.markdown('<div class="ag-fio"></div><div class="ag-org">Movimentações da semana</div>', unsafe_allow_html=True)
-        url_m = ss.url_matriz_inteligov(c, INI, FIM)
-        if url_m:
-            st.markdown(f'<p class="ag-sub">Abra a <a href="{url_m}" target="_blank">Matriz do Inteligov já filtrada</a>, '
-                        'clique em XLS e suba o arquivo aqui.</p>', unsafe_allow_html=True)
-            xls = st.file_uploader("XLS do Inteligov", type=["xls", "xlsx"], key=f"sm_{c}",
-                                   label_visibility="collapsed")
-            if xls is not None:
-                try:
-                    SS[f"movs_{c}"] = ss.ler_movimentacoes(xls.getvalue(), xls.name)
-                    st.caption(f"{len(SS[f'movs_{c}'])} proposições com andamento na semana.")
-                except Exception as e:  # noqa: BLE001
-                    st.error(f"Não consegui ler o arquivo: {e}")
+        if c == "Desiderata":
+            st.markdown('<p class="ag-nota">Proposições do Desiderata são de Niterói e do RJ; entram à mão.</p>',
+                        unsafe_allow_html=True)
+        elif movs_por_cli is None:
+            st.markdown('<p class="ag-nota">Não consegui consultar as movimentações.</p>', unsafe_allow_html=True)
+        elif not movs_por_cli.get(c):
+            st.markdown('<p class="ag-nota">Nenhuma proposição acompanhada andou na semana.</p>', unsafe_allow_html=True)
         else:
-            st.markdown('<p class="ag-nota">Proposições do Desiderata são de Niterói e do RJ, fora do Inteligov; '
-                        'entram à mão.</p>' if c == "Desiderata" else
-                        '<p class="ag-nota">Cliente sem matriz no Inteligov.</p>', unsafe_allow_html=True)
+            for j, m in enumerate(movs_por_cli[c]):
+                st.checkbox(f"{m['proposicao']} · {m['data']} {m['orgao']} · {m['andamento'][:140]}",
+                            value=True, key=f"sm_{c}_{j}")
 
         atos = dou_por_cli.get(c, [])
         st.markdown('<div class="ag-fio"></div><div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
@@ -430,7 +449,7 @@ if gerar:
         novas = [p for j, p in enumerate([p for p in div["proposicoes"] if c in [x for x, _ in p["clientes"]]])
                  if SS.get(f"sp_{c}_{j}", True)]
         atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", True)]
-        movs = SS.get(f"movs_{c}", [])
+        movs = [m for j, m in enumerate((movs_por_cli or {}).get(c, [])) if SS.get(f"sm_{c}_{j}", True)]
         modelo = (MODELO_IDEC if c == "IDEC" else MODELO).read_bytes()
         nome = ss.nome_arquivo(c, INI, FIM)
         arquivos[nome] = ss.gerar_docx(modelo, c, PERIODO, bl, cl, novas, movs, atos)

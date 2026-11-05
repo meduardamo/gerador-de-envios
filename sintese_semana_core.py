@@ -476,57 +476,170 @@ def gerar_bullets(client, modelo: str, cliente: str, noticias: list[dict]) -> li
     return out
 
 
-# ─── Movimentações (export da Matriz do Inteligov) ───────────────────────────
-def url_matriz_inteligov(cliente: str, ini: dt.date, fim: dt.date) -> str | None:
-    cod = CLIENTES[cliente].get("inteligov")
-    if not cod:
+# ─── Movimentações (proposições acompanhadas + APIs da Câmara e do Senado) ────
+# A lista de acompanhadas fica na aba "Acompanhadas" da planilha da Agenda (veio da
+# Matriz do Inteligov em 5/11/2026; as novas proposições da Divisão entram sozinhas).
+# Toda semana a tramitação de cada uma é consultada nas APIs abertas.
+ABA_ACOMP = "Acompanhadas"
+CAB_ACOMP = ["Cliente", "Proposição", "Casa", "ID na Casa", "Origem", "Incluída em"]
+_JSON = {"Accept": "application/json"}
+CAMARA = "https://dadosabertos.camara.leg.br/api/v2"
+SENADO = "https://legis.senado.leg.br/dadosabertos"
+
+
+def ler_acompanhadas(ws) -> list[dict]:
+    vals = ws.get_all_values()
+    cab = vals[0] if vals else CAB_ACOMP
+    return [dict(zip(cab, r + [""] * (len(cab) - len(r)))) for r in vals[1:] if any(r)]
+
+
+def _get(url, **params):
+    for tentativa in range(3):
+        try:
+            r = requests.get(url, params=params or None, headers=_JSON, timeout=30)
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            return r.json()
+        except Exception:  # noqa: BLE001
+            if tentativa == 2:
+                raise
+    return None
+
+
+def resolver_id(proposicao: str, casa: str) -> str:
+    m = re.match(r"(\w+)\s+(\d+)/(\d{4})", proposicao.strip())
+    if not m:
+        return ""
+    sig, num, ano = m.groups()
+    if casa.startswith("Câmara"):
+        d = (_get(f"{CAMARA}/proposicoes", siglaTipo=sig, numero=num, ano=ano) or {}).get("dados") or []
+        return str(d[0]["id"]) if d else ""
+    d = _get(f"{SENADO}/processo", sigla=sig, numero=num, ano=ano) or []
+    return str(d[0]["id"]) if d else ""
+
+
+def casa_da_proposicao(link: str, proposicao: str) -> str:
+    if "senado" in (link or "").lower():
+        return "Senado Federal"
+    return "Câmara dos Deputados"
+
+
+def acrescentar_novas(ws, novas: list[dict], atuais: list[dict], hoje: str) -> int:
+    """Põe na aba as novas proposições da Divisão (por cliente) que ainda não estão lá."""
+    tem = {(a["Cliente"], a["Proposição"].strip().upper(), a["Casa"]) for a in atuais}
+    linhas = []
+    for p in novas:
+        casa = casa_da_proposicao(p.get("link", ""), p["proposicao"])
+        for cli, _duvida in p["clientes"]:
+            chave = (cli, p["proposicao"].strip().upper(), casa)
+            if chave in tem:
+                continue
+            tem.add(chave)
+            linhas.append([cli, p["proposicao"].strip(), casa, resolver_id(p["proposicao"], casa),
+                           "Divisão semanal", hoje])
+    if linhas:
+        ws.append_rows(linhas, value_input_option="RAW")
+    return len(linhas)
+
+
+def _autor_camara(id_: str) -> str:
+    d = (_get(f"{CAMARA}/proposicoes/{id_}/autores") or {}).get("dados") or []
+    nomes = []
+    for a in d[:3]:
+        uri = a.get("uri", "")
+        if "/deputados/" in uri:
+            st = ((_get(uri) or {}).get("dados") or {}).get("ultimoStatus") or {}
+            nomes.append(f"{st.get('nome', a['nome'])} ({st.get('siglaPartido', '')}/{st.get('siglaUf', '')})")
+        else:
+            nomes.append(re.sub(r"^Senado Federal - ", "", a.get("nome", "")))
+    return ", ".join(nomes) + (" e outros" if len(d) > 3 else "")
+
+
+def _relator_camara(uri: str) -> str:
+    if not uri:
+        return ""
+    d = (_get(uri) or {}).get("dados") or {}
+    st = d.get("ultimoStatus") or {}
+    if st.get("idLegislatura") != 57:  # relator de legislatura passada não vale mais
+        return ""
+    return f"{st.get('nome', '')} ({st.get('siglaPartido', '')}/{st.get('siglaUf', '')})"
+
+
+def _mov_camara(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
+    det = (_get(f"{CAMARA}/proposicoes/{id_}") or {}).get("dados")
+    if not det:
         return None
-    return (f"https://app.inteligov.com.br/beta/proposicoes?cf=t&fcl%5B%5D={cod}"
-            f"&bsd={ini:%d/%m/%Y}&bed={fim:%d/%m/%Y}")
-
-
-def ler_movimentacoes(dados: bytes, nome: str) -> list[dict]:
-    """Lê o XLS/XLSX exportado da Matriz de monitoramento do Inteligov.
-
-    O cabeçalho é localizado pelo nome das colunas (o export tem linhas de título antes).
-    """
-    import pandas as pd
-    try:
-        bruto = pd.read_excel(io.BytesIO(dados), header=None, dtype=str)
-    except Exception:  # noqa: BLE001
-        # alguns ".xls" de sistema web são HTML com extensão de planilha
-        bruto = pd.read_html(io.BytesIO(dados), header=None)[0].astype(str)
-    linha_cab = 0
-    for i in range(min(15, len(bruto))):
-        vals = " | ".join(str(v).lower() for v in bruto.iloc[i].tolist())
-        if "ementa" in vals and ("identifica" in vals or "proposi" in vals):
-            linha_cab = i
-            break
-    df = bruto.iloc[linha_cab + 1:].copy()
-    df.columns = [str(c).strip() for c in bruto.iloc[linha_cab].tolist()]
-    df = df.fillna("")
-
-    def col(*nomes):
-        for c in df.columns:
-            if any(n in c.lower() for n in nomes):
-                return c
+    stt = det.get("statusProposicao") or {}
+    if not (ini.isoformat() <= (stt.get("dataHora") or "")[:10] <= fim.isoformat()):
         return None
+    tram = (_get(f"{CAMARA}/proposicoes/{id_}/tramitacoes", dataInicio=ini.isoformat(),
+                 dataFim=fim.isoformat()) or {}).get("dados") or [stt]
+    ult = sorted(tram, key=lambda t: (t.get("dataHora", ""), t.get("sequencia", 0)))[-1]
+    d = dt.date.fromisoformat(ult["dataHora"][:10])
+    return {"proposicao": f"{det['siglaTipo']} {det['numero']}/{det['ano']}", "ementa": det.get("ementa", ""),
+            "autor": _autor_camara(id_), "relator": _relator_camara(ult.get("uriUltimoRelator", "")),
+            "data": f"{d.day}/{d.month}/{d.year}", "orgao": ult.get("siglaOrgao", ""),
+            "andamento": (ult.get("despacho") or ult.get("descricaoTramitacao") or "").strip(),
+            "link": det.get("urlInteiroTeor") or f"https://www.camara.leg.br/propostas-legislativas/{id_}",
+            "teor": ult.get("url") or ""}
 
-    c_id, c_em, c_aut = col("identifica", "proposi"), col("ementa"), col("autor")
-    c_rel = col("relator")
-    c_and = col("último andamento", "ultimo andamento", "andamento", "tramita")
-    c_dt = col("data do último", "data do ultimo", "data último", "data andamento")
-    c_org = col("órgão", "orgao", "local")
-    c_link = col("inteiro teor", "link")
-    out = []
-    for _, r in df.iterrows():
-        ident = str(r.get(c_id, "")).strip() if c_id else ""
-        if not ident:
-            continue
-        out.append({"proposicao": ident, "ementa": r.get(c_em, "") if c_em else "",
-                    "autor": r.get(c_aut, "") if c_aut else "", "relator": r.get(c_rel, "") if c_rel else "",
-                    "data": r.get(c_dt, "") if c_dt else "", "orgao": r.get(c_org, "") if c_org else "",
-                    "andamento": r.get(c_and, "") if c_and else "", "link": r.get(c_link, "") if c_link else ""})
+
+def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
+    det = _get(f"{SENADO}/processo/{id_}")
+    if not det:
+        return None
+    infs = [i for a in det.get("autuacoes") or [] for i in a.get("informesLegislativos") or []
+            if ini.isoformat() <= (i.get("data") or "")[:10] <= fim.isoformat()]
+    if not infs:
+        return None
+    ult = sorted(infs, key=lambda i: i["data"])[-1]
+    d = dt.date.fromisoformat(ult["data"][:10])
+    relator = ""
+    rel = _get(f"{SENADO}/processo/relatoria", codigoMateria=det.get("codigoMateria")) or []
+    atuais = [r for r in rel if not r.get("dataDestituicao") and not r.get("dataFimColegiado")]
+    if atuais:
+        r = atuais[-1]
+        relator = f"{r.get('nomeParlamentar', '')} ({r.get('siglaPartidoParlamentar', '')}/{r.get('ufParlamentar', '')})"
+    autoria = (det.get("autoriaIniciativa") or [{}])
+    autor = det.get("documento", {}).get("autoria") if isinstance(det.get("documento"), dict) else ""
+    if not autor and isinstance(autoria, list) and autoria:
+        autor = autoria[0].get("autor") or autoria[0].get("descricao") or ""
+    doc = (ult.get("documentosAssociados") or [{}])[0]
+    return {"proposicao": det.get("identificacao", ""), "ementa": (det.get("conteudo") or {}).get("ementa", ""),
+            "autor": re.sub(r"^Senador(a)? ", "", autor or ""), "relator": relator,
+            "data": f"{d.day}/{d.month}/{d.year}", "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
+            "andamento": re.sub(r"\s+", " ", ult.get("descricao", "")).strip(),
+            "link": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{det.get('codigoMateria')}",
+            "teor": doc.get("url") or ""}
+
+
+def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers: int = 16,
+                         progresso=None) -> dict[str, list[dict]]:
+    """Cliente -> movimentações da semana (uma linha por proposição, o último andamento)."""
+    unicos = {(a["Casa"], a["ID na Casa"]) for a in acomp if a.get("ID na Casa")}
+    feitos = [0]
+
+    def um(chave):
+        casa, id_ = chave
+        try:
+            m = _mov_camara(id_, ini, fim) if casa.startswith("Câmara") else _mov_senado(id_, ini, fim)
+        except Exception:  # noqa: BLE001
+            m = None
+        feitos[0] += 1
+        if progresso:
+            progresso(feitos[0], len(unicos))
+        return chave, m
+
+    with ThreadPoolExecutor(workers) as ex:
+        res = dict(ex.map(um, unicos))
+    out: dict[str, list[dict]] = {}
+    for a in acomp:
+        m = res.get((a["Casa"], a.get("ID na Casa")))
+        if m and m["proposicao"] not in [x["proposicao"] for x in out.get(a["Cliente"], [])]:
+            out.setdefault(a["Cliente"], []).append(m)
+    for v in out.values():
+        v.sort(key=lambda m: tuple(reversed([int(x) for x in m["data"].split("/")])))
     return out
 
 
@@ -708,7 +821,7 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, bullets: list[dict],
             tbl.remove(tr)
         for m in movs:
             mov = " ".join(x for x in [m.get("data", ""), m.get("orgao", "")] if x)
-            mov = (mov + "\n" if mov else "") + m.get("andamento", "")
+            mov = (mov + " " if mov else "") + m.get("andamento", "")
             tbl.append(_linha_tabela(P["tab_mov"], [(m["proposicao"], m.get("link") or None), (m["ementa"], None),
                                                     (m["autor"], None), (m.get("relator") or "-", None),
                                                     (mov, None)], doc))
