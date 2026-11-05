@@ -3,8 +3,9 @@
 Entrada: o doc "Divisão semanal - Saúde" baixado em .docx ou .pdf (links agrupados por
 tema, tabela NOVAS PROPOSIÇÕES com a coluna Cliente). Cada notícia é baixada e lida;
 o Gemini faz uma chamada por cliente, só com a fatia da matriz temática daquele cliente,
-e devolve os bullets. Movimentações da semana vêm do export da Matriz do Inteligov e o
-DOU, da aba do cliente na planilha da raspagem.
+e devolve os bullets. Movimentações da semana: proposições acompanhadas (aba
+"Acompanhadas") consultadas nas APIs da Câmara e do Senado, com o XLS da Matriz do
+Inteligov como complemento. DOU: aba do cliente na planilha da raspagem.
 
 Saída: um .docx por cliente no modelo das sínteses enviadas (UNFPA para todos, IDEC por
 área) e o corpo do email em HTML para colar no Wix.
@@ -585,10 +586,13 @@ def _mov_camara(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
     if not det:
         return None
     stt = det.get("statusProposicao") or {}
-    if not (ini.isoformat() <= (stt.get("dataHora") or "")[:10] <= fim.isoformat()):
+    if (stt.get("dataHora") or "")[:10] < ini.isoformat():  # último andamento antes da semana
         return None
-    tram = (_get(f"{CAMARA}/proposicoes/{id_}/tramitacoes", dataInicio=ini.isoformat(),
-                 dataFim=fim.isoformat()) or {}).get("dados") or [stt]
+    tram = [t for t in (_get(f"{CAMARA}/proposicoes/{id_}/tramitacoes", dataInicio=ini.isoformat(),
+                             dataFim=fim.isoformat()) or {}).get("dados") or []
+            if ini.isoformat() <= (t.get("dataHora") or "")[:10] <= fim.isoformat()]
+    if not tram:
+        return None
     ult = sorted(tram, key=lambda t: (t.get("dataHora", ""), t.get("sequencia", 0)))[-1]
     d = dt.date.fromisoformat(ult["dataHora"][:10])
     return {"proposicao": f"{det['siglaTipo']} {det['numero']}/{det['ano']}", "ementa": det.get("ementa", ""),
@@ -615,13 +619,17 @@ def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
     if atuais:
         r = atuais[-1]
         relator = f"{r.get('nomeParlamentar', '')} ({r.get('siglaPartidoParlamentar', '')}/{r.get('ufParlamentar', '')})"
-    autoria = (det.get("autoriaIniciativa") or [{}])
-    autor = det.get("documento", {}).get("autoria") if isinstance(det.get("documento"), dict) else ""
-    if not autor and isinstance(autoria, list) and autoria:
-        autor = autoria[0].get("autor") or autoria[0].get("descricao") or ""
+    autores = []
+    for a in det.get("autoriaIniciativa") or []:
+        nome = a.get("autor") or ""
+        if a.get("siglaPartido") and a.get("uf"):
+            nome += f" ({a['siglaPartido']}/{a['uf']})"
+        if nome:
+            autores.append(nome)
+    autor = ", ".join(autores[:3]) + (" e outros" if len(autores) > 3 else "")
     doc = (ult.get("documentosAssociados") or [{}])[0]
     return {"proposicao": det.get("identificacao", ""), "ementa": (det.get("conteudo") or {}).get("ementa", ""),
-            "autor": re.sub(r"^Senador(a)? ", "", autor or ""), "relator": relator,
+            "autor": autor, "relator": relator,
             "data": f"{d.day}/{d.month}/{d.year}", "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
             "andamento": re.sub(r"\s+", " ", ult.get("descricao", "")).strip(),
             "link": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{det.get('codigoMateria')}",
@@ -657,7 +665,70 @@ def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers:
     return out
 
 
+# ─── Inteligov (conferência e complemento) ───────────────────────────────────
+def url_matriz_inteligov(cliente: str, ini: dt.date, fim: dt.date) -> str | None:
+    cod = CLIENTES[cliente].get("inteligov")
+    if not cod:
+        return None
+    return (f"https://app.inteligov.com.br/beta/proposicoes?cf=t&fcl%5B%5D={cod}"
+            f"&bsd={ini:%d/%m/%Y}&bed={fim:%d/%m/%Y}")
+
+
+def ler_movimentacoes(dados: bytes, nome: str) -> list[dict]:
+    """Lê o XLS/XLSX exportado da Matriz de monitoramento do Inteligov.
+
+    O cabeçalho é localizado pelo nome das colunas (o export tem linhas de título antes).
+    """
+    import pandas as pd
+    try:
+        bruto = pd.read_excel(io.BytesIO(dados), header=None, dtype=str)
+    except Exception:  # noqa: BLE001
+        # alguns ".xls" de sistema web são HTML com extensão de planilha
+        bruto = pd.read_html(io.BytesIO(dados), header=None)[0].astype(str)
+    linha_cab = 0
+    for i in range(min(15, len(bruto))):
+        vals = " | ".join(str(v).lower() for v in bruto.iloc[i].tolist())
+        if "ementa" in vals and ("identifica" in vals or "proposi" in vals):
+            linha_cab = i
+            break
+    df = bruto.iloc[linha_cab + 1:].copy()
+    df.columns = [str(c).strip() for c in bruto.iloc[linha_cab].tolist()]
+    df = df.fillna("")
+
+    def col(*nomes):
+        for c in df.columns:
+            if any(n in c.lower() for n in nomes):
+                return c
+        return None
+
+    c_id, c_em, c_aut = col("identifica", "proposi"), col("ementa"), col("autor")
+    c_rel = col("relator")
+    c_and = col("último andamento", "ultimo andamento", "andamento", "tramita")
+    c_dt = col("data do último", "data do ultimo", "data último", "data andamento")
+    c_org = col("órgão", "orgao", "local")
+    c_link = col("inteiro teor", "link")
+    out = []
+    for _, r in df.iterrows():
+        ident = str(r.get(c_id, "")).strip() if c_id else ""
+        if not ident:
+            continue
+        out.append({"proposicao": ident, "ementa": r.get(c_em, "") if c_em else "",
+                    "autor": r.get(c_aut, "") if c_aut else "", "relator": r.get(c_rel, "") if c_rel else "",
+                    "data": r.get(c_dt, "") if c_dt else "", "orgao": r.get(c_org, "") if c_org else "",
+                    "andamento": r.get(c_and, "") if c_and else "", "link": r.get(c_link, "") if c_link else ""})
+    return out
+
+
 # ─── DOU (aba do cliente na planilha da raspagem) ────────────────────────────
+def _data_flex(txt: str) -> dt.date | None:
+    for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return dt.datetime.strptime(txt.strip(), fmt).date()
+        except ValueError:
+            pass
+    return None
+
+
 def ler_dou_cliente(gc, planilha_id: str, cliente: str, ini: dt.date, fim: dt.date,
                     aceitar=("Alinha",)) -> list[dict]:
     ws = gc.open_by_key(planilha_id).worksheet(CLIENTES[cliente]["dou"])
@@ -669,9 +740,8 @@ def ler_dou_cliente(gc, planilha_id: str, cliente: str, ini: dt.date, fim: dt.da
     out, vistos = [], set()
     for row in vals[1:]:
         g = lambda c: row[ix[c]].strip() if c in ix and ix[c] < len(row) else ""  # noqa: E731
-        try:
-            d = dt.datetime.strptime(g("Data"), "%d-%m-%Y").date()
-        except ValueError:
+        d = _data_flex(g("Data"))
+        if d is None:
             continue
         if not (ini <= d <= fim) or g("Alinhamento") not in aceitar or g("Link") in vistos:
             continue

@@ -108,7 +108,7 @@ footer { display: none !important; }
     color: #fff; background: #962E4D; border-radius: 3px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
 .ag-fora .ag-tit a, .ag-fora .ag-tit { color: #9A9A95; text-decoration: line-through; }
 .ag-fora .ag-ementa { color: #9A9A95; }
-.ag-nota { font-size: 12.5px; color: #767672; margin: 4px 0 0; }
+.ag-nota { font-size: 12.5px !important; color: #767672 !important; margin: 4px 0 0 !important; }
 .ag-tit span.ag-novo { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
     color: #192D4E; border: 1px solid #192D4E; border-radius: 3px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
 /* chave "só os novos" em vinho, não no vermelho padrão */
@@ -125,7 +125,15 @@ footer { display: none !important; }
     border-bottom: 1px solid #DADAD4; }
 .sb-email { background: #fff; border: 1px solid #DADAD4; padding: 18px 22px; font-size: 14px; line-height: 1.6; }
 .sb-email h3 { font-size: 15px; color: #192D4E; margin: 14px 0 6px; }
-.sb-card { padding: 10px 0 2px; }
+.sb-card { padding: 0; }
+div[class*="st-key-it_"] { background: #FFFFFF; border: 1px solid #E4E3DD; border-radius: 8px;
+    padding: 16px 20px 30px; margin-bottom: 10px; gap: 0.35rem; }
+div[class*="st-key-it_"]:has(input[role="switch"]:not(:checked)) { background: #F9F9F7; }
+.sb-ementa { font-size: 13px !important; line-height: 1.55 !important; color: #444 !important; margin: 4px 0 0 !important; }
+.sb-and { font-size: 13px !important; line-height: 1.55 !important; color: #222 !important; margin: 6px 0 0 !important; }
+.sb-and b { color: #192D4E; }
+.sb-fonte { font-size: 12.5px !important; color: #767672 !important; margin: 0 0 10px !important; }
+.sb-fonte a { color: #962E4D !important; }
 .sb-txt { font-size: 14.5px !important; line-height: 1.65 !important; color: #222 !important; margin: 0 !important; }
 .sb-tit, .sb-tit:visited { font-weight: 700; color: #962E4D !important; text-decoration: none !important; }
 .sb-tit:hover { text-decoration: underline; }
@@ -231,6 +239,24 @@ def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
     return ss.movimentacoes_semana(ss.ler_acompanhadas(ws), ini, fim)
 
 
+def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
+    """Um bloco branco: conteúdo à esquerda, chave de incluir à direita (mesmo componente em toda seção)."""
+    with st.container(key=f"it_{chave}"):
+        col1, col2 = st.columns([0.93, 0.07], vertical_alignment="top")
+        with col2:
+            on = st.toggle("Incluir", value=valor, key=chave, label_visibility="collapsed",
+                           help="Desligado, o item não vai para o Word nem para o email")
+        with col1:
+            st.markdown(f'<div class="sb-card{"" if on else " sb-fora"}">{html_corpo}</div>', unsafe_allow_html=True)
+            if editar:
+                editar()
+
+
+def _a(url: str, txt: str, cls: str = "sb-tit") -> str:
+    return f'<a class="{cls}" href="{_html.escape(url)}" target="_blank">{_html.escape(txt)}</a>' if url else \
+        f'<b>{_html.escape(txt)}</b>'
+
+
 def _segunda(d: dt.date) -> dt.date:
     return d - dt.timedelta(days=d.weekday())
 
@@ -251,6 +277,13 @@ with st.sidebar:
 st.markdown('<div class="ge-hero"><div class="ge-hero-title">Síntese da Semana</div></div>',
             unsafe_allow_html=True)
 
+if SS.get("sint_semana") != INI:  # trocou a semana: DOU, movimentações e arquivos são outros
+    SS["sint_semana"] = INI
+    for k in ("sint_dou", "sint_arquivos", "sint_emails", "sint_movs_xls"):
+        SS.pop(k, None)
+    for k in [k for k in SS.keys() if str(k).startswith(("sd_", "sm_"))]:
+        del SS[k]
+
 CLIS = [c for c, v in ss.CLIENTES.items() if quinzenal or not v.get("quinzenal")]
 
 # ========= 1. DIVISÃO SEMANAL =========
@@ -261,8 +294,11 @@ arq = st.file_uploader("Divisão semanal - Saúde", type=["docx", "pdf"], label_
 if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
     SS["sint_arquivo"] = (arq.name, arq.size)
     SS["sint_div"] = ss.ler_divisao(arq.getvalue(), arq.name)
-    for k in ("sint_noticias", "sint_bullets", "sint_dou", "sint_arquivos"):
+    for k in ("sint_noticias", "sint_bullets", "sint_dou", "sint_arquivos", "sint_emails", "sint_acomp_ok",
+              "sint_acomp_n", "sint_movs_xls"):
         SS.pop(k, None)
+    for k in [k for k in SS.keys() if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_"))]:
+        del SS[k]
 
 div = SS.get("sint_div")
 if not div:
@@ -290,6 +326,9 @@ if st.button("Ler notícias e gerar bullets", type="primary"):
     if not GEMINI_API_KEY:
         st.error("Faltou a GEMINI_API_KEY nos Secrets.")
         st.stop()
+    if not escolhidos:
+        st.warning("Escolha ao menos um cliente.")
+        st.stop()
     with st.spinner("Baixando as notícias..."):
         SS["sint_noticias"] = ss.baixar_todas(nots)
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -311,7 +350,7 @@ if st.button("Ler notícias e gerar bullets", type="primary"):
                     erros[c] = err
     SS["sint_bullets"], SS["sint_erros"] = bullets, erros
     for k in list(SS.keys()):
-        if str(k).startswith(("sb_", "sc_", "sd_")):
+        if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_")):
             del SS[k]
 
 noticias = SS.get("sint_noticias")
@@ -338,7 +377,15 @@ if DOU_SHEET_ID and "sint_dou" not in SS:
     with st.spinner("Lendo o DOU da raspagem..."):
         try:
             gc = _gc()
-            brutos = {c: ss.ler_dou_cliente(gc, DOU_SHEET_ID, c, INI, FIM) for c in abas}
+            brutos, falhou = {}, []
+            for c in abas:
+                try:
+                    brutos[c] = ss.ler_dou_cliente(gc, DOU_SHEET_ID, c, INI, FIM)
+                except Exception as e:  # noqa: BLE001
+                    brutos[c] = []
+                    falhou.append(f"{ss.CLIENTES[c]['titulo']} ({type(e).__name__})")
+            if falhou:
+                st.warning("DOU não lido para: " + ", ".join(falhou))
             todos = {a["link"]: a for v in brutos.values() for a in v}
             with ThreadPoolExecutor(8) as ex:
                 completos = dict(zip(todos, ex.map(ss.completar_ato_dou, todos.values())))
@@ -350,13 +397,16 @@ dou_por_cli = SS.get("sint_dou", {})
 
 movs_por_cli = None
 if AGENDA_SHEET_ID:
-    with st.spinner("Consultando a tramitação na Câmara e no Senado..."):
+    if div.get("proposicoes") and not SS.get("sint_acomp_ok"):
         try:
-            if div.get("proposicoes") and not SS.get("sint_acomp_ok"):
-                ws = _gc().open_by_key(AGENDA_SHEET_ID).worksheet(ss.ABA_ACOMP)
-                SS["sint_acomp_n"] = ss.acrescentar_novas(ws, div["proposicoes"], ss.ler_acompanhadas(ws),
-                                                          hoje.strftime("%d/%m/%Y"))
-                SS["sint_acomp_ok"] = True
+            ws = _gc().open_by_key(AGENDA_SHEET_ID).worksheet(ss.ABA_ACOMP)
+            SS["sint_acomp_n"] = ss.acrescentar_novas(ws, div["proposicoes"], ss.ler_acompanhadas(ws),
+                                                      hoje.strftime("%d/%m/%Y"))
+        except Exception as e:  # noqa: BLE001
+            st.warning(f"Não consegui pôr as novas proposições na lista de acompanhadas: {e}")
+        SS["sint_acomp_ok"] = True
+    with st.spinner("Consultando a tramitação na Câmara e no Senado (na primeira vez da semana leva até 2 minutos)..."):
+        try:
             movs_por_cli = _movs_da_semana(INI, FIM, SS.get("sint_acomp_n", 0))
         except Exception as e:  # noqa: BLE001
             st.warning(f"Movimentações: {e}")
@@ -369,7 +419,8 @@ for c, tab in zip(abas, tabs):
         if clipping.get(c):
             st.markdown('<div class="ag-org ag-primeira">Clipping da semana</div>', unsafe_allow_html=True)
             for i, cl in enumerate(clipping[c]):
-                st.checkbox(f"{cl['titulo']} - {cl['lide'][:180]}", value=True, key=f"sc_{c}_{i}")
+                _item(f"sc_{c}_{i}", f'<p class="sb-txt">{_a(cl["url"], cl["titulo"])} '
+                                     f'{_html.escape(cl["lide"])}</p>')
         for sec in ss.secoes_do_cliente(c):
             doses = [(i, b) for i, b in enumerate(bullets[c]) if b["secao"] == sec]
             if not doses:
@@ -377,58 +428,90 @@ for c, tab in zip(abas, tabs):
             rot = sec if c == "IDEC" else f"Destaques {sec}"
             st.markdown(f'<div class="ag-org">{_html.escape(rot)}</div>', unsafe_allow_html=True)
             for i, b in doses:
-                on = SS.get(f"sb_{c}_{i}_on", True)
                 tit = SS.get(f"sb_{c}_{i}_t", b["titulo"])
                 txt = SS.get(f"sb_{c}_{i}_x", b["texto"])
                 docs = "".join(f' · <a href="{_html.escape(d["url"])}" target="_blank">{_html.escape(d["nome"])}</a>'
                                for d in b.get("documentos", []))
-                col1, col2 = st.columns([0.92, 0.08], vertical_alignment="top")
-                with col1:
-                    st.markdown(
-                        f'<div class="sb-card{"" if on else " sb-fora"}">'
-                        f'<p class="sb-txt"><a class="sb-tit" href="{_html.escape(b["url"])}" target="_blank">'
-                        f'{_html.escape(tit.rstrip("."))}.</a> {_html.escape(txt)}</p>'
-                        f'<p class="sb-meta">{_html.escape(b.get("tema", ""))}{docs}</p></div>',
-                        unsafe_allow_html=True)
+
+                def _editar(c=c, i=i, b=b):
                     with st.expander("Editar", expanded=False):
                         st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t")
                         st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=110)
-                with col2:
-                    st.toggle("Incluir", value=True, key=f"sb_{c}_{i}_on", label_visibility="collapsed",
-                              help="Desligado, o bullet não vai para o Word nem para o email")
+
+                _item(f"sb_{c}_{i}_on",
+                      f'<p class="sb-txt">{_a(b["url"], tit.rstrip(".") + ".")} {_html.escape(txt)}</p>'
+                      f'<p class="sb-meta">{_html.escape(b.get("tema", ""))}{docs}</p>', editar=_editar)
         if not bullets[c]:
             st.markdown('<p class="ag-nota">Nenhuma notícia da semana com relação direta com os temas do cliente.</p>',
                         unsafe_allow_html=True)
 
         novas = [p for p in div["proposicoes"] if c in [x for x, _ in p["clientes"]]]
         if novas:
-            st.markdown('<div class="ag-fio"></div><div class="ag-org">Novas proposições</div>', unsafe_allow_html=True)
+            st.markdown('<div class="ag-org">Novas proposições</div>', unsafe_allow_html=True)
             for j, p in enumerate(novas):
                 duvida = any(x == c and d for x, d in p["clientes"])
-                st.checkbox(f"{p['proposicao']} - {p['ementa'][:160]}" + ("  (marcado com ?)" if duvida else ""),
-                            value=not duvida, key=f"sp_{c}_{j}")
+                aviso = ' <span class="sb-meta">· marcada com "?" na Divisão</span>' if duvida else ""
+                _item(f"sp_{c}_{j}",
+                      f'<p class="sb-txt">{_a(p.get("link", ""), p["proposicao"])}{aviso}</p>'
+                      f'<p class="sb-ementa">{_html.escape(p["ementa"])}</p>'
+                      f'<p class="sb-meta">{_html.escape(p.get("autor", ""))}</p>', valor=not duvida)
 
-        st.markdown('<div class="ag-fio"></div><div class="ag-org">Movimentações da semana</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ag-org">Movimentações da semana</div>', unsafe_allow_html=True)
+        url_m = ss.url_matriz_inteligov(c, INI, FIM)
         if c == "Desiderata":
             st.markdown('<p class="ag-nota">Proposições do Desiderata são de Niterói e do RJ; entram à mão.</p>',
                         unsafe_allow_html=True)
-        elif movs_por_cli is None:
-            st.markdown('<p class="ag-nota">Não consegui consultar as movimentações.</p>', unsafe_allow_html=True)
-        elif not movs_por_cli.get(c):
-            st.markdown('<p class="ag-nota">Nenhuma proposição acompanhada andou na semana.</p>', unsafe_allow_html=True)
         else:
-            for j, m in enumerate(movs_por_cli[c]):
-                st.checkbox(f"{m['proposicao']} · {m['data']} {m['orgao']} · {m['andamento'][:140]}",
-                            value=True, key=f"sm_{c}_{j}")
+            if url_m:
+                st.markdown(f'<p class="sb-fonte">Câmara e Senado, a partir das proposições acompanhadas do cliente · '
+                            f'<a href="{url_m}" target="_blank">conferir na Matriz do Inteligov</a></p>',
+                            unsafe_allow_html=True)
+            movs_c = (movs_por_cli or {}).get(c, []) + SS.get("sint_movs_xls", {}).get(c, [])
+            if movs_por_cli is None:
+                st.markdown('<p class="ag-nota">Não consegui consultar a Câmara e o Senado agora.</p>',
+                            unsafe_allow_html=True)
+            elif not movs_c:
+                st.markdown('<p class="ag-nota">Nenhuma proposição acompanhada andou na semana.</p>',
+                            unsafe_allow_html=True)
+            for j, m in enumerate(movs_c):
+                quem = " · ".join(x for x in [m.get("autor") and f"Autoria: {m['autor']}",
+                                              m.get("relator") and f"Relatoria: {m['relator']}"] if x)
+                onde = " · ".join(x for x in [m.get("data", ""), m.get("orgao", "")] if x)
+                _item(f"sm_{c}_{j}",
+                      f'<p class="sb-txt">{_a(m.get("link", ""), m["proposicao"])}'
+                      f' <span class="sb-meta">{_html.escape(onde)}</span></p>'
+                      f'<p class="sb-ementa">{_html.escape(m.get("ementa", ""))}</p>'
+                      f'<p class="sb-and"><b>Andamento:</b> {_html.escape(m.get("andamento", ""))}</p>'
+                      + (f'<p class="sb-meta">{_html.escape(quem)}</p>' if quem else ""))
+            if url_m:
+                with st.expander("Acrescentar do Inteligov (XLS)"):
+                    st.markdown(f'<p class="ag-sub">Se faltar alguma, abra a <a href="{url_m}" target="_blank">'
+                                'Matriz já filtrada</a>, clique em XLS e suba o arquivo. O que já está acima '
+                                'não se repete.</p>', unsafe_allow_html=True)
+                    xls = st.file_uploader("XLS do Inteligov", type=["xls", "xlsx"], key=f"xls_{c}",
+                                           label_visibility="collapsed")
+                    if xls is not None and SS.get(f"xls_lido_{c}") != (xls.name, xls.size):
+                        try:
+                            ja = {m["proposicao"].upper() for m in (movs_por_cli or {}).get(c, [])}
+                            extra = [m for m in ss.ler_movimentacoes(xls.getvalue(), xls.name)
+                                     if m["proposicao"].upper() not in ja]
+                            SS.setdefault("sint_movs_xls", {})[c] = extra
+                            SS[f"xls_lido_{c}"] = (xls.name, xls.size)
+                            st.rerun()
+                        except Exception as e:  # noqa: BLE001
+                            st.error(f"Não consegui ler o arquivo: {e}")
 
         atos = dou_por_cli.get(c, [])
-        st.markdown('<div class="ag-fio"></div><div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
         if not DOU_SHEET_ID:
-            st.markdown('<p class="ag-nota">DOU_CLIENTES_SHEET_ID não configurado.</p>', unsafe_allow_html=True)
-        if DOU_SHEET_ID and not atos:
+            st.markdown('<p class="ag-nota">Planilha da raspagem do DOU não configurada.</p>', unsafe_allow_html=True)
+        elif not atos:
             st.markdown('<p class="ag-nota">Nenhum ato marcado como alinhado na semana.</p>', unsafe_allow_html=True)
         for j, a in enumerate(atos):
-            st.checkbox(f"{a['ato']} ({a.get('orgao', '')}) - {a['resumo'][:150]}", value=True, key=f"sd_{c}_{j}")
+            _item(f"sd_{c}_{j}",
+                  f'<p class="sb-txt">{_a(a["link"], a["ato"])}'
+                  f' <span class="sb-meta">{_html.escape(a.get("orgao", ""))}</span></p>'
+                  f'<p class="sb-ementa">{_html.escape(a.get("resumo", ""))}</p>')
 
 
 # ========= 3. WORD E EMAIL =========
@@ -449,7 +532,8 @@ if gerar:
         novas = [p for j, p in enumerate([p for p in div["proposicoes"] if c in [x for x, _ in p["clientes"]]])
                  if SS.get(f"sp_{c}_{j}", True)]
         atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", True)]
-        movs = [m for j, m in enumerate((movs_por_cli or {}).get(c, [])) if SS.get(f"sm_{c}_{j}", True)]
+        movs_c = (movs_por_cli or {}).get(c, []) + SS.get("sint_movs_xls", {}).get(c, [])
+        movs = [m for j, m in enumerate(movs_c) if SS.get(f"sm_{c}_{j}", True)]
         modelo = (MODELO_IDEC if c == "IDEC" else MODELO).read_bytes()
         nome = ss.nome_arquivo(c, INI, FIM)
         arquivos[nome] = ss.gerar_docx(modelo, c, PERIODO, bl, cl, novas, movs, atos)
