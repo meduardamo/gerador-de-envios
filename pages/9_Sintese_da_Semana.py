@@ -209,7 +209,7 @@ with st.sidebar:
     if os.path.exists(LOGO_PATH):
         st.image(LOGO_PATH, use_container_width=True)
     hoje = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
-    padrao = _segunda(hoje) - dt.timedelta(days=7) if hoje.weekday() < 4 else _segunda(hoje)
+    padrao = _segunda(hoje) - dt.timedelta(days=7) if hoje.weekday() < 3 else _segunda(hoje)
     seg = _segunda(st.date_input("Semana (qualquer dia dela)", value=padrao, format="DD/MM/YYYY"))
     INI, FIM = seg, seg + dt.timedelta(days=4)
     PERIODO = ss.periodo_extenso(INI, FIM)
@@ -259,11 +259,12 @@ if st.button("Ler notícias e gerar bullets", type="primary"):
     with st.spinner("Baixando as notícias..."):
         SS["sint_noticias"] = ss.baixar_todas(nots)
     client = genai.Client(api_key=GEMINI_API_KEY)
+    baixadas = SS["sint_noticias"]  # thread não enxerga st.session_state
     bullets, erros = {}, {}
     with st.spinner(f"Gerando bullets de {len(escolhidos)} clientes..."):
         def _um(c):
             try:
-                return c, ss.gerar_bullets(client, GEMINI_MODEL, c, SS["sint_noticias"]), None
+                return c, ss.gerar_bullets(client, GEMINI_MODEL, c, baixadas), None
             except Exception as e:  # noqa: BLE001
                 return c, [], f"{type(e).__name__}: {e}"[:300]
         with ThreadPoolExecutor(5) as ex:
