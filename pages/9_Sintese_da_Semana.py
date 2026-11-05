@@ -123,11 +123,14 @@ footer { display: none !important; }
 /* bullets da síntese: prévia como sai no Word, edição recolhida */
 .sb-cli { font-size: 14px; font-weight: 700; color: #192D4E; margin: 0; padding: 8px 0;
     border-bottom: 1px solid #DADAD4; }
+.sb-email { background: #fff; border: 1px solid #DADAD4; padding: 18px 22px; font-size: 14px; line-height: 1.6; }
+.sb-email h3 { font-size: 15px; color: #192D4E; margin: 14px 0 6px; }
 .sb-card { padding: 10px 0 2px; }
-.sb-txt { font-size: 14px; line-height: 1.65; color: #222; margin: 0; }
-.sb-tit { font-weight: 700; color: #962E4D !important; text-decoration: none; }
+.sb-txt { font-size: 14.5px !important; line-height: 1.65 !important; color: #222 !important; margin: 0 !important; }
+.sb-tit, .sb-tit:visited { font-weight: 700; color: #962E4D !important; text-decoration: none !important; }
 .sb-tit:hover { text-decoration: underline; }
-.sb-meta { font-size: 12px; color: #767672; margin: 4px 0 0; }
+.sb-meta { font-size: 11.5px !important; color: #9A9A95 !important; margin: 3px 0 0 !important; letter-spacing: 0.02em; }
+.st-key-sb_falha summary p { color: #B4532A !important; }
 .sb-meta a { color: #767672 !important; }
 .sb-fora .sb-txt, .sb-fora .sb-tit { color: #A9A9A4 !important; text-decoration: line-through; }
 [data-testid="stExpander"] details { border: none !important; background: transparent !important; }
@@ -269,6 +272,9 @@ with st.expander("Ver as notícias por seção"):
 
 # ========= 2. BULLETS =========
 st.markdown('<div class="ge-rule">2. Bullets por cliente</div>', unsafe_allow_html=True)
+st.markdown('<p class="ag-sub">Escolha os clientes desta rodada. O texto de cada bullet segue o padrão do '
+            'prompt: fato no presente, sem análise. Ajuste ou desligue o que não servir antes de gerar o Word.</p>',
+            unsafe_allow_html=True)
 escolhidos = st.pills("Clientes", CLIS, default=CLIS, selection_mode="multi", label_visibility="collapsed")
 
 if st.button("Ler notícias e gerar bullets", type="primary"):
@@ -280,14 +286,17 @@ if st.button("Ler notícias e gerar bullets", type="primary"):
     client = genai.Client(api_key=GEMINI_API_KEY)
     baixadas = SS["sint_noticias"]  # thread não enxerga st.session_state
     bullets, erros = {}, {}
-    with st.spinner(f"Gerando bullets de {len(escolhidos)} clientes..."):
+    barra = st.progress(0.0, text=f"Gerando bullets: 0 de {len(escolhidos)} clientes")
+    with st.container():
         def _um(c):
             try:
                 return c, ss.gerar_bullets(client, GEMINI_MODEL, c, baixadas), None
             except Exception as e:  # noqa: BLE001
                 return c, [], f"{type(e).__name__}: {e}"[:300]
         with ThreadPoolExecutor(5) as ex:
-            for c, bl, err in ex.map(_um, escolhidos):
+            for n_feito, (c, bl, err) in enumerate(ex.map(_um, escolhidos), 1):
+                barra.progress(n_feito / len(escolhidos),
+                               text=f"Gerando bullets: {n_feito} de {len(escolhidos)} clientes")
                 bullets[c] = bl
                 if err:
                     erros[c] = err
@@ -302,7 +311,7 @@ if noticias is None:
 
 falhas = [n for n in noticias if n.get("erro")]
 if falhas:
-    with st.expander(f"{len(falhas)} notícia(s) não foram lidas e ficaram de fora"):
+    with st.container(key="sb_falha"), st.expander(f"{len(falhas)} notícia(s) não foram lidas e ficaram de fora"):
         for n in falhas:
             st.markdown(f"- {n['url']} ({n['erro']})")
 for c, e in SS.get("sint_erros", {}).items():
@@ -361,7 +370,8 @@ for c, tab in zip(abas, tabs):
                         st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t")
                         st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=110)
                 with col2:
-                    st.toggle("Incluir", value=True, key=f"sb_{c}_{i}_on", label_visibility="collapsed")
+                    st.toggle("Incluir", value=True, key=f"sb_{c}_{i}_on", label_visibility="collapsed",
+                              help="Desligado, o bullet não vai para o Word nem para o email")
         if not bullets[c]:
             st.markdown('<p class="ag-nota">Nenhuma notícia da semana com relação direta com os temas do cliente.</p>',
                         unsafe_allow_html=True)
@@ -406,7 +416,9 @@ for c, tab in zip(abas, tabs):
 st.markdown('<div class="ag-fim"></div>', unsafe_allow_html=True)
 st.markdown('<div class="ge-rule">3. Word e corpo do email</div>', unsafe_allow_html=True)
 
-if st.button("Gerar Word e email", type="primary"):
+g1, g2 = st.columns([0.25, 0.75], vertical_alignment="center")
+gerar = g1.button("Gerar Word e email", type="primary", use_container_width=True)
+if gerar:
     arquivos = {}
     for c in abas:
         bl = []
@@ -426,23 +438,28 @@ if st.button("Gerar Word e email", type="primary"):
             modelo, c, PERIODO, [], None, novas, movs, atos, so_anexo=True)
         arquivos[nome.replace(".docx", " - email.html")] = ss.html_email(c, PERIODO, bl, cl).encode("utf8")
     SS["sint_arquivos"] = arquivos
+    SS["sint_emails"] = {c: arquivos[ss.nome_arquivo(c, INI, FIM).replace(".docx", " - email.html")].decode("utf8")
+                         for c in abas}
 
 arqs = SS.get("sint_arquivos")
 if arqs:
-    st.download_button("Baixar tudo (.zip)", ss.pacote_zip(arqs),
+    g2.download_button("Baixar tudo (.zip)", ss.pacote_zip(arqs),
                        file_name=f"Sínteses {INI:%d.%m} a {FIM:%d.%m.%Y}.zip", mime="application/zip")
     st.markdown('<p class="ag-sub"><b>Síntese</b>: Word completo · <b>Anexo</b>: proposições, movimentações e DOU, '
-                'para o PDF do botão · <b>Email</b>: abra no navegador, selecione tudo e cole no Wix (os links vão junto).</p>',
-                unsafe_allow_html=True)
+                'para o PDF do botão · <b>Email</b>: o corpo pronto; abra "Ver email", selecione o texto e cole no Wix '
+                '(os links vão junto).</p>', unsafe_allow_html=True)
     DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     with st.container(key="ag_por_cliente"):
         for k, c in enumerate(abas):
             nome = ss.nome_arquivo(c, INI, FIM)
-            trio = [("Síntese", nome, DOCX), ("Anexo", nome.replace(".docx", " - anexo.docx"), DOCX),
-                    ("Email", nome.replace(".docx", " - email.html"), "text/html")]
-            c0, c1, c2, c3 = st.columns([0.4, 0.2, 0.2, 0.2], vertical_alignment="center")
+            trio = [("Síntese", nome, DOCX), ("Anexo", nome.replace(".docx", " - anexo.docx"), DOCX)]
+            c0, c1, c2 = st.columns([0.5, 0.25, 0.25], vertical_alignment="center")
             c0.markdown(f'<p class="sb-cli">{_html.escape(ss.CLIENTES[c]["titulo"])}</p>', unsafe_allow_html=True)
-            for col, (rot, arq_nome, mime) in zip((c1, c2, c3), trio):
+            for col, (rot, arq_nome, mime) in zip((c1, c2), trio):
                 if arq_nome in arqs:
                     col.download_button(rot, arqs[arq_nome], file_name=arq_nome, mime=mime,
                                         key=f"dl_{k}_{rot}", use_container_width=True)
+            corpo = SS.get("sint_emails", {}).get(c)
+            if corpo:
+                with st.expander("Ver email"):
+                    st.html(f'<div class="sb-email">{corpo.split("<body", 1)[-1].split(">", 1)[-1].rsplit("</body>", 1)[0]}</div>')
