@@ -913,11 +913,15 @@ def _partes_bullet(b: dict) -> list[tuple[str, bool, str | None]]:
 
 def _linha_tabela(tbl_proto, valores: list[tuple[str, str | None]], doc):
     tr = copy.deepcopy(tbl_proto._tbl.findall(f"{W}tr")[1])
-    for tc, (txt, link) in zip(tr.findall(f"{W}tc"), valores):
+    for tc, valor in zip(tr.findall(f"{W}tc"), valores):
         ps = tc.findall(f"{W}p")
         for extra in ps[1:]:
             tc.remove(extra)
-        _set_texto(ps[0], [(txt or "-", False, link)], doc)
+        if isinstance(valor, list):  # já em partes (texto, negrito, link)
+            _set_texto(ps[0], [x for x in valor if x[0]] or [("-", False, None)], doc)
+        else:
+            txt, link = valor
+            _set_texto(ps[0], [(txt or "-", False, link)], doc)
     return tr
 
 
@@ -972,7 +976,8 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, bullets: list[dict],
             mov = (mov + " " if mov else "") + m.get("andamento", "")
             tbl.append(_linha_tabela(P["tab_mov"], [(m["proposicao"], m.get("link") or None), (m["ementa"], None),
                                                     (m["autor"], None), (m.get("relator") or "-", None),
-                                                    (mov, None)], doc))
+                                                    [(mov, False, None)] + ([(" ", False, None), ("Inteiro teor", False, m["teor"])]
+                                                                            if m.get("teor") else [])], doc))
         els.append(tbl)
     if dou:
         add_par("sub", [("NOVAS PUBLICAÇÕES", False, None)])
@@ -1046,6 +1051,63 @@ def html_email(cliente: str, periodo: str, bullets: list[dict], clipping: list[d
         partes.append("</ul>")
     return "<html><head><meta charset='utf-8'></head><body style='font-family:Montserrat,Arial,sans-serif;font-size:14px'>" \
            + "\n".join(partes) + "</body></html>"
+
+
+# ─── PDF (LibreOffice convertendo o próprio Word, para sair com o mesmo layout) ──
+def _instalar_fontes(pasta_fontes: str) -> None:
+    """Montserrat não tem pacote no Debian 12: copia os .ttf do repo para ~/.fonts."""
+    import glob
+    import os
+    import shutil
+    import subprocess
+    destino = os.path.expanduser("~/.fonts")
+    os.makedirs(destino, exist_ok=True)
+    novas = False
+    for f in glob.glob(os.path.join(pasta_fontes, "*.ttf")):
+        alvo = os.path.join(destino, os.path.basename(f))
+        if not os.path.exists(alvo):
+            shutil.copy(f, alvo)
+            novas = True
+    if novas and shutil.which("fc-cache"):
+        subprocess.run(["fc-cache", "-f", destino], capture_output=True, timeout=60)
+
+
+def pdf_disponivel() -> bool:
+    import shutil
+    return bool(shutil.which("soffice") or shutil.which("libreoffice"))
+
+
+def docx_para_pdf(arquivos: dict[str, bytes], pasta_fontes: str = "fontes") -> dict[str, bytes]:
+    """{nome.docx: bytes} -> {nome.pdf: bytes}, numa chamada só do LibreOffice."""
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice or not arquivos:
+        return {}
+    _instalar_fontes(pasta_fontes)
+    with tempfile.TemporaryDirectory() as tmp:
+        entrada, saida = os.path.join(tmp, "in"), os.path.join(tmp, "out")
+        os.makedirs(entrada)
+        os.makedirs(saida)
+        apelido = {}
+        for i, (nome, dados) in enumerate(arquivos.items()):
+            caminho = os.path.join(entrada, f"{i}.docx")  # nome curto: acento e espaço não atrapalham
+            with open(caminho, "wb") as f:
+                f.write(dados)
+            apelido[f"{i}.pdf"] = nome[:-5] + ".pdf"
+        subprocess.run([soffice, "--headless", "--norestore", f"-env:UserInstallation=file://{tmp}/perfil",
+                        "--convert-to", "pdf", "--outdir", saida]
+                       + [os.path.join(entrada, f"{i}.docx") for i in range(len(arquivos))],
+                       capture_output=True, timeout=300)
+        out = {}
+        for curto, nome in apelido.items():
+            caminho = os.path.join(saida, curto)
+            if os.path.exists(caminho):
+                with open(caminho, "rb") as f:
+                    out[nome] = f.read()
+        return out
 
 
 def pacote_zip(arquivos: dict[str, bytes]) -> bytes:
