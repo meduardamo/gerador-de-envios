@@ -5,7 +5,6 @@ from urllib.parse import quote
 import os
 import re
 import json
-import inspect
 
 import streamlit as st
 from google import genai
@@ -13,9 +12,6 @@ from google.genai import types
 import gspread
 from google.oauth2.service_account import Credentials
 
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 
 import fitz  # PyMuPDF
 
@@ -29,7 +25,9 @@ from alerta_pesquisa_core import (
 from estilo_paginas import cabecalho, chip, explica, secao, vazio
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Gerador de Envios", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Gerador de Envios")
 
 EIXO = {
     "tinta":    "#111111",
@@ -47,21 +45,7 @@ LOGO_PATH = "logo_eixo_gov_magenta.png"
 # Botões, rótulos, abas, caixas e cabeçalho vêm do CSS compartilhado (estilo_paginas,
 # carregado junto do CSS_MENU). Aqui fica só o que é desta página.
 st.markdown(f"""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] {{ background: {EIXO["gelo"]} !important; }}
-[data-testid="stAppViewContainer"] > section > div {{ background: {EIXO["gelo"]}; }}
 .block-container, [data-testid="stMainBlockContainer"] {{ max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: {EIXO["gelo"]}; }}
-* {{ box-sizing: border-box; }}
-body, p, span, div, label, input, select, textarea {{ font-family: 'Montserrat', sans-serif !important; }}
-[data-testid="stHeader"], [data-testid="stDecoration"] {{ display: none; }}
-[data-testid="stSidebar"] {{ background: {EIXO["gelo"]} !important; border-right: 1px solid {EIXO["borda"]} !important; }}
-[data-testid="stSidebar"] * {{ font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }}
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {{
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }}
-footer, #MainMenu {{ display: none !important; }}
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
 .st-key-ge_classif, .st-key-ge_resultado {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 16px 20px; }}
 .st-key-ge_ufs_topo {{ gap: 12px !important; margin-top: 4px; }}
 .st-key-ge_ufs_topo [data-testid="stButton"] button {{ min-height: 30px !important; padding: 2px 12px !important; }}
@@ -72,66 +56,11 @@ div[data-testid="stCodeBlock"] > pre {{ max-height: 520px !important; overflow: 
 
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-    if os.path.exists("config.yaml"):
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-sig = inspect.signature(authenticator.login)
-params = sig.parameters
-
-try:
-    if "location" in params:
-        login_result = authenticator.login(location="main")
-    else:
-        login_result = authenticator.login("Login", "main")
-except TypeError:
-    login_result = authenticator.login("Login", "main")
-
-if isinstance(login_result, (tuple, list)) and len(login_result) == 3:
-    name, authentication_status, username = login_result
-else:
-    authentication_status = st.session_state.get("authentication_status", None)
-    name = st.session_state.get("name", "")
-    username = st.session_state.get("username", "")
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 # ─── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
-    try:
-        st.image(LOGO_PATH, use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
     st.markdown(
         f'<div style="border-left:3px solid {EIXO["vinho"]};padding:10px 12px;'
         f'margin:10px 0 0 0;background:transparent;">'
@@ -143,14 +72,13 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    if st.button("Atualizar dados", icon=":material/refresh:", use_container_width=True):
+    if st.button("Atualizar dados", icon=":material/refresh:", width="stretch"):
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
-    if _auth_cfg:
-        authenticator.logout("Sair", "sidebar")
+    authenticator.logout("Sair", "sidebar")
 
 
 # ─── Configurações ───────────────────────────────────────────────────────────
@@ -449,7 +377,7 @@ def whatsapp_share_link(message: str) -> str:
 @st.dialog("Enviar no WhatsApp")
 def dialog_whatsapp(message: str):
     st.caption("Vai abrir o WhatsApp com o texto já preenchido. O envio final acontece por lá.")
-    st.link_button("Abrir WhatsApp", whatsapp_share_link(message), use_container_width=True)
+    st.link_button("Abrir WhatsApp", whatsapp_share_link(message), width="stretch")
 
 
 # ─── PDF: extração de texto ───────────────────────────────────────────────────
@@ -802,7 +730,7 @@ with col_esq:
                     "para pesquisa eleitoral, 2 ou 3 páginas costumam bastar."
                 )
 
-            if st.button("Extrair texto do PDF", use_container_width=True):
+            if st.button("Extrair texto do PDF", width="stretch"):
                 try:
                     texto_extraido = processar_pdf(
                         pdf_bytes=pdf_bytes,
@@ -818,7 +746,7 @@ with col_esq:
                         st.image(
                             st.session_state["pdf_preview_png"],
                             caption="Primeira página lida como imagem",
-                            use_container_width=True,
+                            width="stretch",
                         )
                 except Exception as e:
                     st.error(f"Não consegui extrair o texto do PDF. Tente outro modo de leitura ou menos páginas. Detalhe: {e}")
@@ -853,7 +781,7 @@ with col_esq:
         link = st.text_input("Link (opcional)", value="", placeholder="Ex.: https://...")
 
         submitted = st.form_submit_button(
-            "Gerar alerta" if is_alerta else "Gerar envio", type="primary", use_container_width=True
+            "Gerar alerta" if is_alerta else "Gerar envio", type="primary", width="stretch"
         )
 
     if submitted:
@@ -942,11 +870,11 @@ with col_dir:
             c1, c2 = st.columns(2)
 
             with c1:
-                if st.button("Enviar no WhatsApp", use_container_width=True):
+                if st.button("Enviar no WhatsApp", width="stretch"):
                     dialog_whatsapp(st.session_state["resultado_final"])
 
             with c2:
-                if st.button("Salvar na planilha", use_container_width=True,
+                if st.button("Salvar na planilha", width="stretch",
                              help="Registra o envio na planilha de envios da equipe."):
                     if get_sheets_client():
                         with st.spinner("Salvando..."):

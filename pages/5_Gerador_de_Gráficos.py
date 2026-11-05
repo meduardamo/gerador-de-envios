@@ -16,7 +16,6 @@ Divisão de trabalho:
 Esta página não grava nada em planilha nenhuma.
 """
 
-import inspect
 import io
 import json
 import os
@@ -27,9 +26,6 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -64,24 +60,12 @@ from gerador_graficos_extracao import (
 from polling_extracao_core import definir_api_key
 from estilo_paginas import MARINHO, cabecalho, esc, explica, resumo, secao, vazio
 
-st.set_page_config(page_title="Gerador de Gráficos", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Gerador de Gráficos")
 
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
-[data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
 .block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
-* { box-sizing: border-box; }
-body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
-[data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
-[data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }
-footer, #MainMenu { display: none !important; }
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
 .st-key-gg_cx_fonte, .st-key-gg_cx_ctl, .st-key-gg_cx_baixar { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 18px; gap: .6rem; }
 .st-key-gg_cx_ctl .eg-secao, .st-key-gg_cx_baixar .eg-secao { margin: 10px 0 2px; }
 .gg-forma { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 11px 16px; font-size: 13px; line-height: 1.6; color: #4A4A4A; margin: 4px 0 12px; }
@@ -95,61 +79,7 @@ p.gg-arquivo, .gg-arquivo { font-size: 12px !important; color: #6A6A66 !importan
 
 # ── autenticação ──────────────────────────────────────────────────────────────
 
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-
-    config_path = ROOT_DIR / "config.yaml"
-    if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-sig = inspect.signature(authenticator.login)
-params = sig.parameters
-
-try:
-    if "location" in params:
-        login_result = authenticator.login(location="main")
-    else:
-        login_result = authenticator.login("Login", "main")
-except TypeError:
-    login_result = authenticator.login("Login", "main")
-
-if isinstance(login_result, (tuple, list)) and len(login_result) == 3:
-    name, authentication_status, username = login_result
-else:
-    authentication_status = st.session_state.get("authentication_status", None)
-    name = st.session_state.get("name", "")
-    username = st.session_state.get("username", "")
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 
@@ -632,10 +562,6 @@ cabecalho("Gerador de Gráficos",
 
 # Mesma lateral das outras páginas: logo, o que a página faz, usuário e sair.
 with st.sidebar:
-    try:
-        st.image(LOGO_PATH, use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
         'margin:10px 0 0 0;background:transparent;">'
@@ -653,12 +579,11 @@ with st.sidebar:
     st.markdown("---")
     # Sem help: com tooltip o Streamlit embrulha o botão e ele perde o
     # estilo dos outros botões da lateral.
-    st.button("Limpar tudo", on_click=_limpar_tabela, use_container_width=True)
+    st.button("Limpar tudo", on_click=_limpar_tabela, width="stretch")
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** "
                f"({st.session_state.get('username', '')})")
-    if _auth_cfg:
-        authenticator.logout("Sair", "sidebar")
+    authenticator.logout("Sair", "sidebar")
 
 # ── 1. dados ─────────────────────────────────────────────────────────────────
 
@@ -677,7 +602,7 @@ with st.container(key="gg_cx_fonte"):
                      key="gg_colado", height=110,
                      placeholder="Ano\tPLOA\tPago\n2023\t225,5\t312,7\n2024\t445,0\t384,7")
         b1, b2 = st.columns([1.5, 4], vertical_alignment="center")
-        b1.button("Usar dados colados", on_click=_usar_colado, use_container_width=True,
+        b1.button("Usar dados colados", on_click=_usar_colado, width="stretch",
                   type="primary")
         with b2:
             explica("Ou digite direto na tabela abaixo.")
@@ -705,7 +630,7 @@ with st.container(key="gg_cx_fonte"):
         else:
             l1, l2 = st.columns([1.5, 4], vertical_alignment="center")
             ler = l1.button("Ler tabela", disabled=not tem_fonte, type="primary",
-                            icon=":material/document_scanner:", use_container_width=True)
+                            icon=":material/document_scanner:", width="stretch")
             if not tem_fonte:
                 with l2:
                     explica("Suba um arquivo ou cole o texto para liberar a leitura.")
@@ -743,7 +668,7 @@ if st.session_state.get("gg_origem") == "ia":
     if st.session_state.get("gg_fonte_imgs"):
         with st.expander("Ver a fonte ao lado da tabela"):
             for imagem in st.session_state["gg_fonte_imgs"]:
-                st.image(imagem, use_container_width=True)
+                st.image(imagem, width="stretch")
 
 secao("Tabela", cor=MARINHO, menor=True,
       explicacao="A primeira coluna é a categoria (ano, órgão, UF) e cada outra coluna é "
@@ -759,12 +684,12 @@ t1.text_input("Colunas (separadas por vírgula)", key="gg_colunas",
               on_change=_aplicar_colunas,
               help="Edite para renomear, acrescentar ou tirar colunas. Linhas "
                    "você acrescenta direto na tabela.")
-t3.button("Limpar tabela", on_click=_limpar_tabela, use_container_width=True,
+t3.button("Limpar tabela", on_click=_limpar_tabela, width="stretch",
           help="Esvazia a tabela e os textos da peça.")
 
 base = st.session_state["gg_base"]
 editado = st.data_editor(
-    base, num_rows="dynamic", hide_index=True, use_container_width=True,
+    base, num_rows="dynamic", hide_index=True, width="stretch",
     key=f"gg_editor_{st.session_state['gg_v']}",
     column_config={c: st.column_config.TextColumn(c) for c in base.columns},
 ).fillna("").astype(str)
@@ -1021,7 +946,7 @@ with col_prev:
         st.image(gerar_peca(tipo, categorias, selecao,
                             incluir_logo="com-logo" in logos or not logos,
                             fundo_transparente=bool(fundos) and "fundo-branco" not in fundos,
-                            **opcoes), use_container_width=True)
+                            **opcoes), width="stretch")
     except ValueError as exc:
         st.error(str(exc))
         _parar("A peça não fecha com estes dados: veja o aviso")
@@ -1085,12 +1010,12 @@ with col_prev:
             st.download_button(
                 f"Baixar {SAIDA_FORMATO[formato]}", _arquivos(assinatura),
                 file_name=nome, mime=MIMES_SAIDA[formato],
-                use_container_width=True, type="primary", icon=":material/download:")
+                width="stretch", type="primary", icon=":material/download:")
             st.markdown(f'<p class="gg-arquivo">{esc(nome)}</p>', unsafe_allow_html=True)
         else:
             st.download_button(
                 f"Baixar {len(arquivos)} arquivos (.zip)", _arquivos(assinatura),
                 file_name=slug_arquivo(titulo, tipo, "zip"), mime="application/zip",
-                use_container_width=True, type="primary", icon=":material/download:")
+                width="stretch", type="primary", icon=":material/download:")
             st.markdown('<p class="gg-arquivo">Uma opção marcada em cada grupo baixa o '
                         'arquivo direto, sem zip.</p>', unsafe_allow_html=True)

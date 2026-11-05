@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from difflib import get_close_matches
 import hashlib
-import inspect
 import json
 import os
 import re
@@ -14,9 +13,6 @@ import gspread
 import pandas as pd
 import streamlit as st
 from google.oauth2.service_account import Credentials
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -64,21 +60,15 @@ from polling_extracao_core import (
 )
 
 
-st.set_page_config(page_title="Polling", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Polling")
 
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 :root { --eixo-vinho: #962E4D; }
-html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
-[data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
 .block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 0 2rem 3rem !important; background: #F4F3EF; }
-* { box-sizing: border-box; }
-body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
 [data-testid="stHeader"] { display: none; }
 [data-testid="stDecoration"] { display: none; }
-[data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
-[data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
@@ -135,61 +125,7 @@ footer { display: none !important; }
 
 # ── autenticação ──────────────────────────────────────────────────────────────
 
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-
-    config_path = ROOT_DIR / "config.yaml"
-    if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-sig = inspect.signature(authenticator.login)
-params = sig.parameters
-
-try:
-    if "location" in params:
-        login_result = authenticator.login(location="main")
-    else:
-        login_result = authenticator.login("Login", "main")
-except TypeError:
-    login_result = authenticator.login("Login", "main")
-
-if isinstance(login_result, (tuple, list)) and len(login_result) == 3:
-    name, authentication_status, username = login_result
-else:
-    authentication_status = st.session_state.get("authentication_status", None)
-    name = st.session_state.get("name", "")
-    username = st.session_state.get("username", "")
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 # ── configurações ─────────────────────────────────────────────────────────────
@@ -1290,7 +1226,7 @@ def render_editor_cenarios_polling(
             key=f"polling_editor_{idx}",
             num_rows="dynamic",
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "candidato": st.column_config.TextColumn("Candidato / opção"),
                 "partido": st.column_config.TextColumn("Partido"),
@@ -1392,10 +1328,6 @@ def render_manual():
     # ── sidebar ───────────────────────────────────────────────────────────────────
 
     with st.sidebar:
-        try:
-            st.image(LOGO_PATH, use_container_width=True)
-        except Exception:
-            st.caption("Logo não encontrada.")
         st.markdown(
             '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
             'margin:10px 0 0 0;background:transparent;">'
@@ -1414,16 +1346,15 @@ def render_manual():
                 faltantes.append("T2")
             st.warning(f"Matriz(es) sem ID configurado: {', '.join(faltantes)}.")
         st.markdown("---")
-        if st.button("↻ Recarregar dados", use_container_width=True):
+        if st.button("↻ Recarregar dados", width="stretch"):
             st.cache_data.clear()
             st.rerun()
-        if st.button("🧹 Limpar tudo", use_container_width=True, help="Zera a pesquisa da tela (fonte, foco, header e cenários) pra começar do zero"):
+        if st.button("🧹 Limpar tudo", width="stretch", help="Zera a pesquisa da tela (fonte, foco, header e cenários) pra começar do zero"):
             st.session_state["polling_limpar_tudo_pendente"] = True
             st.rerun()
         st.markdown("---")
         st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
-        if _auth_cfg:
-            authenticator.logout("Sair", "sidebar")
+        authenticator.logout("Sair", "sidebar")
 
 
     st.markdown(
@@ -1475,7 +1406,7 @@ def render_manual():
                 if pagina_fim < pagina_ini:
                     pagina_fim = pagina_ini
 
-                if st.button("Ler PDF para texto bruto", use_container_width=True):
+                if st.button("Ler PDF para texto bruto", width="stretch"):
                     qtd_paginas = pagina_fim - pagina_ini + 1
                     try:
                         with st.status(
@@ -1512,7 +1443,7 @@ def render_manual():
                     st.image(
                         st.session_state["polling_pdf_preview_png"],
                         caption="Prévia da primeira página renderizada",
-                        use_container_width=True,
+                        width="stretch",
                     )
 
         with st.expander("Refinar extração (opcional)", expanded=False):
@@ -1552,7 +1483,7 @@ def render_manual():
                 placeholder='Ex.: "Pegar só o cenário sem o Ratinho Junior" ou "Usar o segundo bloco da página 3".',
             )
 
-        if st.button("Identificar pesquisa com Gemini", use_container_width=True):
+        if st.button("Identificar pesquisa com Gemini", width="stretch"):
             texto_fonte = st.session_state.get("polling_manual_texto_fonte", "")
             if not normalizar_texto_simples(texto_fonte):
                 st.error("Cole o texto completo ou extraia o PDF antes de identificar a pesquisa.")
@@ -1797,18 +1728,18 @@ def render_manual():
                         "origem",
                     ]
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             col_cancelar, col_forcar = st.columns(2)
             with col_cancelar:
-                if st.button("Cancelar e revisar", use_container_width=True, key="polling_dup_cancelar"):
+                if st.button("Cancelar e revisar", width="stretch", key="polling_dup_cancelar"):
                     st.session_state["polling_manual_duplicatas"] = None
                     st.rerun()
             with col_forcar:
                 forcar_salvar = st.button(
                     "Salvar mesmo assim",
-                    use_container_width=True,
+                    width="stretch",
                     key="polling_dup_forcar",
                     type="primary",
                     help="Use só se conferiu que não é a mesma pesquisa.",
@@ -1838,7 +1769,7 @@ def render_manual():
                 "ao salvar - continuará pendente pra você voltar e lançar o restante."
             )
 
-        salvar_clicado = st.button("Salvar pesquisa na planilha", use_container_width=True, key="polling_salvar")
+        salvar_clicado = st.button("Salvar pesquisa na planilha", width="stretch", key="polling_salvar")
         if salvar_clicado or forcar_salvar:
             erros = []
             if not normalizar_texto_simples(instituto):
@@ -2131,7 +2062,7 @@ def render_colar():
         key="colar_texto", height=260,
         placeholder="Cole aqui o conteúdo copiado da tabela de pesquisas.")
 
-    if st.button("Processar", use_container_width=True, type="primary", key="colar_processar"):
+    if st.button("Processar", width="stretch", type="primary", key="colar_processar"):
         st.session_state.pop("colar_resultado", None)
         if not url.strip() or not texto.strip():
             st.error("Preencha a URL e cole o texto.")
@@ -2167,7 +2098,7 @@ def render_colar():
     df = pd.DataFrame(res["linhas_r"]).reindex(columns=[
         "registro_tse", "instituto", "data_campo", "scenario_label",
         "candidato_partido", "partido", "tipo", "percentual"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     st.markdown('<div class="ge-rule">Gravar</div>', unsafe_allow_html=True)
     if res["avisos"]:
@@ -2200,7 +2131,7 @@ def render_colar():
                  f"**{len(linhas_r)} resultado(s)**.")
     rotulo_botao = (f"[TESTE] Gravar nas abas _novas da {nome_destino}"
                     if MODO_TESTE_COLAR else f"Gravar na {nome_destino}")
-    if st.button(rotulo_botao, use_container_width=True, key="colar_gravar"):
+    if st.button(rotulo_botao, width="stretch", key="colar_gravar"):
         if not gc:
             st.error("Credenciais do Google Sheets não encontradas.")
         elif MODO_TESTE_COLAR:

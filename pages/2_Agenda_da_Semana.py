@@ -10,9 +10,6 @@ from zoneinfo import ZoneInfo
 import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 
 import agenda_semana_core as ag
 import importlib
@@ -22,27 +19,15 @@ from estilo_paginas import MARINHO, VINHO, cabecalho, chip, esc, explica, resumo
 ag = importlib.reload(ag)
 
 
-st.set_page_config(page_title="Agenda da Semana", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Agenda da Semana")
 
 # Base da página (fundo, fonte, cabeçalho do Streamlit escondido) e o que é só da Agenda:
 # cartão branco por reunião, pílulas de cliente menores e à direita, texto de cada item.
 # Botões, abas, pílulas, chave e títulos vêm do CSS_PAGINAS (carregado depois, no CSS_MENU).
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
-[data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
 .block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
-* { box-sizing: border-box; }
-body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
-[data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
-[data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }
-footer, #MainMenu { display: none !important; }
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
 .st-key-ag_barra { gap: 24px !important; margin-bottom: 4px; }
 .ag-clis { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #4A4A4A; margin: 0 0 12px; }
 .ag-clis .r { font-size: 0.72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #4E5A6E; margin-right: 4px; }
@@ -84,49 +69,7 @@ p.ag-nota { font-size: 12px !important; color: #962E4D !important; font-weight: 
 
 
 # ========= LOGIN =========
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-
-    if os.path.exists("config.yaml"):
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-try:
-    authenticator.login(location="main")
-except TypeError:
-    authenticator.login("Login", "main")
-
-authentication_status = st.session_state.get("authentication_status", None)
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 # ========= DADOS =========
@@ -294,10 +237,6 @@ def _dia_extenso(iso: str) -> str:
 semanas = _semanas_salvas()
 
 with st.sidebar:
-    try:
-        st.image(LOGO_PATH, use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
         'margin:10px 0 0 0;background:transparent;">'
@@ -310,10 +249,10 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", use_container_width=True,
+    atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", width="stretch",
                           key="ag_atualizar",
                           help="A pauta muda ao longo da semana. Busca de novo na Câmara e no Senado.")
-    recarregar = st.button("Ver seleção da equipe", icon=":material/group:", use_container_width=True,
+    recarregar = st.button("Ver seleção da equipe", icon=":material/group:", width="stretch",
                            key="ag_recarregar",
                            help="Traz o que a equipe salvou desde que você abriu a página. "
                                 "Marcações suas ainda não salvas são descartadas.")
@@ -407,8 +346,8 @@ pacote_pronto = bool(st.session_state.get("ag_pacote")) and st.session_state["ag
 
 
 resumo(
-    [(len(ativos), "item na pauta" if len(ativos) == 1 else "itens na pauta")]
-    + ([(fora, "em reunião cancelada ou adiada", True)] if fora else [])
+    [(len(itens), "item na pauta" if len(itens) == 1 else "itens na pauta")]
+    + ([(fora, "deles em reunião cancelada ou adiada", True)] if fora else [])
     + ([(len(novos), "novo desde segunda" if len(novos) == 1 else "novos desde segunda")] if novos else [])
     + [(n_marc, "com cliente marcado")]
 )
@@ -455,7 +394,7 @@ if pacote_pronto:
         with st.container(key="ag_por_cliente"):
             cols = st.columns(len(ag.CLIENTES))
             for col, (nome, dados), (cli, n) in zip(cols, arquivos.items(), contagem.items()):
-                col.download_button(f"{cli} · {n}", data=dados, file_name=nome, use_container_width=True,
+                col.download_button(f"{cli} · {n}", data=dados, file_name=nome, width="stretch",
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                     icon=":material/download:", key=f"ag_baixar_{cli}",
                                     help=f"{_plural(n, 'item', 'itens')} no Word de {cli}")
@@ -494,7 +433,7 @@ def _item(it: dict, fio: bool) -> None:
 
 COR_CASA = {"CD": MARINHO, "SF": VINHO}
 
-secao("Pauta por dia", f"{_plural(len(itens), 'item', 'itens')} em {_plural(len(dias_com), 'dia', 'dias')}", MARINHO,
+secao("Pauta por dia", _plural(len(dias_com), "dia com reunião", "dias com reunião"), MARINHO,
       "Marcar um cliente não grava nada nem recarrega a página. Salvar seleção grava só o que você mudou, "
       "por cima do que o resto da equipe já salvou, e registra no histórico. Salvar e gerar Word grava e "
       "monta um arquivo por cliente.")

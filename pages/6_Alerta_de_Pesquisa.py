@@ -12,7 +12,6 @@ Polling Manual; aqui é só produção de peça de divulgação.
 """
 
 from datetime import datetime, timedelta, timezone
-import inspect
 import io
 import json
 import os
@@ -22,9 +21,6 @@ import zlib
 from pathlib import Path
 
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -78,24 +74,12 @@ from estilo_paginas import (
     vazio,
 )
 
-st.set_page_config(page_title="Alerta de Pesquisa", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Alerta de Pesquisa")
 
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
-[data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
 .block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
-* { box-sizing: border-box; }
-body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
-[data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
-[data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }
-footer, #MainMenu { display: none !important; }
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
 div[class*="st-key-ap_caixa"] { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; }
 div[class*="st-key-ap_caixa"] [data-testid="stImage"] img { border-radius: 4px; }
 .ap-th { font-size: 0.69rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #4E5A6E; padding-bottom: 2px; }
@@ -105,61 +89,7 @@ div[class*="st-key-ap_caixa"] [data-testid="stImage"] img { border-radius: 4px; 
 
 # ── autenticação ──────────────────────────────────────────────────────────────
 
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-
-    config_path = ROOT_DIR / "config.yaml"
-    if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-sig = inspect.signature(authenticator.login)
-params = sig.parameters
-
-try:
-    if "location" in params:
-        login_result = authenticator.login(location="main")
-    else:
-        login_result = authenticator.login("Login", "main")
-except TypeError:
-    login_result = authenticator.login("Login", "main")
-
-if isinstance(login_result, (tuple, list)) and len(login_result) == 3:
-    name, authentication_status, username = login_result
-else:
-    authentication_status = st.session_state.get("authentication_status", None)
-    name = st.session_state.get("name", "")
-    username = st.session_state.get("username", "")
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 
@@ -307,10 +237,6 @@ cabecalho("Alerta de Pesquisa",
           "do alerta. Nada é gravado nas matrizes.")
 
 with st.sidebar:
-    try:
-        st.image(LOGO_PATH, use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
         'margin:10px 0 0 0;background:transparent;">'
@@ -326,7 +252,7 @@ with st.sidebar:
         st.warning("A fonte Montserrat não está instalada no app. O gráfico sai "
                    "em outra fonte, fora da tipografia da casa.")
     st.markdown("---")
-    if st.button("Limpar tudo", use_container_width=True,
+    if st.button("Limpar tudo", width="stretch",
                  help="Zera a pesquisa da tela (texto, extração, gráfico e alerta) "
                       "pra começar do zero"):
         _limpar(limpar_fonte=True)
@@ -334,8 +260,7 @@ with st.sidebar:
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** "
                f"({st.session_state.get('username', '')})")
-    if _auth_cfg:
-        authenticator.logout("Sair", "sidebar")
+    authenticator.logout("Sair", "sidebar")
 
 
 # ── abas ──────────────────────────────────────────────────────────────────────
@@ -819,7 +744,7 @@ with aba_grafico:
                         orientacao=orientacao, incluir_logo=incluir_logo,
                         escala_cheia=escala_cheia,
                         fundo_transparente=fundo_transparente),
-                        use_container_width=True)
+                        width="stretch")
 
             secao("Baixar o gráfico",
                   explicacao="Um zip com quatro arquivos: PNG e SVG, cada um com e "
@@ -860,7 +785,7 @@ with aba_grafico:
                 # para um botão que ninguém pode clicar.
                 if travando:
                     e2.button("Baixar tudo (.zip)", disabled=True,
-                              use_container_width=True, type="primary",
+                              width="stretch", type="primary",
                               icon=":material/download:",
                               help="Falta " + ", ".join(travando) + " na ficha técnica")
                     e2.caption("Complete a ficha na aba 2. Revisão.")
@@ -868,7 +793,7 @@ with aba_grafico:
                     e2.download_button(
                         "Baixar tudo (.zip)", _pacote_graficos(assinatura),
                         file_name=slug_arquivo(payload, cenario_final, "zip"),
-                        mime="application/zip", use_container_width=True, type="primary",
+                        mime="application/zip", width="stretch", type="primary",
                         icon=":material/download:",
                         help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
                     e2.caption("PNG e SVG, com e sem logo.")

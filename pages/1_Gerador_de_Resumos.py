@@ -2,38 +2,21 @@ from datetime import datetime
 from urllib.parse import quote
 import os
 import re
-import json
-import inspect
 
 import streamlit as st
 from google import genai
 from google.genai import types
 import fitz  # PyMuPDF
 
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 
 from estilo_paginas import cabecalho, secao, explica, chip, vazio, esc
 
-st.set_page_config(page_title="Gerador de Resumos", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Gerador de Resumos")
 
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
-[data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
 .block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
-* { box-sizing: border-box; }
-body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
-[data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
-[data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }
-footer, #MainMenu { display: none !important; }
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
 .st-key-gr_config, .st-key-gr_resultado { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; }
 .st-key-gr_resultado div[data-testid="stCodeBlock"] > pre { max-height: 520px !important; overflow: auto !important; border-radius: 8px !important;
     background: #FAFAF7 !important; border: 1px solid #ECEBE6; }
@@ -49,55 +32,7 @@ footer, #MainMenu { display: none !important; }
 
 # ── autenticação ──────────────────────────────────────────────────────────────
 
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-    if os.path.exists("config.yaml"):
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-    return None
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("O login não está configurado neste servidor. Avise a equipe de dados.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-sig = inspect.signature(authenticator.login)
-params = sig.parameters
-try:
-    if "location" in params:
-        login_result = authenticator.login(location="main")
-    else:
-        login_result = authenticator.login("Login", "main")
-except TypeError:
-    login_result = authenticator.login("Login", "main")
-
-if isinstance(login_result, (tuple, list)) and len(login_result) == 3:
-    name, authentication_status, username = login_result
-else:
-    authentication_status = st.session_state.get("authentication_status", None)
-    name = st.session_state.get("name", "")
-    username = st.session_state.get("username", "")
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 # ── configurações ─────────────────────────────────────────────────────────────
@@ -1036,10 +971,6 @@ for k, v in [
 # ── sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    try:
-        st.image(LOGO_PATH, use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
         'margin:10px 0 0 0;background:transparent;">'
@@ -1051,13 +982,12 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    if st.button("Atualizar dados", icon=":material/refresh:", use_container_width=True):
+    if st.button("Atualizar dados", icon=":material/refresh:", width="stretch"):
         st.cache_data.clear()
         st.rerun()
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
-    if _auth_cfg:
-        authenticator.logout("Sair", "sidebar")
+    authenticator.logout("Sair", "sidebar")
 
 
 # ── página principal ──────────────────────────────────────────────────────────

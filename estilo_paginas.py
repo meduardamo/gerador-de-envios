@@ -14,6 +14,23 @@ MUDO = "#4A4A4A"
 ROTULO = "#4E5A6E"
 
 CSS_PAGINAS = f"""<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+/* base de toda página: fundo gelo, Montserrat, sem cabeçalho nem rodapé do Streamlit */
+html, body, [data-testid="stAppViewContainer"] {{ background: {GELO} !important; }}
+[data-testid="stAppViewContainer"] > section > div {{ background: {GELO}; }}
+* {{ box-sizing: border-box; }}
+body, p, span, div, label, input, select, textarea {{ font-family: 'Montserrat', sans-serif !important; }}
+[data-testid="stHeader"], [data-testid="stDecoration"] {{ display: none; }}
+footer, #MainMenu {{ display: none !important; }}
+[data-testid="stSidebar"] {{ background: {GELO} !important; border-right: 1px solid {BORDA} !important; }}
+[data-testid="stSidebar"] * {{ font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }}
+span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
+[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {{ font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
+    letter-spacing: normal !important; text-transform: none !important; }}
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
+/* logo no topo da barra lateral, acima do menu */
+[data-testid="stSidebarHeader"] {{ height: auto !important; padding-top: 22px !important; padding-bottom: 6px !important; }}
+[data-testid="stSidebarLogo"], [data-testid="stSidebarHeader"] img {{ height: 64px !important; width: auto !important; max-width: 100% !important; }}
 .block-container, [data-testid="stMainBlockContainer"] {{ padding-top: 1.8rem !important; }}
 
 /* cabeçalho: sem faixa, título marinho grande com rótulo vinho em cima */
@@ -22,7 +39,7 @@ CSS_PAGINAS = f"""<style>
     margin: 0 0 18px !important; border-bottom: 1px solid {BORDA} !important; }}
 .ge-hero-title {{ color: {MARINHO} !important; font-size: clamp(28px, 3vw, 38px) !important; font-weight: 800 !important;
     line-height: 1.2 !important; letter-spacing: -0.01em !important; }}
-.ge-hero-title::before {{ content: "Eixo · gerador de envios"; display: block; font-size: 11px; font-weight: 700;
+.ge-hero-title::before {{ content: "EixoGov"; display: block; font-size: 11px; font-weight: 700;
     letter-spacing: .14em; text-transform: uppercase; color: {VINHO}; margin-bottom: 6px; line-height: 1.4; }}
 .ge-hero-logo {{ display: none !important; }}
 .ge-hero-selo {{ margin: 0 0 6px !important; padding: 3px 11px !important; border: 1px solid {VINHO} !important;
@@ -178,7 +195,20 @@ def info(texto: str) -> str:
     return f'<span class="eg-info" tabindex="0" role="note">i<span class="eg-bolha">{esc(texto)}</span></span>' if texto else ""
 
 
-def cabecalho(titulo: str, sub: str = "", kicker: str = "Eixo · gerador de envios"):
+# Grupo de cada aba, na ordem do menu: aparece em cima do título.
+GRUPOS = {
+    "Gerador de Envios": "Dia a dia",
+    "Gerador de Resumos": "Dia a dia",
+    "Agenda da Semana": "Entrega semanal",
+    "Síntese da Semana": "Entrega semanal · Saúde",
+    "Automações": "Consulta",
+    "Gerador de Gráficos": "Ferramenta",
+    "Alerta de Pesquisa": "Ferramenta",
+}
+
+
+def cabecalho(titulo: str, sub: str = "", kicker: str | None = None):
+    kicker = GRUPOS.get(titulo, "EixoGov") if kicker is None else kicker
     _md(f'<div class="eg-cab"><div class="k">{esc(kicker)}</div><div class="tit">{esc(titulo)}</div>'
         + (f'<div class="sub">{esc(sub)}</div>' if sub else "") + "</div>")
 

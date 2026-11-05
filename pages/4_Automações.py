@@ -9,14 +9,13 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 
 from estilo_paginas import cabecalho, chip, resumo, secao, vazio
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Automações", layout="wide")
+from base_pagina import exigir_login, iniciar
+
+iniciar("Automações")
 
 EIXO = {
     "tinta":    "#111111",
@@ -29,21 +28,7 @@ EIXO = {
 }
 
 st.markdown(f"""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] {{ background: {EIXO["gelo"]} !important; }}
-[data-testid="stAppViewContainer"] > section > div {{ background: {EIXO["gelo"]}; }}
 .block-container, [data-testid="stMainBlockContainer"] {{ max-width: 1400px !important; padding: 1.8rem 2.5rem 4rem !important; background: {EIXO["gelo"]}; }}
-* {{ box-sizing: border-box; }}
-body, p, span, div, label, input, select, textarea {{ font-family: 'Montserrat', sans-serif !important; }}
-[data-testid="stHeader"], [data-testid="stDecoration"] {{ display: none; }}
-[data-testid="stSidebar"] {{ background: {EIXO["gelo"]} !important; border-right: 1px solid {EIXO["borda"]} !important; }}
-[data-testid="stSidebar"] * {{ font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }}
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {{
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }}
-footer, #MainMenu {{ display: none !important; }}
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
 div[class*="st-key-at_filtros_"] {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 14px 18px 18px; margin: 14px 0 4px; }}
 div[class*="st-key-at_res_"] .eg-resumo {{ margin: 0; height: 48px; padding-top: 0; padding-bottom: 0; flex-wrap: nowrap; overflow: hidden; }}
 div[class*="st-key-at_res_"] [data-testid="stMarkdownContainer"], div[class*="st-key-at_res_"] [data-testid="stMarkdown"] {{ margin-bottom: 0 !important; }}
@@ -70,44 +55,7 @@ div[class*="st-key-at_res_"] [data-testid="stDownloadButton"] button {{ height: 
 
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-    if os.path.exists("config.yaml"):
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-try:
-    authenticator.login(location="main")
-except TypeError:
-    authenticator.login("Login", "main")
-
-if st.session_state.get("authentication_status") is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-if not st.session_state.get("authentication_status"):
-    st.stop()
+authenticator = exigir_login()
 
 
 # ─── Google Sheets ────────────────────────────────────────────────────────────
@@ -382,10 +330,6 @@ def _parse_datas(serie: pd.Series) -> pd.Series:
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
-    try:
-        st.image("logo_eixo_gov_magenta.png", use_container_width=True)
-    except Exception:
-        st.caption("Logo não encontrada.")
     st.markdown(
         f'<div style="border-left:3px solid {EIXO["vinho"]};padding:10px 12px;'
         f'margin:10px 0 0 0;background:transparent;">'
@@ -397,7 +341,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    if st.button("Atualizar dados", icon=":material/refresh:", use_container_width=True):
+    if st.button("Atualizar dados", icon=":material/refresh:", width="stretch"):
         st.cache_data.clear()
         st.rerun()
     st.markdown("---")
@@ -405,8 +349,7 @@ with st.sidebar:
         f"Usuário: **{st.session_state.get('name', '')}** "
         f"({st.session_state.get('username', '')})"
     )
-    if _auth_cfg:
-        authenticator.logout("Sair", "sidebar")
+    authenticator.logout("Sair", "sidebar")
 
 
 def _n(valor: int) -> str:
@@ -449,7 +392,7 @@ for tab, automacao in zip(tabs, AUTOMACOES):
             cliente = st.selectbox("Cliente", abas, key=f"cli_{sheet_id}")
         with col_btn:
             if st.button("Atualizar", icon=":material/refresh:", key=f"rl_{sheet_id}",
-                         use_container_width=True, help="Busca de novo os dados da planilha"):
+                         width="stretch", help="Busca de novo os dados da planilha"):
                 st.cache_data.clear()
                 st.rerun()
 
@@ -539,7 +482,7 @@ for tab, automacao in zip(tabs, AUTOMACOES):
         with st.container(key=f"at_res_{idx}"):
             col_meta, col_dl = st.columns([3, 1], vertical_alignment="center")
         with col_meta:
-            itens = [(_n(len(df_exib)), " registro mostrado" if len(df_exib) == 1 else " registros mostrados")]
+            itens = [(_n(len(df_exib)), " registro" if len(df_exib) == 1 else " registros")]
             if len(df_exib) != len(df_total):
                 itens.append((_n(len(df_total)), " no total"))
             if ultimo is not None:
@@ -553,7 +496,7 @@ for tab, automacao in zip(tabs, AUTOMACOES):
                 file_name=f"{nome}_{cliente}.csv",
                 mime="text/csv",
                 key=f"dl_{sheet_id}_{cliente}",
-                use_container_width=True,
+                width="stretch",
                 disabled=df_exib.empty,
             )
 
@@ -561,4 +504,13 @@ for tab, automacao in zip(tabs, AUTOMACOES):
             vazio("Nenhum registro com esses filtros. Amplie o período, limpe a busca ou marque mais opções "
                   "de alinhamento.")
         else:
-            st.markdown(_render_table(df_exib), unsafe_allow_html=True)
+            # 50 linhas por vez: tabela grande demora a desenhar e a rolagem fica pesada.
+            chave_lim = f"at_lim_{sheet_id}_{cliente}"
+            limite = st.session_state.get(chave_lim, 50)
+            st.markdown(_render_table(df_exib.head(limite)), unsafe_allow_html=True)
+            resta = len(df_exib) - limite
+            if resta > 0:
+                if st.button(f"Mostrar mais {min(50, resta)} (faltam {_n(resta)})", icon=":material/expand_more:",
+                             key=f"mais_{sheet_id}_{cliente}"):
+                    st.session_state[chave_lim] = limite + 50
+                    st.rerun()

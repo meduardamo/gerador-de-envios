@@ -6,7 +6,7 @@ menu aparece antes do gate de login.
 """
 from estilo_paginas import CSS_PAGINAS
 
-PAGINAS_OCULTAS = ["Polling", "Monitoramento_de_Pesquisas", "Mudanca_de_Cargos_DOU"]
+PAGINAS_OCULTAS = ["Polling"]
 
 CSS_MENU = "<style>" + "".join(
     f'[data-testid="stSidebarNav"] li:has(a[href$="/{p}"]) {{ display: none !important; }}'

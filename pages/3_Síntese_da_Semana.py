@@ -10,9 +10,6 @@ from zoneinfo import ZoneInfo
 import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
 
 import sintese_semana_core as ss
 import importlib
@@ -21,24 +18,14 @@ import importlib
 ss = importlib.reload(ss)
 
 
-st.set_page_config(page_title="Síntese da Semana", layout="wide")
+from base_pagina import exigir_login, iniciar
+from estilo_paginas import cabecalho, esc, vazio
+from estilo_paginas import chip as _chip, secao as _secao
+
+iniciar("Síntese da Semana")
 
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
-[data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
 .block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
-* { box-sizing: border-box; }
-body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
-[data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
-[data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
-[data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
-    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important; }
-footer, #MainMenu { display: none !important; }
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
 
 /* botões: contorno neutro; a ação principal da etapa em vinho cheio */
 [data-testid="stButton"] button, [data-testid="stDownloadButton"] > button, [data-testid="stPopover"] > div > button,
@@ -63,50 +50,29 @@ label:has(input[role="switch"]) p { text-transform: none !important; letter-spac
 [data-testid="stFileUploaderDropzone"] { background: #fff !important; border: 1px dashed #B9B5AA !important; border-radius: 8px !important; }
 
 /* cabeçalho */
-.sx-cab { padding: 0 0 14px; border-bottom: 1px solid #DADAD4; margin: 0 0 14px; }
-.sx-cab .k { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #962E4D; margin-bottom: 6px; }
-.sx-cab .tit { color: #192D4E; font-weight: 800; font-size: clamp(28px, 3vw, 38px); line-height: 1.2; letter-spacing: -0.01em; }
-.sx-cab .sub { color: #4A4A4A; font-size: 13.5px; font-weight: 500; margin-top: 6px; line-height: 1.55; }
 .st-key-sx_barra { align-items: flex-end; gap: 28px !important; margin-bottom: 6px; }
 .sx-periodo { font-size: 15px; font-weight: 700; color: #192D4E; padding-bottom: 7px; white-space: nowrap; }
 
 /* régua das três etapas */
-.sx-etapas { display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border: 1px solid #DADAD4; border-radius: 8px; margin: 10px 0 4px; }
-.sx-etapa { display: flex; gap: 12px; padding: 14px 18px; align-items: flex-start; }
-.sx-etapa + .sx-etapa { border-left: 1px solid #DADAD4; }
-.sx-etapa .m { flex: 0 0 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
-.sx-etapa.feita .m { background: #1F5E43; color: #fff; }
-.sx-etapa.atual .m { background: #962E4D; color: #fff; }
-.sx-etapa.aberta .m { border: 2px dashed #A9A9A4; color: #8A8A8A; }
-.sx-etapa .r { font-size: 13.5px; font-weight: 700; color: #111; line-height: 1.3; }
-.sx-etapa.aberta .r { color: #4A4A4A; font-weight: 600; }
-.sx-etapa .d { font-size: 12px; color: #4A4A4A; margin-top: 3px; line-height: 1.4; }
-@media (max-width: 820px) { .sx-etapas { grid-template-columns: 1fr; } .sx-etapa + .sx-etapa { border-left: 0; border-top: 1px solid #DADAD4; } }
+.eg-etapas { display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border: 1px solid #DADAD4; border-radius: 8px; margin: 10px 0 4px; }
+.eg-etapa { display: flex; gap: 12px; padding: 14px 18px; align-items: flex-start; }
+.eg-etapa + .eg-etapa { border-left: 1px solid #DADAD4; }
+.eg-etapa .m { flex: 0 0 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.eg-etapa .r { font-size: 13.5px; font-weight: 700; color: #111; line-height: 1.3; }
+.eg-etapa .d { font-size: 12px; color: #4A4A4A; margin-top: 3px; line-height: 1.4; }
+@media (max-width: 820px) { .eg-etapas { grid-template-columns: 1fr; } .eg-etapa + .eg-etapa { border-left: 0; border-top: 1px solid #DADAD4; } }
 
 /* título de seção: quadrado de cor, nome, contagem e (i) */
-.sx-secao { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 30px 0 8px; }
-.sx-secao .q { width: 14px; height: 14px; border-radius: 4px; flex: none; }
-.sx-secao .t { color: #192D4E; font-weight: 700; font-size: 19px; }
-.sx-secao .n { color: #4A4A4A; font-size: 13px; }
-.sx-secao.menor { margin: 26px 0 8px; }
-.sx-secao.menor .t { font-size: 15.5px; }
-.sx-info { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; background: #192D4E;
-    color: #fff; font-size: 11px; font-weight: 700; cursor: help; position: relative; line-height: 1; flex-shrink: 0; }
-.sx-info:hover, .sx-info:focus { background: #962E4D; outline: none; }
-.sx-info .sx-bolha { display: none; position: absolute; bottom: calc(100% + 8px); left: 0; background: #fff; border: 1px solid #DADAD4; border-radius: 6px;
-    padding: 11px 15px; width: 340px; font-size: 12px; font-weight: 400; line-height: 1.6; color: #111; z-index: 9999;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.10); white-space: normal; pointer-events: none; }
-.sx-info:hover .sx-bolha, .sx-info:focus .sx-bolha { display: block; }
 [data-testid="stTabs"], [data-baseweb="tab-panel"] { overflow: visible !important; }
-.sx-explica, p.sx-explica { color: #4A4A4A !important; font-size: 13px !important; line-height: 1.5 !important; margin: 0 0 10px !important; }
-.sx-explica a { color: #962E4D; }
+.eg-explica, p.eg-explica { color: #4A4A4A !important; font-size: 13px !important; line-height: 1.5 !important; margin: 0 0 10px !important; }
+.eg-explica a { color: #962E4D; }
 
 /* faixa de resumo */
-.sx-resumo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; background: #fff; border: 1px solid #DADAD4; border-radius: 8px;
+.eg-resumo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; background: #fff; border: 1px solid #DADAD4; border-radius: 8px;
     padding: 11px 16px; font-size: 13px; color: #4A4A4A; margin: 10px 0 8px; }
-.sx-resumo b { color: #192D4E; font-size: 16px; font-weight: 800; margin-right: 3px; font-variant-numeric: tabular-nums; }
-.sx-resumo .sep { color: #D5D2CA; }
-.sx-resumo .alerta b { color: #B4532A; }
+.eg-resumo b { color: #192D4E; font-size: 16px; font-weight: 800; margin-right: 3px; font-variant-numeric: tabular-nums; }
+.eg-resumo .sep { color: #D5D2CA; }
+.eg-resumo .alerta b { color: #B4532A; }
 
 /* clientes em pílula; a escolhida em marinho */
 [data-testid="stButtonGroup"] button { border: 1px solid #DADAD4 !important; border-radius: 999px !important; background: #fff !important; box-shadow: none !important;
@@ -126,12 +92,8 @@ label:has(input[role="switch"]) p { text-transform: none !important; letter-spac
 [data-testid="stTabs"] div[data-baseweb="tab-highlight"], [data-testid="stTabs"] .react-aria-SelectionIndicator { background-color: #962E4D !important; }
 
 /* números do cliente */
-.sx-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0 0; }
-.sx-num { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 12px 16px; }
-.sx-num .v { display: flex; align-items: center; gap: 8px; font-size: 24px; font-weight: 800; color: #192D4E; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.sx-num .v i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.sx-num .d { font-size: 12px; color: #4A4A4A; margin-top: 3px; }
-@media (max-width: 820px) { .sx-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.eg-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0 0; }
+@media (max-width: 820px) { .eg-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* itens (bullet, proposição, movimentação, ato): bloco branco com a chave à direita */
 div[class*="st-key-it_"] { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 14px 18px; margin-bottom: 8px; gap: .35rem; transition: border-color .15s; }
@@ -144,10 +106,6 @@ div[class*="st-key-ac_"] [data-testid="stPopover"] button p { font-size: 12px !i
 .sx-fora { opacity: .5; }
 .sx-fora .sx-h a { text-decoration: line-through !important; }
 .sx-top { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 7px; }
-.sx-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: #ECEAE4; color: #3A3A3A; line-height: 1.6; }
-.sx-chip.data { background: #F2E4E9; color: #7A2640; }
-.sx-chip.org { background: #E4E9F1; color: #192D4E; }
-.sx-chip.duvida { background: #F6E9BF; color: #5C4700; }
 p.sx-h { font-size: 15px !important; line-height: 1.45 !important; margin: 0 0 4px !important; font-weight: 700; }
 .sx-h a, .sx-h a:visited { color: #192D4E !important; text-decoration: none !important; }
 .sx-h a:hover { color: #962E4D !important; text-decoration: underline !important; text-underline-offset: 3px; }
@@ -159,7 +117,6 @@ p.sx-and { font-size: 13px !important; line-height: 1.55 !important; color: #111
 .sx-and span { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #4E5A6E; margin-bottom: 2px; }
 p.sx-meta { font-size: 12px !important; color: #6A6A66 !important; margin: 7px 0 0 !important; line-height: 1.5 !important; }
 p.sx-meta a { color: #962E4D !important; }
-.sx-vazio { background: #fff; border: 1px dashed #CFCBC1; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #4A4A4A; }
 
 /* expansores (notícias por seção, XLS do Inteligov) */
 [data-testid="stExpander"] details { border: 1px solid #DADAD4 !important; border-radius: 8px !important; background: #fff !important; }
@@ -185,49 +142,7 @@ div[class*="st-key-lin_"] [data-testid="stDownloadButton"] button, div[class*="s
 
 
 # ========= LOGIN =========
-def _load_auth_config():
-    if "AUTH_CONFIG" in st.secrets:
-        return yaml.load(st.secrets["AUTH_CONFIG"], Loader=SafeLoader)
-
-    if os.path.exists("config.yaml"):
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            return yaml.load(f, Loader=SafeLoader)
-
-    return None
-
-
-_auth_cfg = _load_auth_config()
-if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    _auth_cfg["credentials"],
-    _auth_cfg["cookie"]["name"],
-    _auth_cfg["cookie"]["key"],
-    _auth_cfg["cookie"]["expiry_days"],
-)
-
-# O campo branco do login vem daqui, e tem que ser desenhado antes do gate:
-# sem ninguém logado o gate chama st.stop() e nada depois dele roda.
-from ui_login import CSS_LOGIN
-st.markdown(CSS_LOGIN, unsafe_allow_html=True)
-from menu_paginas import CSS_MENU
-st.markdown(CSS_MENU, unsafe_allow_html=True)
-
-try:
-    authenticator.login(location="main")
-except TypeError:
-    authenticator.login("Login", "main")
-
-authentication_status = st.session_state.get("authentication_status", None)
-
-if authentication_status is False:
-    st.error("Usuário ou senha inválidos.")
-    st.stop()
-
-if authentication_status is None:
-    st.stop()
+authenticator = exigir_login()
 
 
 # ========= DADOS =========
@@ -273,23 +188,12 @@ def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
     return ss.movimentacoes_semana(ss.ler_acompanhadas(ws), ini, fim)
 
 
-def esc(x) -> str:
-    return _html.escape(str(x or "").strip())
-
-
-def _info(texto: str) -> str:
-    return f'<span class="sx-info" tabindex="0" role="note">i<span class="sx-bolha">{esc(texto)}</span></span>'
-
-
 def secao(titulo: str, contagem: str = "", cor: str = "", info: str = "", menor: bool = False):
-    q = f'<span class="q" style="background:{cor}"></span>' if cor else ""
-    n = f'<span class="n">{esc(contagem)}</span>' if contagem else ""
-    st.markdown(f'<div class="sx-secao{" menor" if menor else ""}">{q}<span class="t">{esc(titulo)}</span>{n}'
-                f'{_info(info) if info else ""}</div>', unsafe_allow_html=True)
+    _secao(titulo, contagem, cor, info, menor)
 
 
 def chip(texto, tipo: str = "") -> str:
-    return f'<span class="sx-chip {tipo}">{esc(texto)}</span>' if texto else ""
+    return _chip(texto, "alerta" if tipo == "duvida" else tipo)
 
 
 def _a(url: str, txt: str) -> str:
@@ -298,10 +202,6 @@ def _a(url: str, txt: str) -> str:
 
 def plural(n: int, um: str, varios: str) -> str:
     return f"{n} {um if n == 1 else varios}"
-
-
-def vazio(texto: str):
-    st.markdown(f'<div class="sx-vazio">{esc(texto)}</div>', unsafe_allow_html=True)
 
 
 def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
@@ -325,8 +225,6 @@ def _segunda(d: dt.date) -> dt.date:
 
 # ========= BARRA LATERAL (igual às outras páginas: logo, descrição, usuário e sair) =========
 with st.sidebar:
-    if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, use_container_width=True)
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;margin:10px 0 0 0;background:transparent;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;color:#111;line-height:1.65;margin:0;">'
@@ -337,9 +235,7 @@ with st.sidebar:
     authenticator.logout("Sair", "sidebar")
 
 # ========= CABEÇALHO =========
-st.markdown('<div class="sx-cab"><div class="k">Saúde · envio semanal</div><div class="tit">Síntese da Semana</div>'
-            '<div class="sub">Da Divisão semanal ao Word, ao anexo em PDF e ao corpo do email de cada cliente.</div></div>',
-            unsafe_allow_html=True)
+cabecalho("Síntese da Semana", "Da Divisão semanal ao Word, ao anexo em PDF e ao corpo do email de cada cliente.")
 
 hoje = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 padrao = _segunda(hoje) - dt.timedelta(days=7) if hoje.weekday() < 3 else _segunda(hoje)
@@ -379,8 +275,8 @@ def _etapas():
          f'{plural(len(SS.get("sint_emails") or {}), "cliente pronto", "clientes prontos")} para baixar' if arqs_
          else "Síntese, anexo e corpo do email por cliente"),
     ]
-    etapas_ph.markdown('<div class="sx-etapas">' + "".join(
-        f'<div class="sx-etapa {e}"><div class="m">{"✓" if e == "feita" else i}</div>'
+    etapas_ph.markdown('<div class="eg-etapas">' + "".join(
+        f'<div class="eg-etapa {e}"><div class="m">{"✓" if e == "feita" else i}</div>'
         f'<div><div class="r">{esc(r)}</div><div class="d">{esc(d)}</div></div></div>'
         for i, (e, r, d) in enumerate(itens, 1)) + "</div>", unsafe_allow_html=True)
 
@@ -416,7 +312,7 @@ partes = [f'<span><b>{len(nots)}</b>notícias</span>', '<span class="sep">|</spa
           f'<span><b>{len(div["proposicoes"])}</b>novas proposições</span>']
 if falhas:
     partes += ['<span class="sep">|</span>', f'<span class="alerta"><b>{len(falhas)}</b>não lidas</span>']
-st.markdown('<div class="sx-resumo">' + "".join(partes) + "</div>", unsafe_allow_html=True)
+st.markdown('<div class="eg-resumo">' + "".join(partes) + "</div>", unsafe_allow_html=True)
 with st.expander("Ver as notícias por tema"):
     for sec in dict.fromkeys(n["secao"] for n in nots):
         st.markdown(f"**{_html.escape(sec)}**")
@@ -431,7 +327,7 @@ if falhas:
 # ========= 2. BULLETS =========
 secao("2. Bullets por cliente", cor="#962E4D", info="Uma chamada ao Gemini por cliente, só com os temas dele na matriz. "
       "O texto segue o padrão do prompt: fato no presente, sem análise. Revise, edite ou desligue o que não servir.")
-st.markdown('<p class="sx-explica">Escolha os clientes desta rodada.</p>', unsafe_allow_html=True)
+st.markdown('<p class="eg-explica">Escolha os clientes desta rodada.</p>', unsafe_allow_html=True)
 escolhidos = st.pills("Clientes", CLIS, default=CLIS, selection_mode="multi", label_visibility="collapsed",
                       format_func=lambda c: ss.CLIENTES[c]["titulo"])
 
@@ -522,7 +418,7 @@ if AGENDA_SHEET_ID:
         except Exception as e:  # noqa: BLE001
             st.warning(f"Movimentações: {e}")
 if SS.get("sint_acomp_n"):
-    st.markdown(f'<p class="sx-explica">{plural(SS["sint_acomp_n"], "proposição nova da Divisão entrou", "proposições novas da Divisão entraram")} '
+    st.markdown(f'<p class="eg-explica">{plural(SS["sint_acomp_n"], "proposição nova da Divisão entrou", "proposições novas da Divisão entraram")} '
                 'na lista de acompanhadas.</p>', unsafe_allow_html=True)
 
 
@@ -544,8 +440,8 @@ for c, tab in zip(abas, tabs):
                 ("novas", len(novas), "novas proposições"),
                 ("movs", "-" if c == "Desiderata" else len(movs_c), "movimentações na semana"),
                 ("dou", len(atos), "atos no DOU")]
-        st.markdown('<div class="sx-nums">' + "".join(
-            f'<div class="sx-num"><div class="v"><i style="background:{COR[k]}"></i>{v}</div><div class="d">{esc(d)}</div></div>'
+        st.markdown('<div class="eg-nums">' + "".join(
+            f'<div class="eg-num"><div class="v"><i style="background:{COR[k]}"></i>{v}</div><div class="d">{esc(d)}</div></div>'
             for k, v, d in nums) + "</div>", unsafe_allow_html=True)
 
         if clipping.get(c):
@@ -601,7 +497,7 @@ for c, tab in zip(abas, tabs):
             vazio("Proposições do Desiderata são de Niterói e do RJ; entram à mão.")
         else:
             if url_m:
-                st.markdown(f'<p class="sx-explica">Fonte: Câmara e Senado · <a href="{url_m}" target="_blank">'
+                st.markdown(f'<p class="eg-explica">Fonte: Câmara e Senado · <a href="{url_m}" target="_blank">'
                             'conferir na Matriz do Inteligov</a></p>', unsafe_allow_html=True)
             if movs_por_cli is None:
                 vazio("Não consegui consultar a Câmara e o Senado agora.")
@@ -620,7 +516,7 @@ for c, tab in zip(abas, tabs):
                       + (f'<p class="sx-meta">{quem}</p>' if quem else ""))
             if url_m:
                 with st.expander("Acrescentar do Inteligov (XLS)"):
-                    st.markdown(f'<p class="sx-explica">Se faltar alguma, abra a <a href="{url_m}" target="_blank">'
+                    st.markdown(f'<p class="eg-explica">Se faltar alguma, abra a <a href="{url_m}" target="_blank">'
                                 'Matriz já filtrada</a>, clique em XLS e suba o arquivo. O que já está acima '
                                 'não se repete.</p>', unsafe_allow_html=True)
                     xls = st.file_uploader("XLS do Inteligov", type=["xls", "xlsx"], key=f"xls_{c}",
