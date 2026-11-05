@@ -52,6 +52,7 @@ footer, #MainMenu { display: none !important; }
 [data-testid="stMain"] div[data-testid="stForm"]:has(.st-key-ag_salvar_fim) { border: 0 !important; background: transparent !important; padding: 0 !important; }
 .st-key-ag_acoes, .st-key-ag_acoes_fim { gap: 10px !important; }
 .st-key-ag_acoes { margin-bottom: 6px; }
+[data-testid="stMain"] .st-key-ag_acoes [data-testid="stTextInput"] > label p { font-size: 0.72rem !important; font-weight: 600 !important; letter-spacing: .04em !important; text-transform: uppercase !important; color: #4E5A6E !important; }
 .st-key-ag_acoes_fim { margin-top: 18px; padding-top: 16px; border-top: 1px solid #DADAD4; }
 div[class*="st-key-ag_reu_"] { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; gap: .45rem; }
 div[class*="st-key-ag_reu_"] [data-testid="stMarkdownContainer"], div[class*="st-key-ag_reu_"] [data-testid="stMarkdown"] { margin-bottom: 0 !important; }
@@ -316,9 +317,6 @@ with st.sidebar:
                            key="ag_recarregar",
                            help="Traz o que a equipe salvou desde que você abriu a página. "
                                 "Marcações suas ainda não salvas são descartadas.")
-    st.markdown("---")
-    st.text_input("Seu nome", key="ag_quem", placeholder="quem está marcando",
-                  help="O login é da equipe. O nome entra no histórico de cada salvamento.")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
 
@@ -465,7 +463,7 @@ if pacote_pronto:
 
 # ── seleção ──────────────────────────────────────────────────────────────────
 def _item(it: dict, fio: bool) -> None:
-    texto, escolha = st.columns([3, 2], gap="large", vertical_alignment="top")
+    texto, escolha = st.columns([1.15, 1], gap="large", vertical_alignment="top")
     with texto:
         meta = [f"<b>{r}:</b> {esc(it[k])}" for r, k in (("Autoria", "autor"), ("Relatoria", "relator")) if it.get(k)]
         titulo = it["titulo"]
@@ -515,10 +513,6 @@ if novos:
         explica("A tela e o Word mostram só os itens novos. Os outros continuam marcados; "
                 "para ver ou gerar a agenda completa, desligue a chave.")
 
-if not (st.session_state.get("ag_quem") or "").strip():
-    explica("Escreva seu nome no campo Seu nome, na barra lateral, antes de salvar: ele entra no histórico "
-            "junto com o login da equipe.")
-
 # Com a chave de novos ligada, os outros itens saem da tela. O Streamlit esquece o valor
 # de widget que não foi desenhado, então quem volta à tela nasce de novo da seleção salva.
 visiveis = [i for i in itens if not so_novos or i["id"] in novos]
@@ -529,7 +523,9 @@ dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
 
 # Tudo dentro de um formulário: marcar um cliente não recarrega a página.
 with st.form("ag_form", border=False):
-    with st.container(horizontal=True, vertical_alignment="center", key="ag_acoes"):
+    with st.container(horizontal=True, vertical_alignment="bottom", key="ag_acoes"):
+        st.text_input("Seu nome", key="ag_quem", placeholder="quem está marcando", width=240,
+                      help="O login é da equipe. O nome entra no histórico de cada salvamento.")
         salvar = st.form_submit_button("Salvar seleção", icon=":material/save:")
         gerar = st.form_submit_button("Salvar e gerar Word", type="primary", icon=":material/description:")
 

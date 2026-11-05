@@ -816,12 +816,11 @@ if categorias and series:
                 else f"Para esta tabela a sugestão seria {TIPOS[sugerido]}, porque {motivo}.")
 else:
     sugestao = ""
-g1, g2 = st.columns([3, 1], vertical_alignment="center")
-g1.markdown(f'<div class="gg-forma">{esc(serve)}<br><b>Como a tabela precisa estar:</b> '
+st.markdown(f'<div class="gg-forma">{esc(serve)}<br><b>Como a tabela precisa estar:</b> '
             f'{esc(formato_dados)}' + (f'<br>{esc(sugestao)}' if sugestao else "") + '</div>',
             unsafe_allow_html=True)
-g2.button("Carregar exemplo desta forma", on_click=_carregar_exemplo,
-          args=(tipo,), use_container_width=True)
+st.button("Carregar exemplo desta forma", on_click=_carregar_exemplo, args=(tipo,),
+          icon=":material/table_view:", width="content")
 
 # Linha do tempo lê texto, e o mapa aceita categoria: nesses dois a célula que
 # não é número não é erro.

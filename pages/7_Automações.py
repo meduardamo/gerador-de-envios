@@ -44,7 +44,7 @@ span.material-symbols-rounded, span.material-symbols-outlined, span.material-ico
     letter-spacing: normal !important; text-transform: none !important; }}
 footer, #MainMenu {{ display: none !important; }}
 [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
-div[class*="st-key-at_filtros_"] {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 14px 18px 4px; margin: 14px 0 4px; }}
+div[class*="st-key-at_filtros_"] {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 14px 18px 8px; margin: 14px 0 4px; }}
 div[class*="st-key-at_res_"] .eg-resumo {{ margin: 0; }}
 .at-wrap {{ width: 100%; background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; overflow: auto; max-height: 75vh; margin-top: 8px; }}
 .at-table {{ width: 100%; border-collapse: collapse; font-family: 'Montserrat', sans-serif; font-size: 12.5px; }}
@@ -257,13 +257,15 @@ def _render_table(df: pd.DataFrame) -> str:
             for col, val in zip(df.columns, row)
         )
         rows += f"<tr>{cells}</tr>"
+    # Quebra de linha dentro do HTML do st.markdown encerra o bloco (linha em branco)
+    # e o resto da tabela some ou vira texto: no HTML ela não muda nada, então sai.
     return (
         f'<div class="at-wrap">'
         f'<table class="at-table">'
         f'<thead><tr>{headers}</tr></thead>'
         f'<tbody>{rows}</tbody>'
         f'</table></div>'
-    )
+    ).replace("\r", " ").replace("\n", " ")
 
 
 def _filtrar(df: pd.DataFrame, termo: str) -> pd.DataFrame:
@@ -437,9 +439,10 @@ for tab, automacao in zip(tabs, AUTOMACOES):
 
         # ── Bloco de controles: cliente, filtros e atualizar ──────────────────
         with st.container(key=f"at_filtros_{idx}"):
-            col_sel, col_busca_ui, col_periodo_ui, col_alin_ui, col_btn = st.columns(
-                [2, 2.2, 2, 2, 1], vertical_alignment="bottom"
+            col_sel, col_busca_ui, col_periodo_ui, col_btn = st.columns(
+                [2, 2.4, 2, 1.1], vertical_alignment="bottom"
             )
+            col_alin_ui = st.container()
         with col_sel:
             cliente = st.selectbox("Cliente", abas, key=f"cli_{sheet_id}")
         with col_btn:
@@ -506,13 +509,13 @@ for tab, automacao in zip(tabs, AUTOMACOES):
             )
             if opts_alin:
                 with col_alin_ui:
-                    sel_alin = st.multiselect(
+                    sel_alin = st.pills(
                         "Alinhamento",
                         options=opts_alin,
                         default=opts_alin,
+                        selection_mode="multi",
                         key=f"alin_{sheet_id}",
-                        placeholder="Escolha ao menos uma opção",
-                    )
+                    ) or []
                 if sel_alin:
                     df_exib = df_exib[df_exib[col_alin].isin(sel_alin)]
                 else:

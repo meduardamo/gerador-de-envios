@@ -103,12 +103,9 @@ label:has(input[role="switch"]:checked) > div:first-of-type {{ background-color:
 
 [data-testid="stExpanderIcon"], [data-testid="stIconMaterial"], span.material-symbols-rounded {{ font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important; letter-spacing: normal !important; text-transform: none !important; }}
 [data-testid="stAppViewContainer"] :is([data-testid="stTextAreaRootElement"], [data-testid="stTextInputRootElement"], [data-testid="stNumberInputContainer"], [data-testid="stSelectbox"] [role="group"], [data-testid="stMultiSelect"] [role="group"], [data-testid="stDateInput"] [role="group"]):not(:focus-within) {{ border-color: {BORDA} !important; }}
-/* campos brancos e marcação em vinho (radio e caixa) */
-[data-testid="stMain"] div[data-baseweb="select"] > div, [data-testid="stMain"] div[data-baseweb="input"],
-[data-testid="stMain"] div[data-baseweb="textarea"], [data-testid="stMain"] textarea, [data-testid="stMain"] input {{ background: #fff !important; }}
-[data-testid="stMain"] [role="radiogroup"] input:checked + div, [data-testid="stMain"] [data-baseweb="radio"] input:checked ~ div:first-child {{ background-color: {VINHO} !important; }}
-[data-testid="stMain"] [data-baseweb="checkbox"] input:checked ~ span, [data-testid="stMain"] [data-baseweb="checkbox"] span:has(+ input:checked) {{ background-color: {VINHO} !important; border-color: {VINHO} !important; }}
-
+[data-testid="stAppViewContainer"] [data-testid="stButtonGroup"] [data-testid="stTooltipIcon"] button {{ border: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 0 !important; }}
+[data-testid="stMain"] [data-testid="stButtonGroup"] div:has(> button) {{ column-gap: 6px !important; }}
+[data-testid="stMultiSelect"] span[role="button"] {{ background: {MARINHO} !important; color: #fff !important; border-radius: 6px !important; }}
 /* peças de página (as mesmas da Síntese da Semana) */
 .eg-cab {{ padding: 0 0 14px; border-bottom: 1px solid {BORDA}; margin: 0 0 18px; }}
 .eg-cab .k {{ font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: {VINHO}; margin-bottom: 6px; }}
