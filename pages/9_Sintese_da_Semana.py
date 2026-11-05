@@ -361,7 +361,9 @@ for c, tab in zip(abas, tabs):
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Não consegui ler o arquivo: {e}")
         else:
-            st.markdown('<p class="ag-nota">Cliente sem matriz no Inteligov.</p>', unsafe_allow_html=True)
+            st.markdown('<p class="ag-nota">Proposições do Desiderata são de Niterói e do RJ, fora do Inteligov; '
+                        'entram à mão.</p>' if c == "Desiderata" else
+                        '<p class="ag-nota">Cliente sem matriz no Inteligov.</p>', unsafe_allow_html=True)
 
         atos = dou_por_cli.get(c, [])
         st.markdown('<div class="ag-org">Novas publicações (DOU)</div>', unsafe_allow_html=True)
