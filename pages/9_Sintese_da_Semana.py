@@ -323,10 +323,17 @@ def _segunda(d: dt.date) -> dt.date:
     return d - dt.timedelta(days=d.weekday())
 
 
-# ========= BARRA LATERAL (só logo e sair; a navegação entre páginas fica nela) =========
+# ========= BARRA LATERAL (igual às outras páginas: logo, descrição, usuário e sair) =========
 with st.sidebar:
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width="stretch")
+        st.image(LOGO_PATH, use_container_width=True)
+    st.markdown(
+        '<div style="border-left:3px solid #962E4D;padding:10px 12px;margin:10px 0 0 0;background:transparent;">'
+        '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;color:#111;line-height:1.65;margin:0;">'
+        'Síntese semanal de <strong>saúde</strong>: lê a <strong>Divisão semanal</strong>, gera os bullets de cada '
+        'cliente, consulta as <strong>movimentações</strong> na Câmara e no Senado e monta o Word, o PDF e o email.'
+        '</p></div>', unsafe_allow_html=True)
+    st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
 
 # ========= CABEÇALHO =========
@@ -386,7 +393,7 @@ def _parar():
 CLIS = [c for c, v in ss.CLIENTES.items() if quinzenal or not v.get("quinzenal")]
 
 # ========= 1. DIVISÃO SEMANAL =========
-secao("1. Divisão semanal", info="No Docs: Arquivo > Fazer download > PDF ou Microsoft Word (.docx). Os dois servem: "
+secao("1. Divisão semanal", cor="#962E4D", info="No Docs: Arquivo > Fazer download > PDF ou Microsoft Word (.docx). Os dois servem: "
       "a página lê os links de notícia por tema e a tabela de novas proposições.")
 arq = st.file_uploader("Divisão semanal - Saúde", type=["docx", "pdf"], label_visibility="collapsed")
 if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
@@ -422,7 +429,7 @@ if falhas:
             st.markdown(f"- {n['url']} ({n['erro']})")
 
 # ========= 2. BULLETS =========
-secao("2. Bullets por cliente", info="Uma chamada ao Gemini por cliente, só com os temas dele na matriz. "
+secao("2. Bullets por cliente", cor="#962E4D", info="Uma chamada ao Gemini por cliente, só com os temas dele na matriz. "
       "O texto segue o padrão do prompt: fato no presente, sem análise. Revise, edite ou desligue o que não servir.")
 st.markdown('<p class="sx-explica">Escolha os clientes desta rodada.</p>', unsafe_allow_html=True)
 escolhidos = st.pills("Clientes", CLIS, default=CLIS, selection_mode="multi", label_visibility="collapsed",
@@ -643,7 +650,7 @@ for c, tab in zip(abas, tabs):
 
 
 # ========= 3. WORD, PDF E EMAIL =========
-secao("3. Word, PDF e email", info="Síntese: o Word completo. Anexo: novas proposições, movimentações e DOU, "
+secao("3. Word, PDF e email", cor="#962E4D", info="Síntese: o Word completo. Anexo: novas proposições, movimentações e DOU, "
       "o arquivo do botão do email (em Word e em PDF). Email: o corpo pronto para copiar e colar no Wix, com os links.")
 
 with st.container(horizontal=True, vertical_alignment="center", key="sx_acoes"):

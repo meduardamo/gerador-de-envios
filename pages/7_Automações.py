@@ -13,6 +13,8 @@ import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 
+from estilo_paginas import cabecalho, chip, resumo, secao, vazio
+
 # ─── Config ──────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Automações", layout="wide")
 
@@ -28,97 +30,38 @@ EIXO = {
 
 st.markdown(f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-:root {{ --eixo-vinho: {EIXO["vinho"]}; }}
 html, body, [data-testid="stAppViewContainer"] {{ background: {EIXO["gelo"]} !important; }}
 [data-testid="stAppViewContainer"] > section > div {{ background: {EIXO["gelo"]}; }}
-.block-container, [data-testid="stMainBlockContainer"] {{
-    max-width: 1400px !important; padding: 0 2rem 3rem !important; background: {EIXO["gelo"]};
-}}
+.block-container, [data-testid="stMainBlockContainer"] {{ max-width: 1400px !important; padding: 1.8rem 2.5rem 4rem !important; background: {EIXO["gelo"]}; }}
 * {{ box-sizing: border-box; }}
 body, p, span, div, label, input, select, textarea {{ font-family: 'Montserrat', sans-serif !important; }}
-[data-testid="stHeader"] {{ display: none; }}
-[data-testid="stDecoration"] {{ display: none; }}
+[data-testid="stHeader"], [data-testid="stDecoration"] {{ display: none; }}
 [data-testid="stSidebar"] {{ background: {EIXO["gelo"]} !important; border-right: 1px solid {EIXO["borda"]} !important; }}
 [data-testid="stSidebar"] * {{ font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }}
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {{
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important;
-}}
-footer {{ display: none !important; }}
-#MainMenu {{ display: none !important; }}
-[data-testid="stButton"] > button {{
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.1em !important;
-    text-transform: uppercase !important; border-radius: 0 !important;
-    border: 1px solid {EIXO["vinho"]} !important; background: transparent !important;
-    color: {EIXO["vinho"]} !important; padding: 5px 14px !important;
-    transition: background 0.15s, color 0.15s !important;
-}}
-[data-testid="stButton"] > button:hover {{ background: {EIXO["vinho"]} !important; color: #fff !important; }}
-[data-testid="stSidebar"] [data-testid="stButton"] > button {{
-    border: 1px solid {EIXO["vinho"]} !important; color: {EIXO["vinho"]} !important;
-}}
-[data-testid="stSidebar"] [data-testid="stButton"] > button:hover {{
-    background: {EIXO["vinho"]} !important; color: #fff !important;
-}}
-[data-testid="stRadio"] > label, [data-testid="stSelectbox"] > label,
-[data-testid="stMultiSelect"] > label, [data-testid="stTextInput"] > label,
-[data-testid="stNumberInput"] > label, [data-testid="stTextArea"] > label {{
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important;
-    color: {EIXO["subtexto"]} !important;
-}}
-[data-testid="stTabs"] [role="tablist"] {{ border-bottom: 1px solid {EIXO["borda"]} !important; gap: 0 !important; }}
-[data-testid="stTabs"] [role="tab"] {{
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.12em !important;
-    text-transform: uppercase !important; color: {EIXO["subtexto"]} !important;
-    padding: 10px 20px 9px !important; border-bottom: 2px solid transparent !important;
-    background: transparent !important; border-radius: 0 !important;
-}}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] {{
-    color: {EIXO["vinho"]} !important; border-bottom-color: {EIXO["vinho"]} !important;
-}}
-.ge-rule {{
-    font-size: 12px; font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; color: {EIXO["vinho"]};
-    border-top: 1.5px solid {EIXO["vinho"]};
-    padding-top: 8px; margin: 16px 0 12px;
-}}
-/* Tabela de automações */
-.at-wrap {{ width: 100%; background: #fff; border: 1px solid {EIXO["borda"]}; overflow-x: auto; margin-top: 8px; }}
+    letter-spacing: normal !important; text-transform: none !important; }}
+footer, #MainMenu {{ display: none !important; }}
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
+div[class*="st-key-at_filtros_"] {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 14px 18px 4px; margin: 14px 0 4px; }}
+div[class*="st-key-at_res_"] .eg-resumo {{ margin: 0; }}
+.at-wrap {{ width: 100%; background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; overflow: auto; max-height: 75vh; margin-top: 8px; }}
 .at-table {{ width: 100%; border-collapse: collapse; font-family: 'Montserrat', sans-serif; font-size: 12.5px; }}
-.at-table thead th {{
-    background: {EIXO["vinho"]}; color: #fff; font-size: 10px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase; padding: 11px 14px; text-align: left;
-    white-space: nowrap;
-}}
-.at-table tbody tr {{ border-bottom: 1px solid {EIXO["borda"]}; }}
+.at-table thead th {{ position: sticky; top: 0; z-index: 1; background: #fff; color: {EIXO["marinho"]}; font-size: 11px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; padding: 12px 14px 10px; text-align: left; white-space: nowrap;
+    border-bottom: 2px solid {EIXO["marinho"]}; }}
+.at-table tbody tr {{ border-bottom: 1px solid #ECEBE6; }}
 .at-table tbody tr:last-child {{ border-bottom: none; }}
-.at-table tbody tr:nth-child(even) {{ background: {EIXO["gelo"]}; }}
-.at-table tbody tr:hover {{ background: #f0e8eb; }}
-.at-table tbody td {{
-    padding: 9px 14px; color: {EIXO["tinta"]}; vertical-align: top; line-height: 1.5;
-    max-width: 320px; word-wrap: break-word;
-}}
-.at-table td a {{
-    color: {EIXO["vinho"]}; text-decoration: none; font-weight: 500;
-    border-bottom: 1px solid {EIXO["borda"]};
-}}
-.at-table td a:hover {{ border-bottom-color: {EIXO["vinho"]}; }}
-.at-badge {{
-    display: inline-block; padding: 1px 7px; font-size: 10px; font-weight: 700;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    background: {EIXO["vinho"]}; color: #fff; border-radius: 0; margin-right: 4px;
-}}
-.at-meta {{
-    font-family: 'Montserrat', sans-serif; font-size: 11.5px;
-    color: {EIXO["subtexto"]}; margin-bottom: 10px;
-}}
+.at-table tbody tr:hover {{ background: #FAF9F6; }}
+.at-table tbody td {{ padding: 10px 14px; color: {EIXO["tinta"]}; vertical-align: top; line-height: 1.55; max-width: 320px; word-wrap: break-word; }}
+.at-table td.at-prop {{ font-weight: 700; color: {EIXO["marinho"]}; white-space: nowrap; }}
+.at-table td a {{ color: {EIXO["vinho"]}; text-decoration: none; font-weight: 600; white-space: nowrap; }}
+.at-table td a:hover {{ text-decoration: underline; }}
 .at-details summary {{ list-style: none; cursor: pointer; }}
 .at-details summary::-webkit-details-marker {{ display: none; }}
 .at-details summary::marker {{ content: ""; }}
-.at-leia-mais {{ color: {EIXO["vinho"]}; font-size: 11px; font-weight: 600; white-space: nowrap; }}
+.at-leia-mais {{ color: {EIXO["vinho"]}; font-size: 11.5px; font-weight: 600; white-space: nowrap; }}
 .at-details[open] .at-leia-mais {{ display: none; }}
 .at-details[open] summary {{ margin-bottom: 6px; border-bottom: 1px solid {EIXO["borda"]}; padding-bottom: 6px; }}
 </style>""", unsafe_allow_html=True)
@@ -183,7 +126,8 @@ def _get_gc():
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         return gspread.authorize(creds)
     except Exception as e:
-        st.warning(f"Google Sheets não configurado: {e}")
+        print(f"[automacoes] credencial do Google: {e}")
+        st.warning("Não consegui conectar às planilhas do Google. Avise a equipe de dados.")
         return None
 
 
@@ -195,7 +139,7 @@ def _listar_abas(sheet_id: str) -> list[str]:
     try:
         return [ws.title for ws in gc.open_by_key(sheet_id).worksheets()]
     except Exception as e:
-        st.error(f"Erro ao listar abas: {e}")
+        print(f"[automacoes] abrir planilha: {e}")
         return []
 
 
@@ -214,7 +158,8 @@ def _carregar_aba(sheet_id: str, aba: str) -> pd.DataFrame:
         df = df.loc[:, df.columns.str.strip() != ""]
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar aba '{aba}': {e}")
+        print(f"[automacoes] carregar {aba}: {e}")
+        st.error(f"Não consegui carregar os dados de {aba}. Clique em Atualizar; se continuar, avise a equipe de dados.")
         return pd.DataFrame()
 
 
@@ -224,11 +169,11 @@ def _secret(key: str, default: str = "") -> str:
 
 # ─── Automações configuradas via Secrets ──────────────────────────────────────
 # Adicione nos Secrets do Streamlit:
-#   AUTOMACAO_1_SHEET_ID = "1-sUNFrPbs7ljfUvt45yR2AKQmzGKxaGOnDhzH-Ny6YM"
+#   AUTOMACAO_1_SHEET_ID = "<id da planilha>"
 #   AUTOMACAO_1_NOME     = "Monitor Legislativo"
-#   AUTOMACAO_2_SHEET_ID = "1IEVYNRM4VFKDsQlOhymXu-TTSeZTRa04ZeUvXPAXILs"
+#   AUTOMACAO_2_SHEET_ID = "<id da planilha>"
 #   AUTOMACAO_2_NOME     = "DOU"
-#   AUTOMACAO_3_SHEET_ID = "1dQ4IRP7TQnzQ-Bnzd3hKcmaQwzIfGRCMlfs-1WxpxjQ"
+#   AUTOMACAO_3_SHEET_ID = "<id da planilha>"
 #   AUTOMACAO_3_NOME     = "Coletor de Notícias"
 
 AUTOMACOES = [
@@ -268,11 +213,15 @@ def _render_cell(col: str, val: str) -> str:
     if not safe or raw.lower() in ("none", "nan", ""):
         return ''
     if col in _URL_COLS and (raw.startswith("http://") or raw.startswith("https://")):
-        return f'<a href="{safe}" target="_blank" rel="noopener">↗ link</a>'
+        return f'<a href="{safe}" target="_blank" rel="noopener">Abrir ↗</a>'
+    if col in ("Alinhamento", "alinhamento"):
+        baixo = raw.lower()
+        tipo = "" if baixo.startswith(("não", "nao")) else ("ok" if "alinh" in baixo else "org")
+        return chip(raw, tipo)
     if col in _EXPAND_COLS:
         paragrafos = [_html.escape(p.strip()) for p in raw.split('\n') if p.strip()]
         if not paragrafos:
-            return '<span style="color:#DADAD4;">—</span>'
+            return ''
         if len(paragrafos) > 1:
             primeiro = paragrafos[0]
             resto    = '<br><br>'.join(paragrafos[1:])
@@ -284,7 +233,7 @@ def _render_cell(col: str, val: str) -> str:
         return (
             f'<details class="at-details">'
             f'<summary>{primeiro}&nbsp;'
-            f'<span class="at-leia-mais">↓ Leia mais</span>'
+            f'<span class="at-leia-mais">Leia mais</span>'
             f'</summary>'
             f'<div style="margin-top:6px;line-height:1.6;">{resto}</div>'
             f'</details>'
@@ -303,7 +252,8 @@ def _render_table(df: pd.DataFrame) -> str:
     rows = ""
     for _, row in df.iterrows():
         cells = "".join(
-            f"<td>{_render_cell(str(col), str(val))}</td>"
+            ('<td class="at-prop">' if str(col) == "Proposição" else "<td>")
+            + f"{_render_cell(str(col), str(val))}</td>"
             for col, val in zip(df.columns, row)
         )
         rows += f"<tr>{cells}</tr>"
@@ -375,7 +325,7 @@ def _transformar_df(df: pd.DataFrame) -> pd.DataFrame:
             uf      = uf      if uf.lower()      not in ("nan","none","") else ""
             if not nome:
                 return ""
-            sufixo = f"{partido}-{uf}" if partido and uf else partido or uf
+            sufixo = f"{partido}/{uf}" if partido and uf else partido or uf
             return f"{nome} ({sufixo})" if sufixo else nome
         df.insert(idx, "Autor", df.apply(_autor, axis=1))
         for c in ["Autor Principal", "Autor Principal Partido", "Autor Principal UF"]:
@@ -437,12 +387,13 @@ with st.sidebar:
         f'margin:10px 0 0 0;background:transparent;">'
         f'<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         f'color:{EIXO["tinta"]};line-height:1.65;margin:0;">'
-        f'Resultados das <strong>automações de monitoramento</strong> por cliente.'
+        f'O que as <strong>raspagens automáticas</strong> do DOU, do Monitor Legislativo '
+        f'e do Coletor de Notícias encontraram para cada cliente, com busca, filtros e download.'
         f'</p></div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    if st.button("↻ Atualizar dados", use_container_width=True):
+    if st.button("Atualizar dados", icon=":material/refresh:", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
     st.markdown("---")
@@ -454,18 +405,13 @@ with st.sidebar:
         authenticator.logout("Sair", "sidebar")
 
 
-# ─── Hero banner ─────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div style="background:{EIXO['vinho']};display:flex;align-items:center;
-            justify-content:space-between;padding:36px 48px;margin:0 -2rem 32px -2rem;">
-  <div style="font-family:'Montserrat',sans-serif;font-size:48px;font-weight:800;
-              color:#fff;line-height:1;letter-spacing:-0.01em;">Automações</div>
-  <div style="font-family:'Montserrat',sans-serif;font-size:13px;color:rgba(255,255,255,0.7);
-              text-align:right;line-height:1.6;">
-    DOU · Monitor Legislativo · Coletor de Notícias
-  </div>
-</div>
-""", unsafe_allow_html=True)
+def _n(valor: int) -> str:
+    return f"{valor:,}".replace(",", ".")
+
+
+# ─── Cabeçalho ───────────────────────────────────────────────────────────────
+cabecalho("Automações", "Resultados do DOU, do Monitor Legislativo e do Coletor de Notícias por cliente, "
+          "com filtros e download.")
 
 
 # ─── Tabs das 3 automações ────────────────────────────────────────────────────
@@ -478,32 +424,27 @@ for tab, automacao in zip(tabs, AUTOMACOES):
         idx      = AUTOMACOES.index(automacao) + 1
 
         if not sheet_id:
-            st.markdown(
-                f'<div style="background:#fff;border:1px solid {EIXO["borda"]};'
-                f'padding:24px 28px;margin-top:8px;">'
-                f'<p style="font-family:Montserrat,sans-serif;font-size:13px;'
-                f'color:{EIXO["subtexto"]};margin:0;">'
-                f'Configure <code>AUTOMACAO_{idx}_SHEET_ID</code> nos Secrets '
-                f'do Streamlit para conectar esta automação.'
-                f'</p></div>',
-                unsafe_allow_html=True,
-            )
+            vazio(f"{nome} ainda não está conectado a este painel. Avise a equipe de dados para fazer a ligação.")
             continue
 
-        with st.spinner(f"Carregando abas…"):
+        with st.spinner("Abrindo a planilha…"):
             abas = _listar_abas(sheet_id)
 
         if not abas:
-            st.warning("Nenhuma aba encontrada ou erro de acesso à planilha.")
+            vazio(f"Não consegui abrir os resultados de {nome}. Clique em Atualizar dados na barra lateral; "
+                  "se continuar, avise a equipe de dados.")
             continue
 
-        # ── Seleção de cliente + reload ───────────────────────────────────────
-        col_sel, col_btn = st.columns([5, 1])
+        # ── Bloco de controles: cliente, filtros e atualizar ──────────────────
+        with st.container(key=f"at_filtros_{idx}"):
+            col_sel, col_busca_ui, col_periodo_ui, col_alin_ui, col_btn = st.columns(
+                [2, 2.2, 2, 2, 1], vertical_alignment="bottom"
+            )
         with col_sel:
             cliente = st.selectbox("Cliente", abas, key=f"cli_{sheet_id}")
         with col_btn:
-            st.markdown("<div style='margin-top:26px;'></div>", unsafe_allow_html=True)
-            if st.button("↻", key=f"rl_{sheet_id}", use_container_width=True):
+            if st.button("Atualizar", icon=":material/refresh:", key=f"rl_{sheet_id}",
+                         use_container_width=True, help="Busca de novo os dados da planilha"):
                 st.cache_data.clear()
                 st.rerun()
 
@@ -512,7 +453,8 @@ for tab, automacao in zip(tabs, AUTOMACOES):
             df = _carregar_aba(sheet_id, cliente)
 
         if df.empty:
-            st.info("Nenhum dado encontrado nesta aba.")
+            vazio(f"Ainda não há registros de {cliente} em {nome}. Escolha outro cliente ou clique em "
+                  "Atualizar se a automação rodou há pouco.")
             continue
 
         df = _transformar_df(df)
@@ -524,19 +466,20 @@ for tab, automacao in zip(tabs, AUTOMACOES):
             df = df.sort_values("__data_ord", ascending=False, na_position="last")
 
         # ── Filtros: busca + período + alinhamento ────────────────────────────
-        col_busca_ui, col_periodo_ui, col_alin_ui = st.columns([2, 2.5, 2])
         with col_busca_ui:
             busca = st.text_input(
-                "Filtrar",
-                placeholder="Buscar por palavra-chave…",
+                "Buscar",
+                placeholder="Palavra, nome ou número",
                 key=f"busca_{sheet_id}",
             )
 
         df_exib = df.copy()
+        ultimo = None
 
         if col_data_nome and "__data_ord" in df.columns and df["__data_ord"].notna().any():
             d_min = df["__data_ord"].dropna().min().date()
             d_max = df["__data_ord"].dropna().max().date()
+            ultimo = d_max
             with col_periodo_ui:
                 intervalo = st.date_input(
                     "Período",
@@ -568,6 +511,7 @@ for tab, automacao in zip(tabs, AUTOMACOES):
                         options=opts_alin,
                         default=opts_alin,
                         key=f"alin_{sheet_id}",
+                        placeholder="Escolha ao menos uma opção",
                     )
                 if sel_alin:
                     df_exib = df_exib[df_exib[col_alin].isin(sel_alin)]
@@ -578,39 +522,38 @@ for tab, automacao in zip(tabs, AUTOMACOES):
         df_exib  = df_exib.drop(columns=["__data_ord"], errors="ignore")
         df_total = df.drop(columns=["__data_ord"], errors="ignore")
 
-        st.markdown('<div class="ge-rule"></div>', unsafe_allow_html=True)
-
         df_exib = _filtrar(df_exib, busca)
 
-        # ── Meta + Download (mesma linha, acima da tabela) ───────────────────
-        total_str = (
-            f'de {len(df_total)} '
-            if len(df_exib) != len(df_total) else ""
-        )
+        # ── Resultado: números + download, acima da tabela ───────────────────
+        secao(cliente,
+              explicacao=("Mais recentes primeiro. " if col_data_nome else "") + "Cada linha é um registro encontrado pela automação. Em textos longos, clique em "
+                         "Leia mais para abrir o texto inteiro; Abrir leva à página original. O download "
+                         "traz só o que está filtrado.")
         csv = df_exib.to_csv(index=False).encode("utf-8")
 
-        col_meta, col_dl = st.columns([3, 1])
+        with st.container(key=f"at_res_{idx}"):
+            col_meta, col_dl = st.columns([3, 1], vertical_alignment="center")
         with col_meta:
-            st.markdown(
-                f'<p class="at-meta" style="margin-top:8px;">'
-                f'<strong style="color:{EIXO["tinta"]};">{len(df_exib)}</strong> '
-                f'{total_str}'
-                f'registro{"s" if len(df_exib) != 1 else ""} · '
-                f'{len(df_total.columns)} coluna{"s" if len(df_total.columns) != 1 else ""}'
-                f'</p>',
-                unsafe_allow_html=True,
-            )
+            itens = [(_n(len(df_exib)), " registro mostrado" if len(df_exib) == 1 else " registros mostrados")]
+            if len(df_exib) != len(df_total):
+                itens.append((_n(len(df_total)), " no total"))
+            if ultimo is not None:
+                itens.append((ultimo.strftime("%d/%m/%Y"), " é a data do último registro"))
+            resumo(itens)
         with col_dl:
             st.download_button(
-                label=f"⬇ Baixar seleção ({len(df_exib)})",
+                label=f"Baixar seleção ({_n(len(df_exib))})",
+                icon=":material/download:",
                 data=csv,
                 file_name=f"{nome}_{cliente}.csv",
                 mime="text/csv",
                 key=f"dl_{sheet_id}_{cliente}",
                 use_container_width=True,
+                disabled=df_exib.empty,
             )
 
         if df_exib.empty:
-            st.info("Nenhum resultado para os filtros aplicados.")
+            vazio("Nenhum registro com esses filtros. Amplie o período, limpe a busca ou marque mais opções "
+                  "de alinhamento.")
         else:
             st.markdown(_render_table(df_exib), unsafe_allow_html=True)

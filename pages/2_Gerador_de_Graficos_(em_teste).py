@@ -62,79 +62,35 @@ from gerador_graficos_extracao import (
     numeros_fora_da_fonte,
 )
 from polling_extracao_core import definir_api_key
+from estilo_paginas import MARINHO, esc, explica, resumo, secao, vazio
 
 st.set_page_config(page_title="Gerador de Gráficos (em teste)", layout="wide")
 
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-:root { --eixo-vinho: #962E4D; }
 html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
 [data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 0 2rem 3rem !important; background: #F4F3EF; }
+.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
 * { box-sizing: border-box; }
 body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"] { display: none; }
-[data-testid="stDecoration"] { display: none; }
+[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
 [data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
 [data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important;
-}
-footer { display: none !important; }
-#MainMenu { display: none !important; }
-[data-testid="stButton"] > button {
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.1em !important;
-    text-transform: uppercase !important; border-radius: 0 !important;
-    border: 1px solid #962E4D !important; background: transparent !important;
-    color: #962E4D !important; padding: 5px 14px !important;
-    transition: background 0.15s, color 0.15s !important;
-}
-[data-testid="stButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] > button { border: 1px solid #962E4D !important; color: #962E4D !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stRadio"] > label, [data-testid="stSelectbox"] > label,
-[data-testid="stMultiSelect"] > label, [data-testid="stTextInput"] > label,
-[data-testid="stNumberInput"] > label, [data-testid="stTextArea"] > label {
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important; color: #767672 !important;
-}
-[data-testid="stTabs"] [role="tablist"] { border-bottom: 1px solid #DADAD4 !important; gap: 0 !important; }
-[data-testid="stTabs"] [role="tab"] {
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.12em !important;
-    text-transform: uppercase !important; color: #767672 !important;
-    padding: 10px 20px 9px !important; border-bottom: 2px solid transparent !important;
-    background: transparent !important; border-radius: 0 !important;
-}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #962E4D !important; border-bottom-color: #962E4D !important; }
-.ge-hero { background: #962E4D; display: flex; align-items: center; padding: 36px 48px; margin: 0 -2rem 32px -2rem; }
-.ge-hero-title { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.01em; }
-/* A prévia acompanha a rolagem enquanto a pessoa mexe nos controles. */
+    letter-spacing: normal !important; text-transform: none !important; }
+footer, #MainMenu { display: none !important; }
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
+.gg-teste { vertical-align: middle; margin-left: 12px; font-size: 12px !important; letter-spacing: 0; position: relative; top: -4px; }
+.st-key-gg_cx_fonte, .st-key-gg_cx_ctl, .st-key-gg_cx_baixar { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 18px; gap: .6rem; }
+.st-key-gg_cx_ctl .eg-secao, .st-key-gg_cx_baixar .eg-secao { margin: 10px 0 2px; }
+.gg-forma { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 11px 16px; font-size: 13px; line-height: 1.6; color: #4A4A4A; margin: 4px 0 0; }
+.gg-forma b { color: #192D4E; font-weight: 700; }
+[data-baseweb="tag"] { background: #192D4E !important; border-radius: 6px !important; }
 [data-testid="stColumn"]:has(.gg-previa) { position: sticky; top: 1rem; align-self: flex-start; }
-/* O tema do app não define cor primária, e o vermelho padrão do Streamlit
-   briga com a marca. Aqui os controles de destaque usam vinho e marinho. */
-[data-testid="stDownloadButton"] > button {
-    background: #962E4D !important; border: 1px solid #962E4D !important; color: #fff !important;
-    border-radius: 0 !important; font-size: 12px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important; padding: 10px 14px !important;
-}
-[data-testid="stDownloadButton"] > button:hover { background: #7A2640 !important; border-color: #7A2640 !important; }
-[data-baseweb="tag"] { background: #192D4E !important; border-radius: 0 !important; }
-[data-testid="stButtonGroup"] button[data-variant="segmented_control"] {
-    border-radius: 0 !important; padding: 8px 16px !important;
-}
-[data-testid="stButtonGroup"] button[data-variant="segmented_control"][data-selected="true"] {
-    background: #962E4D !important; border-color: #962E4D !important; color: #fff !important;
-}
-[data-testid="stButtonGroup"] button[data-variant="segmented_control"][data-selected="true"] * { color: #fff !important; }
-.gg-passo { font-size: 13px; color: #767672; margin: -8px 0 14px; }
-.gg-grupo { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #192D4E; margin: 18px 0 6px; padding-bottom: 5px; border-bottom: 1px solid #DADAD4; }
-/* Selo ao lado do título enquanto a página está em teste. Tirar daqui, do
-   hero e do nome do arquivo quando ela for liberada. */
-.ge-hero-selo { margin-left: 18px; padding: 6px 12px; border: 1.5px solid #fff; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
-.ge-rule { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #962E4D; border-top: 2px solid #962E4D; padding-top: 10px; margin: 24px 0 16px; }
+.gg-previa { font-size: 0.72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #4E5A6E; margin: 0 0 6px; }
+p.gg-arquivo, .gg-arquivo { font-size: 12px !important; color: #6A6A66 !important; margin: 2px 0 0 !important; word-break: break-all; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -315,7 +271,7 @@ EXEMPLOS = {
 
 FONTES = {
     "colar": ":material/content_paste: Colar ou digitar",
-    "ia": ":material/auto_awesome: Ler de PDF, imagem ou texto",
+    "ia": ":material/document_scanner: Ler de PDF, imagem ou texto",
     "arquivo": ":material/upload_file: Planilha (.xlsx ou .csv)",
 }
 
@@ -652,11 +608,32 @@ def _marca_da_logo(identidade: str) -> list:
 
 # ── página ───────────────────────────────────────────────────────────────────
 
-st.markdown('<div class="ge-hero"><div class="ge-hero-title">Gerador de Gráficos</div>'
-            '<div class="ge-hero-selo">Em teste</div></div>',
-            unsafe_allow_html=True)
-st.caption("Página em teste: o desenho das peças ainda está sendo ajustado. "
-           "Confira a peça antes de usar em material de cliente.")
+def _plural(n: int, um: str, varios: str) -> str:
+    return um if n == 1 else varios
+
+
+def _eh_exemplo(df: pd.DataFrame) -> bool:
+    """A tabela na tela ainda é um dos exemplos da página? Exemplo fictício não
+    pode sair daqui parecendo dado, então a régua e o aviso pedem a troca."""
+    colunas, linhas = list(df.columns), df.values.tolist()
+    return any(colunas == ex["colunas"] and linhas == [[str(c) for c in l] for l in ex["linhas"]]
+               for ex in EXEMPLOS.values())
+
+
+# Estado da página que outras partes consultam (ex.: se a tabela ainda é o exemplo).
+_E: dict = {}
+
+
+def _parar(problema: str = "") -> None:
+    st.stop()
+
+
+st.markdown(
+    '<div class="eg-cab"><div class="k">Eixo · gerador de envios</div>'
+    '<div class="tit">Gerador de Gráficos<span class="eg-chip alerta gg-teste">Em teste</span></div>'
+    '<div class="sub">Traga uma tabela e baixe gráfico ou tabela na identidade da EixoGov, em PNG ou SVG. '
+    'Página em teste: confira a peça antes de usar em material de cliente.</div></div>',
+    unsafe_allow_html=True)
 
 # Mesma lateral das outras páginas: logo, o que a página faz, usuário e sair.
 with st.sidebar:
@@ -670,13 +647,14 @@ with st.sidebar:
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
         'Traga uma tabela e gere <strong>gráfico</strong> ou '
-        '<strong>tabela</strong> na identidade da EixoGov, em PNG e SVG.'
+        '<strong>tabela</strong> na identidade da EixoGov, em PNG e SVG, '
+        'com ou sem logo.'
         '</p></div>',
         unsafe_allow_html=True,
     )
     if not montserrat_disponivel():
-        st.warning("Montserrat não encontrada em fontes/. A peça sai fora da "
-                   "tipografia da EixoGov.")
+        st.warning("A fonte Montserrat não está instalada neste servidor: a peça "
+                   "sai em outra fonte. Avise a equipe de dados.")
     st.markdown("---")
     # Sem help: com tooltip o Streamlit embrulha o botão e ele perde o
     # estilo dos outros botões da lateral.
@@ -689,55 +667,68 @@ with st.sidebar:
 
 # ── 1. dados ─────────────────────────────────────────────────────────────────
 
-st.markdown('<div class="ge-rule">1. Dados</div>'
-            '<div class="gg-passo">Traga a tabela por um dos três caminhos. Ela '
-            'aparece logo abaixo, onde dá para corrigir qualquer célula.</div>',
-            unsafe_allow_html=True)
+secao("1. Dados", explicacao="Três caminhos: colar as células do Sheets, do Excel ou do Docs; "
+      "pedir ao Gemini que leia um PDF, um print ou um texto; ou subir uma planilha. "
+      "A tabela aparece logo abaixo, onde dá para corrigir qualquer célula.")
+explica("Traga a tabela por um dos três caminhos. Ela aparece abaixo, onde dá para corrigir qualquer célula.")
 
-fonte = st.segmented_control("Como os dados entram", list(FONTES),
-                             format_func=FONTES.get, default="colar",
-                             key="gg_fonte", label_visibility="collapsed") or "colar"
+with st.container(key="gg_cx_fonte"):
+    fonte = st.segmented_control("Como os dados entram", list(FONTES),
+                                 format_func=FONTES.get, default="colar",
+                                 key="gg_fonte", label_visibility="collapsed") or "colar"
 
-if fonte == "colar":
-    st.text_area("Copie as células no Sheets, Excel ou Docs (com o cabeçalho) e cole aqui",
-                 key="gg_colado", height=110,
-                 placeholder="Ano\tPLOA\tPago\n2023\t225,5\t312,7\n2024\t445,0\t384,7")
-    b1, b2 = st.columns([1.5, 4])
-    b1.button("Usar dados colados", on_click=_usar_colado, use_container_width=True)
-    b2.caption("Ou digite direto na tabela abaixo.")
-elif fonte == "ia":
-    st.caption("O Gemini transcreve a tabela de um PDF, de um print ou de um texto "
-               "corrido. Ele só lê: não calcula nem completa célula vazia. Confira "
-               "os números na tabela antes de baixar a peça.")
-    f1, f2 = st.columns(2)
-    with f1:
-        arquivo_ia = st.file_uploader("PDF ou imagem",
-                                      type=["pdf", "png", "jpg", "jpeg", "webp"],
-                                      key="gg_ia_arquivo")
-        if arquivo_ia is not None and arquivo_ia.name.lower().endswith(".pdf"):
-            st.text_input("Páginas do PDF", "1", key="gg_ia_paginas",
-                          help=f"Uma página (3) ou um intervalo (2-4), até "
-                               f"{MAX_PAGINAS} páginas.")
-    with f2:
-        st.text_area("Ou cole o texto da fonte", key="gg_ia_texto", height=110)
-        st.text_input("Qual tabela ler (opcional)", key="gg_ia_pedido",
-                      placeholder="Ex.: a tabela da Ação 219E")
-    tem_fonte = arquivo_ia is not None or bool((st.session_state.get("gg_ia_texto") or "").strip())
-    if not GEMINI_API_KEY:
-        st.error("GEMINI_API_KEY não configurada nos Secrets: a leitura por "
-                 "Gemini está desligada. Os outros dois caminhos funcionam.")
-    elif st.button("Ler tabela", disabled=not tem_fonte):
-        with st.spinner("Lendo a tabela…"):
-            try:
-                _ler_com_gemini()
-            except Exception as exc:
-                st.session_state["gg_erro"] = f"Não consegui ler a tabela: {exc}"
-            else:
-                st.rerun()
-else:
-    st.file_uploader("Primeira aba, cabeçalho na primeira linha",
-                     type=["xlsx", "xlsm", "csv"], key="gg_arquivo")
-    st.button("Usar arquivo", on_click=_usar_arquivo)
+    if fonte == "colar":
+        st.text_area("Copie as células no Sheets, Excel ou Docs (com o cabeçalho) e cole aqui",
+                     key="gg_colado", height=110,
+                     placeholder="Ano\tPLOA\tPago\n2023\t225,5\t312,7\n2024\t445,0\t384,7")
+        b1, b2 = st.columns([1.5, 4], vertical_alignment="center")
+        b1.button("Usar dados colados", on_click=_usar_colado, use_container_width=True,
+                  type="primary")
+        with b2:
+            explica("Ou digite direto na tabela abaixo.")
+    elif fonte == "ia":
+        explica("O Gemini transcreve a tabela de um PDF, de um print ou de um texto "
+                "corrido. Ele só lê: não calcula nem completa célula vazia. Confira "
+                "os números na tabela antes de baixar a peça.")
+        f1, f2 = st.columns(2)
+        with f1:
+            arquivo_ia = st.file_uploader("PDF ou imagem",
+                                          type=["pdf", "png", "jpg", "jpeg", "webp"],
+                                          key="gg_ia_arquivo")
+            if arquivo_ia is not None and arquivo_ia.name.lower().endswith(".pdf"):
+                st.text_input("Páginas do PDF", "1", key="gg_ia_paginas",
+                              help=f"Uma página (3) ou um intervalo (2-4), até "
+                                   f"{MAX_PAGINAS} páginas.")
+        with f2:
+            st.text_area("Ou cole o texto da fonte", key="gg_ia_texto", height=110)
+            st.text_input("Qual tabela ler (opcional)", key="gg_ia_pedido",
+                          placeholder="Ex.: a tabela da Ação 219E")
+        tem_fonte = arquivo_ia is not None or bool((st.session_state.get("gg_ia_texto") or "").strip())
+        if not GEMINI_API_KEY:
+            st.error("A leitura de PDF, imagem e texto está desligada neste servidor. "
+                     "Use Colar ou digitar, ou Planilha; os dois funcionam.")
+        else:
+            l1, l2 = st.columns([1.5, 4], vertical_alignment="center")
+            ler = l1.button("Ler tabela", disabled=not tem_fonte, type="primary",
+                            icon=":material/document_scanner:", use_container_width=True)
+            if not tem_fonte:
+                with l2:
+                    explica("Suba um arquivo ou cole o texto para liberar a leitura.")
+            if ler:
+                with st.spinner("Lendo a tabela com o Gemini…"):
+                    try:
+                        _ler_com_gemini()
+                    except Exception as exc:
+                        st.session_state["gg_erro"] = (f"Não consegui ler a tabela: {exc}. "
+                                                       "Tente outra página do PDF, um print mais "
+                                                       "nítido ou cole o texto.")
+                    else:
+                        st.rerun()
+    else:
+        st.file_uploader("Primeira aba, cabeçalho na primeira linha",
+                         type=["xlsx", "xlsm", "csv"], key="gg_arquivo")
+        st.button("Usar arquivo", on_click=_usar_arquivo, type="primary",
+                  icon=":material/upload_file:")
 
 if st.session_state.get("gg_erro"):
     st.error(st.session_state["gg_erro"])
@@ -759,12 +750,22 @@ if st.session_state.get("gg_origem") == "ia":
             for imagem in st.session_state["gg_fonte_imgs"]:
                 st.image(imagem, use_container_width=True)
 
+secao("Tabela", cor=MARINHO, menor=True,
+      explicacao="A primeira coluna é a categoria (ano, órgão, UF) e cada outra coluna é "
+                 "uma série. Número em formato brasileiro (1.234,5). Célula vazia ou com "
+                 "traço fica sem valor. Asterisco junto do número aparece na tabela. "
+                 "Cada forma do passo 2 diz como a tabela precisa estar e tem um "
+                 "exemplo para carregar.")
+explica("Primeira coluna: a categoria (ano, órgão, UF). Cada outra coluna: uma série. "
+        "Números no formato 1.234,5.")
+
 t1, t3 = st.columns([4.6, 1.2], vertical_alignment="bottom")
 t1.text_input("Colunas (separadas por vírgula)", key="gg_colunas",
               on_change=_aplicar_colunas,
               help="Edite para renomear, acrescentar ou tirar colunas. Linhas "
                    "você acrescenta direto na tabela.")
-t3.button("Limpar tabela", on_click=_limpar_tabela, use_container_width=True)
+t3.button("Limpar tabela", on_click=_limpar_tabela, use_container_width=True,
+          help="Esvazia a tabela e os textos da peça.")
 
 base = st.session_state["gg_base"]
 editado = st.data_editor(
@@ -773,18 +774,22 @@ editado = st.data_editor(
     column_config={c: st.column_config.TextColumn(c) for c in base.columns},
 ).fillna("").astype(str)
 st.session_state["gg_atual"] = editado
-st.caption("A primeira coluna é a categoria (ano, órgão, UF) e cada outra coluna é "
-           "uma série. Número em formato brasileiro (1.234,5). Célula vazia ou com "
-           "traço fica sem valor. Asterisco junto do número aparece na tabela. "
-           "Cada forma do passo 2 diz como a tabela precisa estar e tem um "
-           "exemplo para carregar.")
 
 categorias, series, avisos = series_da_tabela(list(editado.columns),
                                               editado.values.tolist())
+_E.update(dados_ok=bool(categorias and series), exemplo=_eh_exemplo(editado),
+          linhas=len(categorias), series=len(series))
+if categorias and series:
+    resumo([(len(categorias), _plural(len(categorias), "linha", "linhas")),
+            (len(series), _plural(len(series), "série", "séries"))])
+if _E["exemplo"]:
+    explica("Esta é uma tabela de exemplo. Troque pelos seus dados antes de baixar a peça.")
 
 # ── 2. peça ──────────────────────────────────────────────────────────────────
 
-st.markdown('<div class="ge-rule">2. Peça</div>', unsafe_allow_html=True)
+secao("2. Forma e texto", explicacao="Primeiro o que a peça mostra, depois a forma. "
+      "A sugestão vem de regra: tempo na primeira coluna pede linha, UF pede mapa, "
+      "uma coluna de valor pede ranking, várias pedem barras.")
 
 # O tipo é a decisão principal do passo: fica sozinho, acima dos controles e da
 # prévia. Primeiro a pergunta, depois a forma.
@@ -803,11 +808,17 @@ tipo = st.segmented_control(
     format_func=lambda t: f"{ICONES_TIPO[t]} {TIPOS[t]}") or formas[0]
 # Cópia fora de widget, para quem precisa saber o tipo atual num callback.
 st.session_state["gg_tipo"] = tipo
+_E["tipo"] = tipo
 
 serve, formato_dados = TIPO_SERVE[tipo]
+if categorias and series:
+    sugestao = (f"Forma sugerida para esta tabela, porque {motivo}." if tipo == sugerido
+                else f"Para esta tabela a sugestão seria {TIPOS[sugerido]}, porque {motivo}.")
+else:
+    sugestao = ""
 g1, g2 = st.columns([3, 1], vertical_alignment="center")
-g1.markdown(f'<div class="gg-passo" style="margin:2px 0 4px">{serve}<br>'
-            f'<b>Como a tabela precisa estar:</b> {formato_dados}</div>',
+g1.markdown(f'<div class="gg-forma">{esc(serve)}<br><b>Como a tabela precisa estar:</b> '
+            f'{esc(formato_dados)}' + (f'<br>{esc(sugestao)}' if sugestao else "") + '</div>',
             unsafe_allow_html=True)
 g2.button("Carregar exemplo desta forma", on_click=_carregar_exemplo,
           args=(tipo,), use_container_width=True)
@@ -819,8 +830,9 @@ if avisos and tipo not in ("tempo", "mapa"):
                + ("; e outros." if len(avisos) > 8 else "."))
 
 if not categorias or not series:
-    st.info("Preencha a tabela no passo 1, ou carregue o exemplo desta forma.")
-    st.stop()
+    vazio("A tabela ainda não tem categoria e valor. Preencha no passo 1 ou use "
+          "Carregar exemplo desta forma.")
+    _parar()
 
 # Empilhar soma as séries. A ferramenta não sabe se a soma faz sentido para
 # estes dados (PLOA + dotação + pago, por exemplo, não é total de nada).
@@ -833,15 +845,16 @@ if tipo in ("empilhadas", "cem") and parecem_etapas(nomes):
 col_ctl, col_prev = st.columns([1, 2], gap="large")
 versao = st.session_state["gg_v"]
 
-with col_ctl:
+with col_ctl, st.container(key="gg_cx_ctl"):
     esquema, destaque, limite = "categorias", "", 0
     orientacao, rotulos, eixo_zero = "vertical", "", True
 
     # ── quais colunas entram ────────────────────────────────────────────────
     if tipo in DUAS_SERIES:
         if len(series) < 2:
-            st.info(f"{TIPOS[tipo]} precisa de duas colunas de valor na tabela.")
-            st.stop()
+            vazio(f"{TIPOS[tipo]} precisa de duas colunas de valor. Acrescente uma "
+                  "coluna no passo 1 ou escolha outra forma.")
+            _parar("Precisa de duas colunas de valor")
         if tipo == "execucao":
             padrao_a, padrao_b = par_execucao(nomes)
             rot_a, rot_b = "Previsto (barra larga)", "Realizado (barra de dentro)"
@@ -854,8 +867,8 @@ with col_ctl:
         nome_b = x2.selectbox(rot_b, nomes, index=nomes.index(padrao_b),
                               key=f"gg_b_{versao}_{tipo}")
         if nome_a == nome_b:
-            st.info("Escolha duas colunas diferentes.")
-            st.stop()
+            vazio("As duas escolhas apontam para a mesma coluna. Escolha duas colunas diferentes.")
+            _parar("Escolha duas colunas diferentes")
         selecao = [series[nomes.index(nome_a)], series[nomes.index(nome_b)]]
     elif tipo in UMA_SERIE:
         nome = nomes[0] if len(nomes) == 1 else st.selectbox(
@@ -947,7 +960,7 @@ with col_ctl:
             format_func={"vertical": "Em pé", "horizontal": "Deitada"}.get,
             key=f"gg_orientacao_{versao}_{tipo}")
 
-    st.markdown('<div class="gg-grupo">Texto da peça</div>', unsafe_allow_html=True)
+    secao("Texto da peça", cor=MARINHO, menor=True)
     titulo = st.text_input("Título", key="gg_titulo")
     subtitulo = st.text_input("Subtítulo", key="gg_subtitulo",
                               placeholder="O que é, período e unidade")
@@ -955,7 +968,7 @@ with col_ctl:
 
     unidade, casas = st.session_state.get("gg_unidade", "Número"), 1
     if tipo != "tempo":
-        st.markdown('<div class="gg-grupo">Números</div>', unsafe_allow_html=True)
+        secao("Números", cor=MARINHO, menor=True)
         # Contagem (proposições, cadeiras, UFs) não tem casa decimal: o padrão
         # acompanha o dado, e a pessoa muda se quiser.
         numeros = [v for s in selecao for v in s["valores"] if v is not None]
@@ -1000,10 +1013,10 @@ opcoes = {
 }
 
 with col_prev:
-    st.markdown('<div class="gg-previa"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="gg-previa">Prévia</div>', unsafe_allow_html=True)
     if not selecao:
-        st.info("Escolha ao menos uma série.")
-        st.stop()
+        vazio("Nenhuma série escolhida. Marque ao menos uma no seletor ao lado.")
+        _parar("Escolha ao menos uma série")
 
     # A prévia mostra a primeira combinação escolhida para o download, então o
     # que está na tela é um dos arquivos que vão sair. Os seletores ficam
@@ -1017,66 +1030,73 @@ with col_prev:
                             **opcoes), use_container_width=True)
     except ValueError as exc:
         st.error(str(exc))
-        st.stop()
+        _parar("A peça não fecha com estes dados: veja o aviso")
     except Exception as exc:
-        st.error(f"Falha ao gerar a peça: {exc}")
-        st.stop()
+        st.error(f"Não consegui desenhar a peça ({exc}). Confira a tabela e a forma; "
+                 "se continuar, avise a equipe de dados.")
+        _parar("A peça não foi desenhada: veja o aviso")
+    _E["peca_ok"] = True
 
-    st.markdown('<div class="gg-grupo">Baixar</div>', unsafe_allow_html=True)
-    s1, s2, s3 = st.columns(3)
-    with s1:
-        st.segmented_control(
-            "Fundo", list(SAIDA_FUNDO), format_func=SAIDA_FUNDO.get,
-            selection_mode="multi", default=["fundo-branco"], key="gg_saida_fundo",
-            help="Sem fundo assenta direto em slide ou documento. O texto "
-                 "continua escuro, então pede fundo claro.")
-    with s2:
-        st.segmented_control(
-            "Logo", list(SAIDA_LOGO), format_func=SAIDA_LOGO.get,
-            selection_mode="multi", default=["com-logo", "sem-logo"],
-            key="gg_saida_logo")
-    with s3:
-        formatos = st.segmented_control(
-            "Formato", list(SAIDA_FORMATO), format_func=SAIDA_FORMATO.get,
-            selection_mode="multi", default=["png", "svg"], key="gg_saida_formato",
-            help="PNG para WhatsApp, slide e documento. SVG é vetor, para "
-                 "quem vai editar depois.") or []
+    secao("3. Baixar", explicacao="A prévia acima é um dos arquivos que vão sair. "
+          "Uma opção marcada em cada grupo baixa o arquivo direto; mais de uma "
+          "sai em .zip com todas as combinações.")
+    with st.container(key="gg_cx_baixar"):
+        s1, s2, s3 = st.columns(3)
+        with s1:
+            st.segmented_control(
+                "Fundo", list(SAIDA_FUNDO), format_func=SAIDA_FUNDO.get,
+                selection_mode="multi", default=["fundo-branco"], key="gg_saida_fundo",
+                help="Sem fundo assenta direto em slide ou documento. O texto "
+                     "continua escuro, então pede fundo claro.")
+        with s2:
+            st.segmented_control(
+                "Logo", list(SAIDA_LOGO), format_func=SAIDA_LOGO.get,
+                selection_mode="multi", default=["com-logo", "sem-logo"],
+                key="gg_saida_logo")
+        with s3:
+            formatos = st.segmented_control(
+                "Formato", list(SAIDA_FORMATO), format_func=SAIDA_FORMATO.get,
+                selection_mode="multi", default=["png", "svg"], key="gg_saida_formato",
+                help="PNG para WhatsApp, slide e documento. SVG é vetor, para "
+                     "quem vai editar depois.") or []
 
-    # Ordem fixa, igual à dos seletores, seja qual for a ordem do clique.
-    fundos = [f for f in SAIDA_FUNDO if f in fundos]
-    logos = [l for l in SAIDA_LOGO if l in logos]
-    formatos = [f for f in SAIDA_FORMATO if f in formatos]
+        # Ordem fixa, igual à dos seletores, seja qual for a ordem do clique.
+        fundos = [f for f in SAIDA_FUNDO if f in fundos]
+        logos = [l for l in SAIDA_LOGO if l in logos]
+        formatos = [f for f in SAIDA_FORMATO if f in formatos]
 
-    escala = 2
-    if "png" in formatos:
-        escala = st.radio(
-            "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
-            index=list(ESCALAS_EXPORT).index(2), key="gg_escala",
-            format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}")
+        escala = 2
+        if "png" in formatos:
+            escala = st.radio(
+                "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
+                index=list(ESCALAS_EXPORT).index(2), key="gg_escala",
+                format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}")
 
-    arquivos = [(slug_arquivo(titulo, tipo, formato, f"{logo}_{fundo}"),
-                 fundo, logo, formato)
-                for fundo in fundos for logo in logos for formato in formatos]
-    if not arquivos:
-        st.info("Marque pelo menos uma opção de fundo, de logo e de formato.")
-        st.stop()
+        arquivos = [(slug_arquivo(titulo, tipo, formato, f"{logo}_{fundo}"),
+                     fundo, logo, formato)
+                    for fundo in fundos for logo in logos for formato in formatos]
+        _E["arquivos"] = len(arquivos)
+        if not arquivos:
+            vazio("Nada marcado para baixar. Marque pelo menos uma opção em Fundo, "
+                  "em Logo e em Formato.")
+            _parar()
 
-    assinatura = json.dumps({
-        "logo": _marca_da_logo(identidade), "tipo": tipo,
-        "categorias": categorias, "series": selecao, "opcoes": opcoes,
-        "escala": escala, "arquivos": arquivos,
-    }, sort_keys=True, ensure_ascii=False)
-    if len(arquivos) == 1:
-        nome, _, _, formato = arquivos[0]
-        st.download_button(
-            f"Baixar {SAIDA_FORMATO[formato]}", _arquivos(assinatura),
-            file_name=nome, mime=MIMES_SAIDA[formato],
-            use_container_width=True, type="primary")
-        st.caption(nome)
-    else:
-        st.download_button(
-            f"Baixar {len(arquivos)} arquivos (.zip)", _arquivos(assinatura),
-            file_name=slug_arquivo(titulo, tipo, "zip"), mime="application/zip",
-            use_container_width=True, type="primary")
-        st.caption("Uma opção marcada em cada grupo baixa o arquivo direto, "
-                   "sem zip.")
+        assinatura = json.dumps({
+            "logo": _marca_da_logo(identidade), "tipo": tipo,
+            "categorias": categorias, "series": selecao, "opcoes": opcoes,
+            "escala": escala, "arquivos": arquivos,
+        }, sort_keys=True, ensure_ascii=False)
+        if len(arquivos) == 1:
+            nome, _, _, formato = arquivos[0]
+            st.download_button(
+                f"Baixar {SAIDA_FORMATO[formato]}", _arquivos(assinatura),
+                file_name=nome, mime=MIMES_SAIDA[formato],
+                use_container_width=True, type="primary", icon=":material/download:")
+            st.markdown(f'<p class="gg-arquivo">{esc(nome)}</p>', unsafe_allow_html=True)
+        else:
+            st.download_button(
+                f"Baixar {len(arquivos)} arquivos (.zip)", _arquivos(assinatura),
+                file_name=slug_arquivo(titulo, tipo, "zip"), mime="application/zip",
+                use_container_width=True, type="primary", icon=":material/download:")
+            st.markdown('<p class="gg-arquivo">Uma opção marcada em cada grupo baixa o '
+                        'arquivo direto, sem zip.</p>', unsafe_allow_html=True)

@@ -68,73 +68,38 @@ from graficos_pesquisa_core import (
     slug_arquivo,
     titulo_padrao,
 )
+from estilo_paginas import (
+    MARINHO,
+    cabecalho,
+    esc,
+    explica,
+    resumo,
+    secao,
+    vazio,
+)
 
 st.set_page_config(page_title="Alerta de Pesquisa", layout="wide")
 
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-:root { --eixo-vinho: #962E4D; }
 html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
 [data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 0 2rem 3rem !important; background: #F4F3EF; }
+.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
 * { box-sizing: border-box; }
 body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"] { display: none; }
-[data-testid="stDecoration"] { display: none; }
+[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
 [data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
 [data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important;
-}
-footer { display: none !important; }
-#MainMenu { display: none !important; }
-[data-testid="stButton"] button {
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.1em !important;
-    text-transform: uppercase !important; border-radius: 0 !important;
-    border: 1px solid #962E4D !important; background: transparent !important;
-    color: #962E4D !important; padding: 5px 14px !important;
-    transition: background 0.15s, color 0.15s !important;
-}
-[data-testid="stButton"] button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] button { border: 1px solid #962E4D !important; color: #962E4D !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stRadio"] > label, [data-testid="stSelectbox"] > label,
-[data-testid="stMultiSelect"] > label, [data-testid="stTextInput"] > label,
-[data-testid="stNumberInput"] > label, [data-testid="stTextArea"] > label {
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important; color: #767672 !important;
-}
-[data-testid="stTabs"] [role="tablist"] { border-bottom: 1px solid #DADAD4 !important; gap: 0 !important; }
-[data-testid="stTabs"] [role="tab"] {
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.12em !important;
-    text-transform: uppercase !important; color: #767672 !important;
-    padding: 10px 20px 9px !important; border-bottom: 2px solid transparent !important;
-    background: transparent !important; border-radius: 0 !important;
-}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #962E4D !important; border-bottom-color: #962E4D !important; }
-.ge-hero { background: #962E4D; display: flex; align-items: center; padding: 36px 48px; margin: 0 -2rem 32px -2rem; }
-.ge-hero-title { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.01em; }
-.ge-rule { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #962E4D; border-top: 2px solid #962E4D; padding-top: 10px; margin: 24px 0 16px; }
-.ge-alerta-cenario {
-    background: #192D4E; color: #fff; border-left: 4px solid #962E4D;
-    padding: 10px 14px; margin: 4px 0 14px; font-size: 12.5px; line-height: 1.5;
-}
-/* Faixa de grupo cargo — turno: separa visualmente presidente/governador/
-   senador e 1º/2º turno quando vêm no mesmo material. */
-.ge-grupo {
-    background: #192D4E; color: #fff; border-left: 6px solid #962E4D;
-    padding: 13px 20px; margin: 28px 0 6px;
-    font-size: 18px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-}
-/* Rótulo de cada cenário dentro do grupo. */
-.ge-cenario-lbl {
-    font-size: 14px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
-    color: #962E4D; margin: 16px 0 4px; padding-bottom: 6px;
-    border-bottom: 1px solid #DADAD4;
-}
+    letter-spacing: normal !important; text-transform: none !important; }
+footer, #MainMenu { display: none !important; }
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
+div[class*="st-key-ap_caixa"] { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; }
+div[class*="st-key-ap_caixa"] [data-testid="stImage"] img { border-radius: 4px; }
+.ap-th { font-size: 0.69rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #4E5A6E; padding-bottom: 2px; }
+.st-key-ap_caixa_itens [data-testid="stHorizontalBlock"] { align-items: center; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -322,8 +287,24 @@ def _processar_pdf(pdf_bytes: bytes, modo: str, paginas: list[int]) -> str:
         [render_pdf_page_png(pdf_bytes, i, zoom=3.0) for i in paginas])
 
 
-st.markdown('<div class="ge-hero"><div class="ge-hero-title">Alerta de Pesquisa</div></div>',
-            unsafe_allow_html=True)
+def _plural(n: int, um: str, varios: str) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
+# Rótulos de tela para valores internos. O valor do widget continua o mesmo
+# (é ele que vai para a extração e para a ficha); só muda o que aparece.
+ROTULO_LEITURA = {
+    LEITURA_PDF[0]: "Automático (texto; imagem se for digitalizado)",
+    LEITURA_PDF[1]: "Texto do PDF",
+    LEITURA_PDF[2]: "Imagem das páginas (lê gráfico de barra)",
+}
+ROTULO_TURNO = {"t1": "1º turno", "t2": "2º turno"}
+ROTULO_TIPO = {"candidato": "Candidato", "nao_valido": "Branco, nulo ou NS/NR"}
+
+
+cabecalho("Alerta de Pesquisa",
+          "Da pesquisa colada ou do PDF do instituto ao gráfico pronto e ao texto "
+          "do alerta. Nada é gravado nas matrizes.")
 
 with st.sidebar:
     try:
@@ -335,14 +316,15 @@ with st.sidebar:
         'margin:10px 0 0 0;background:transparent;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
-        'Cole a pesquisa ou suba o PDF do instituto e gere o '
-        '<strong>gráfico</strong> e o <strong>texto do alerta</strong>.'
+        'Cole a pesquisa ou suba o PDF do instituto: a página extrai os números, '
+        'monta o <strong>gráfico</strong> no padrão da casa e escreve o '
+        '<strong>texto do alerta</strong>. Não grava nada nas matrizes.'
         '</p></div>',
         unsafe_allow_html=True,
     )
     if not montserrat_disponivel():
-        st.warning("Montserrat não encontrada em fontes/. O gráfico sai fora da "
-                   "tipografia da casa.")
+        st.warning("A fonte Montserrat não está instalada no app. O gráfico sai "
+                   "em outra fonte, fora da tipografia da casa.")
     st.markdown("---")
     if st.button("Limpar tudo", use_container_width=True,
                  help="Zera a pesquisa da tela (texto, extração, gráfico e alerta) "
@@ -375,39 +357,58 @@ with aba_dados:
         st.session_state["alerta_texto_fonte"] = st.session_state.pop(
             "alerta_texto_pendente")
 
-    col_txt, col_cfg = st.columns([2, 1])
+    secao("Material da pesquisa",
+          explicacao="Cole a notícia, o release ou o texto lido do PDF. O Gemini "
+                     "separa o instituto, a ficha técnica e os cenários com o "
+                     "número de cada nome. Tudo pode ser corrigido na revisão.")
+    with st.container(key="ap_caixa_material"):
+        col_txt, col_cfg = st.columns([2, 1], gap="large")
 
-    with col_txt:
-        st.text_area(
-            "Texto da notícia, release ou PDF lido",
-            key="alerta_texto_fonte", height=240,
-            placeholder="Cole aqui o material da pesquisa…",
-        )
-        url_original = st.text_input("Link da fonte (opcional)", key="alerta_url")
+        with col_txt:
+            st.text_area(
+                "Texto da notícia, release ou PDF lido",
+                key="alerta_texto_fonte", height=240,
+                placeholder="Cole aqui o material da pesquisa…",
+            )
+            url_original = st.text_input(
+                "Link da fonte (opcional)", key="alerta_url",
+                placeholder="https://…",
+                help="Vai para o texto do alerta. Dá para trocar depois, na aba 4.")
 
-    with col_cfg:
-        st.caption("Foco da extração — deixe em branco se o material tiver só uma "
-                   "pesquisa.")
-        foco_cargo = st.selectbox("Cargo", [""] + POLLING_MANUAL_CARGOS,
-                                  key="alerta_foco_cargo")
-        foco_uf = st.selectbox("UF", [""] + ["BR"] + UFS, key="alerta_foco_uf")
-        foco_turno = st.selectbox("Turno", [""] + POLLING_MANUAL_TURNOS,
-                                  key="alerta_foco_turno")
+        with col_cfg:
+            secao("Foco da extração", cor=MARINHO, menor=True,
+                  explicacao="Use quando o material traz mais de uma pesquisa ou "
+                             "mais de uma disputa. Em branco, a extração pega tudo "
+                             "o que encontrar.")
+            explica("Opcional. Deixe em branco se o material tiver uma pesquisa só.")
+            foco_cargo = st.selectbox(
+                "Cargo", [""] + POLLING_MANUAL_CARGOS, key="alerta_foco_cargo",
+                format_func=lambda c: c.capitalize() if c else "Qualquer cargo")
+            foco_uf = st.selectbox(
+                "UF", [""] + ["BR"] + UFS, key="alerta_foco_uf",
+                format_func=lambda u: ("Qualquer UF" if not u else
+                                       "BR (nacional)" if u == "BR" else u))
+            foco_turno = st.selectbox(
+                "Turno", [""] + POLLING_MANUAL_TURNOS, key="alerta_foco_turno",
+                format_func=lambda t: ROTULO_TURNO.get(t, t) if t else "Qualquer turno")
 
-    with st.expander("Extrair texto de PDF"):
+    with st.expander("Só tem o PDF? Leia o relatório do instituto aqui",
+                     icon=":material/picture_as_pdf:"):
         pdf = st.file_uploader("Relatório do instituto", type=["pdf"], key="alerta_pdf")
         if pdf:
             import fitz
             with fitz.open(stream=pdf.getvalue(), filetype="pdf") as doc:
                 n_pag = doc.page_count
-            st.caption(f"{n_pag} página(s). Recorte: PDF inteiro no modo Auto costuma "
-                       "escolher texto e devolver número sem nome.")
+            explica(f"{_plural(n_pag, 'página', 'páginas')}. Recorte só as páginas "
+                    "dos resultados: com o PDF inteiro, o modo automático tende a "
+                    "ler como texto e devolver número sem nome de candidato.")
             c1, c2, c3 = st.columns(3)
-            modo = c1.selectbox("Modo de leitura", LEITURA_PDF, key="alerta_modo_pdf")
+            modo = c1.selectbox("Modo de leitura", LEITURA_PDF, key="alerta_modo_pdf",
+                                format_func=lambda m: ROTULO_LEITURA.get(m, m))
             p_ini = c2.number_input("Página inicial", 1, n_pag, 1, key="alerta_pag_ini")
             p_fim = c3.number_input("Página final", 1, n_pag, min(n_pag, 4),
                                     key="alerta_pag_fim")
-            if st.button("Ler PDF para texto"):
+            if st.button("Ler o PDF e colar no texto", icon=":material/description:"):
                 paginas = list(range(int(p_ini) - 1, int(p_fim)))
                 with st.spinner("Lendo o PDF…"):
                     try:
@@ -415,13 +416,14 @@ with aba_dados:
                             pdf.getvalue(), modo, paginas)
                         st.rerun()
                     except Exception as exc:
-                        st.error(f"Falha ao ler o PDF: {exc}")
+                        st.error(f"Não foi possível ler o PDF ({exc}). Tente outro "
+                                 "modo de leitura ou um recorte menor de páginas.")
 
-    if st.button("Extrair dados", type="primary"):
+    if st.button("Extrair dados da pesquisa", type="primary"):
         if not (st.session_state.get("alerta_texto_fonte") or "").strip():
             st.error("Cole o texto da pesquisa ou leia um PDF primeiro.")
         else:
-            with st.spinner("Extraindo com o Gemini…"):
+            with st.spinner("Lendo a pesquisa com o Gemini…"):
                 try:
                     novo = extrair_dados_polling_gemini(
                         st.session_state["alerta_texto_fonte"], url_original or "",
@@ -439,22 +441,34 @@ with aba_dados:
                     st.session_state["alerta_payload"] = novo
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"Falha na extração: {exc}")
+                    st.error(f"A extração falhou ({exc}). Tente de novo; se repetir, "
+                             "cole só o trecho com os resultados ou use o foco da "
+                             "extração.")
 
     if st.session_state.get("alerta_payload"):
-        st.success("Dados extraídos. Confira na aba **2. Revisão**.")
+        _pl = st.session_state["alerta_payload"]
+        _cens = _pl.get("cenarios") or []
+        _nomes = sum(len(c.get("itens") or []) for c in _cens)
+        resumo([((_pl.get("instituto") or "Instituto não identificado"), ""),
+                (len(_cens), "cenários" if len(_cens) != 1 else "cenário"),
+                (_nomes, "linhas extraídas" if _nomes != 1 else "linha extraída")])
+        explica("Próximo passo: conferir nomes, números e ficha técnica na aba "
+                "2. Revisão.")
 
 
 payload = st.session_state.get("alerta_payload")
 itens_editados: list[dict] = []
 cenario_final: dict = {}
 votos_validos = False
-AVISO_SEM_DADOS = "Extraia os dados na aba **1. Dados** para liberar esta etapa."
+AVISO_SEM_DADOS = ("Ainda não há pesquisa extraída. Cole o material na aba 1. Dados "
+                   "e clique em Extrair dados da pesquisa.")
+AVISO_SEM_ITENS = ("Nenhum nome marcado na revisão. Marque ao menos um na aba "
+                   "2. Revisão para liberar esta etapa.")
 
 
 with aba_revisao:
     if not payload:
-        st.info(AVISO_SEM_DADOS)
+        vazio(AVISO_SEM_DADOS)
     else:
         cenarios = payload.get("cenarios") or []
         rotulos_cen = [
@@ -492,42 +506,53 @@ with aba_revisao:
         # avulso vira a exceção que se escolhe de propósito.
         opcoes = list(medias) + [f"c{i}" for i in range(len(cenarios))]
         escolha = opcoes[0] if opcoes else "c0"
-        if len(opcoes) > 1:
-            escolha = st.selectbox("Cenário", opcoes, format_func=_rotulo_opcao,
-                                   key="alerta_cenario_op")
 
+        secao("Cenário", _plural(len(cenarios), "cenário extraído", "cenários extraídos"),
+              explicacao="Quando há mais de um cenário da mesma disputa no 1º turno, "
+                         "a média deles vem primeiro: é a leitura da disputa. Escolha "
+                         "um cenário avulso só quando for esse o recorte da peça.")
         combinar, modo_comb = [], "media"
-        if escolha in medias:
-            grupo = medias[escolha]
-            chave_comb = f"alerta_comb_{escolha}"
-            # Sobra de uma extração anterior derrubaria a página no cenarios[i].
-            if chave_comb in st.session_state:
-                st.session_state[chave_comb] = [
-                    i for i in st.session_state[chave_comb] if i in grupo]
-            c_sel, c_modo = st.columns([2, 1])
-            with c_sel:
-                combinar = st.multiselect(
-                    "Cenários na média", grupo, default=grupo,
-                    format_func=lambda i: rotulos_cen[i], key=chave_comb,
-                    help="Tire da conta o cenário que não for variação da mesma "
-                         "pergunta.")
-            with c_modo:
-                modo_comb = st.radio(
-                    "Como combinar", ["media", "soma"], horizontal=True,
-                    format_func=lambda m: ("Média" if m == "media"
-                                           else "Soma (1º + 2º voto)"),
-                    key=f"alerta_modo_comb_{escolha}",
-                    help="Média divide cada nome só pelos cenários em que ele "
-                         "aparece, então quem está em um cenário só não é diluído. "
-                         "Soma serve quando os cenários são o 1º e o 2º voto da "
-                         "mesma pergunta e a leitura é o total (~200%).",
-                )
-            if not combinar:
-                st.error("Marque ao menos um cenário para a média.")
-                combinar = list(grupo)
-            idx = combinar[0]
-        else:
-            idx = int(escolha[1:]) if escolha.startswith("c") else 0
+        with st.container(key="ap_caixa_cenario"):
+            if len(opcoes) > 1:
+                escolha = st.selectbox("Cenário", opcoes, format_func=_rotulo_opcao,
+                                       key="alerta_cenario_op")
+            elif cenarios:
+                explica(f"Cenário único: {_rotulo_opcao(escolha)}.")
+            else:
+                explica("A extração não encontrou cenário com números. Volte à aba "
+                        "1. Dados e confira o material colado.")
+
+            if escolha in medias:
+                grupo = medias[escolha]
+                chave_comb = f"alerta_comb_{escolha}"
+                # Sobra de uma extração anterior derrubaria a página no cenarios[i].
+                if chave_comb in st.session_state:
+                    st.session_state[chave_comb] = [
+                        i for i in st.session_state[chave_comb] if i in grupo]
+                c_sel, c_modo = st.columns([2, 1])
+                with c_sel:
+                    combinar = st.multiselect(
+                        "Cenários na média", grupo, default=grupo,
+                        format_func=lambda i: rotulos_cen[i], key=chave_comb,
+                        help="Tire da conta o cenário que não for variação da mesma "
+                             "pergunta.")
+                with c_modo:
+                    modo_comb = st.radio(
+                        "Como combinar", ["media", "soma"], horizontal=True,
+                        format_func=lambda m: ("Média" if m == "media"
+                                               else "Soma (1º + 2º voto)"),
+                        key=f"alerta_modo_comb_{escolha}",
+                        help="Média divide cada nome só pelos cenários em que ele "
+                             "aparece, então quem está em um cenário só não é diluído. "
+                             "Soma serve quando os cenários são o 1º e o 2º voto da "
+                             "mesma pergunta e a leitura é o total (~200%).",
+                    )
+                if not combinar:
+                    st.error("Marque ao menos um cenário para a média.")
+                    combinar = list(grupo)
+                idx = combinar[0]
+            else:
+                idx = int(escolha[1:]) if escolha.startswith("c") else 0
 
         # Cargo, UF, turno e ficha saem do primeiro cenário da média: são iguais
         # no grupo inteiro, é o que define o grupo.
@@ -542,7 +567,10 @@ with aba_revisao:
             for chave in CHAVES_DERIVADAS:
                 st.session_state.pop(chave, None)
 
-        with st.expander("Ficha técnica", expanded=True):
+        # O título da seção diz se a ficha fecha, e isso só se sabe depois dos
+        # campos: o lugar é guardado aqui e preenchido abaixo.
+        titulo_ficha = st.empty()
+        with st.container(key="ap_caixa_ficha"):
             m1, m2, m3 = st.columns(3)
             payload["instituto"] = m1.text_input("Instituto", payload.get("instituto") or "")
             payload["registro_tse"] = m2.text_input("Registro TSE",
@@ -578,9 +606,9 @@ with aba_revisao:
 
             faltando = ficha_incompleta(payload)
             if faltando:
-                st.error("Ficha incompleta: falta " + ", ".join(faltando) +
-                         ". O rodapé sairia sem esses campos, então o download do "
-                         "gráfico e o texto do alerta ficam travados.")
+                st.error("Falta " + ", ".join(faltando) + " na ficha. O rodapé "
+                         "sairia sem esses campos, por isso o download do gráfico "
+                         "e o texto do alerta ficam travados até completar.")
                 st.checkbox(
                     "Publicar assim mesmo, com a ficha incompleta",
                     key=CHAVE_FORCAR_FICHA,
@@ -589,11 +617,18 @@ with aba_revisao:
                          "confiança e datas de campo também estão na ficha "
                          "registrada no [PesqEle](https://pesqele.tse.jus.br), "
                          "buscando pelo registro TSE.")
+        with titulo_ficha.container():
+            secao("Ficha técnica",
+                  "completa" if not faltando else
+                  _plural(len(faltando), "campo faltando", "campos faltando"),
+                  explicacao="Sai no rodapé do gráfico e no texto do alerta. Campo "
+                             "vazio não aparece no rodapé, por isso a peça só é "
+                             "liberada com a ficha completa.")
 
         if combinar:
             fonte = [cenarios[i] for i in combinar]
             itens_base = combinar_cenarios(fonte, modo=modo_comb)
-            st.caption(
+            explica_itens = (
                 ("Média nome a nome, dividida só pelos cenários em que cada um "
                  "aparece." if modo_comb == "media" else
                  "Soma dos cenários, nome a nome.") +
@@ -608,214 +643,259 @@ with aba_revisao:
         else:
             itens_base = cenario.get("itens") or []
             marca = ""
-            st.caption("Itens do cenário — desmarque para tirar do gráfico e do texto. "
-                       "O que você corrigir aqui entra na média dos cenários.")
+            explica_itens = ("Desmarque para tirar do gráfico e do texto. O que você "
+                             "corrigir aqui entra na média dos cenários.")
+
+        secao("Nomes e percentuais",
+              _plural(len(itens_base), "linha", "linhas"),
+              explicacao="O nome sai na forma da peça: nome de urna, partido "
+                         "abreviado e sem cargo ou profissão na frente.")
+        explica(explica_itens)
 
         # A combinação entra na chave do widget: chave repetida faria o Streamlit
         # manter o número do cenário anterior no campo.
         cmb = "-".join([escolha] + [str(i) for i in combinar] + [modo_comb]) + marca
-        for i, item in enumerate(itens_base):
-            c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
-            ligado = c_on.checkbox("", True, key=f"alerta_item_on_{cmb}_{i}",
-                                   label_visibility="collapsed")
-            nome = c_nome.text_input("Candidato", item.get("candidato") or "",
-                                     key=f"alerta_item_nome_{cmb}_{i}",
-                                     label_visibility="collapsed")
-            partido = c_part.text_input("Partido", item.get("partido") or "",
-                                        key=f"alerta_item_part_{cmb}_{i}",
+        with st.container(key="ap_caixa_itens"):
+            if itens_base:
+                h = st.columns([0.5, 3, 1.2, 1.2, 1.6])
+                for col, rot in zip(h, ["", "Nome", "Partido", "%", "Tipo"]):
+                    col.markdown(f'<div class="ap-th">{esc(rot)}</div>',
+                                 unsafe_allow_html=True)
+            else:
+                vazio("Este cenário veio sem nomes. Escolha outro cenário ou volte "
+                      "à aba 1. Dados e extraia de novo.")
+            for i, item in enumerate(itens_base):
+                c_on, c_nome, c_part, c_pct, c_tipo = st.columns([0.5, 3, 1.2, 1.2, 1.6])
+                ligado = c_on.checkbox("Incluir", True, key=f"alerta_item_on_{cmb}_{i}",
+                                       label_visibility="collapsed")
+                nome = c_nome.text_input("Candidato", item.get("candidato") or "",
+                                         key=f"alerta_item_nome_{cmb}_{i}",
+                                         label_visibility="collapsed")
+                partido = c_part.text_input("Partido", item.get("partido") or "",
+                                            key=f"alerta_item_part_{cmb}_{i}",
+                                            label_visibility="collapsed")
+                pct = c_pct.number_input("%", 0.0, 100.0, float(item.get("percentual") or 0.0),
+                                         step=0.1, key=f"alerta_item_pct_{cmb}_{i}",
+                                         label_visibility="collapsed")
+                tipo_atual = item.get("tipo") or classificar_tipo_resultado_manual(nome)
+                tipo = c_tipo.selectbox("Tipo", ["candidato", "nao_valido"],
+                                        index=0 if tipo_atual == "candidato" else 1,
+                                        format_func=lambda t: ROTULO_TIPO.get(t, t),
+                                        key=f"alerta_item_tipo_{cmb}_{i}",
                                         label_visibility="collapsed")
-            pct = c_pct.number_input("%", 0.0, 100.0, float(item.get("percentual") or 0.0),
-                                     step=0.1, key=f"alerta_item_pct_{cmb}_{i}",
-                                     label_visibility="collapsed")
-            tipo_atual = item.get("tipo") or classificar_tipo_resultado_manual(nome)
-            tipo = c_tipo.selectbox("Tipo", ["candidato", "nao_valido"],
-                                    index=0 if tipo_atual == "candidato" else 1,
-                                    key=f"alerta_item_tipo_{cmb}_{i}",
-                                    label_visibility="collapsed")
-            # Correção feita no cenário avulso volta pro payload, senão a média
-            # continuaria sendo calculada em cima do número errado. Na média não
-            # há volta: ela é resultado, não fonte.
-            if not combinar:
-                item.update({"candidato": nome, "partido": partido,
-                             "percentual": pct, "tipo": tipo})
+                # Correção feita no cenário avulso volta pro payload, senão a média
+                # continuaria sendo calculada em cima do número errado. Na média não
+                # há volta: ela é resultado, não fonte.
+                if not combinar:
+                    item.update({"candidato": nome, "partido": partido,
+                                 "percentual": pct, "tipo": tipo})
 
-            if ligado and normalizar_texto_simples(nome):
-                # O que ela digita aqui também sai na forma da peça: partido em
-                # nome próprio, título de urna abreviado e sem descritor de
-                # profissão ou cargo na frente do nome.
-                itens_editados.append({
-                    "candidato": nome if tipo == "nao_valido"
-                                 else nome_de_urna_alerta(nome),
-                    "partido": rotulo_partido_alerta(partido),
-                    "percentual": pct, "tipo": tipo})
+                if ligado and normalizar_texto_simples(nome):
+                    # O que ela digita aqui também sai na forma da peça: partido em
+                    # nome próprio, título de urna abreviado e sem descritor de
+                    # profissão ou cargo na frente do nome.
+                    itens_editados.append({
+                        "candidato": nome if tipo == "nao_valido"
+                                     else nome_de_urna_alerta(nome),
+                        "partido": rotulo_partido_alerta(partido),
+                        "percentual": pct, "tipo": tipo})
 
         if itens_editados:
             soma = sum(i["percentual"] for i in itens_editados)
-            st.caption(f"Soma dos itens marcados: {soma:.1f}%".replace(".", ","))
+            aviso_soma = ""
             if combinar and modo_comb == "soma":
                 # Dois votos por entrevistado: o total esperado é perto de 200%.
                 if not 150 <= soma <= 250:
-                    st.warning("A soma ficou longe dos 200% esperados de dois votos "
-                               "por entrevistado. Confira se os cenários somados são "
-                               "mesmo o 1º e o 2º voto da mesma pergunta.")
+                    aviso_soma = ("A soma ficou longe dos 200% esperados de dois votos "
+                                  "por entrevistado. Confira se os cenários somados são "
+                                  "mesmo o 1º e o 2º voto da mesma pergunta.")
             elif combinar:
                 # Média passa um pouco de 100% quando alguém aparece em um
                 # cenário só, mas muito acima disso é cenário que não combina.
                 if soma > 120:
-                    st.warning("A média passou de 120%. Confira se os cenários "
-                               "combinados são mesmo variações da mesma pergunta.")
+                    aviso_soma = ("A média passou de 120%. Confira se os cenários "
+                                  "combinados são mesmo variações da mesma pergunta.")
             elif soma > 105:
-                st.warning("Soma acima de 105%. Confira se não entrou mais de um "
-                           "cenário na mesma lista.")
+                aviso_soma = ("Soma acima de 105%. Confira se não entrou mais de um "
+                              "cenário na mesma lista.")
+            resumo([(len(itens_editados),
+                     "nome no gráfico" if len(itens_editados) == 1 else "nomes no gráfico"),
+                    (f"{soma:.1f}%".replace(".", ","), "soma dos marcados",
+                     bool(aviso_soma))])
+            if aviso_soma:
+                st.warning(aviso_soma)
             cenario_final = dict(cenario, itens=itens_editados)
             if combinar:
                 cenario_final["combinacao"] = {
                     "modo": modo_comb,
                     "cenarios": [rotulos_cen[i] for i in combinar],
                 }
-        else:
-            st.error("Nenhum item marcado. Marque ao menos um para gerar o gráfico "
+        elif itens_base:
+            st.error("Nenhum nome marcado. Marque ao menos um para gerar o gráfico "
                      "e o texto.")
 
 
 with aba_grafico:
     if not itens_editados:
-        st.info(AVISO_SEM_DADOS if not payload else
-                "Marque ao menos um item na aba **2. Revisão**.")
+        vazio(AVISO_SEM_DADOS if not payload else AVISO_SEM_ITENS)
     else:
         travando = _travar_por_ficha(payload)
         if travando:
-            st.error("Ficha incompleta: falta " + ", ".join(travando) +
-                     ". Complete na aba **2. Revisão** para liberar o download.")
+            st.error("Falta " + ", ".join(travando) + " na ficha técnica. Complete "
+                     "na aba 2. Revisão para liberar o download.")
 
-        col_ctl, col_prev = st.columns([1, 2])
+        col_ctl, col_prev = st.columns([1, 2], gap="large")
 
         with col_ctl:
-            # Horizontal por padrão: nome de candidato é longo e cabe deitado
-            # sem girar rótulo nem encolher fonte.
-            orientacao = st.radio("Orientação", ["horizontal", "vertical"],
-                                  key="alerta_orientacao")
-            incluir_logo = st.checkbox(
-                "Logo da Eixo na prévia", True, key="alerta_logo",
-                help="Só muda a prévia: o arquivo baixado sai sempre nas duas "
-                     "versões, com e sem logo.")
-            fundo_transparente = st.checkbox(
-                "Fundo transparente", False, key="alerta_fundo",
-                help="Desligado (padrão), o gráfico sai com fundo branco. Ligado, "
-                     "sai sem fundo e assenta direto em slide ou story de "
-                     "qualquer cor — mas o texto continua escuro, então pede "
-                     "fundo claro.")
-            escala_cheia = st.checkbox(
-                "Escala de 0 a 100%", True, key="alerta_escala",
-                help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam "
-                     "comparáveis. Desligado, o topo aperta até um pouco acima do "
-                     "maior valor. A base fica no zero nos dois casos.")
-            # Base do número, no título. A peça de válidos e a de total
-            # mostram o mesmo candidato com percentuais diferentes: sem dizer a
-            # base, quem recebe as duas não tem como saber qual é qual.
-            validos_padrao = _parece_votos_validos(itens_editados)
-            votos_validos = st.checkbox(
-                "Votos válidos no título", validos_padrao,
-                # A composição da lista muda o padrão; chave fixa deixaria a
-                # caixa presa no que valia para o cenário anterior.
-                key=f"alerta_validos_{int(validos_padrao)}",
-                help='Escreve "(votos válidos)" no título do gráfico e do '
-                     "alerta. Vem marcada quando a lista não tem branco, nulo "
-                     "nem indeciso e a soma fecha em 100%. Confira no "
-                     "relatório: a extração não registra em que base o "
-                     "instituto publicou.")
-            # Trocar a base muda o título padrão, e o Streamlit devolveria o
-            # texto anterior pela chave do widget.
-            if st.session_state.get("alerta_validos_visto") != votos_validos:
-                st.session_state["alerta_validos_visto"] = votos_validos
-                for chave in ("alerta_titulo", "alerta_titulo_envio"):
-                    st.session_state.pop(chave, None)
-            titulo_grafico = st.text_input(
-                "Título do gráfico",
-                titulo_padrao(payload, cenario_final, votos_validos),
-                key="alerta_titulo")
-            # Gráfico de cenários combinados tem que dizer isso na ficha: quem
-            # lê a peça precisa saber que o número não é um cenário publicado.
-            COMBINACAO_RODAPE = {"media": "Média dos cenários estimulados",
-                                 "soma": "1º + 2º voto somados"}
-            nota_comb = COMBINACAO_RODAPE.get(
-                (cenario_final.get("combinacao") or {}).get("modo"), "")
-            rodape_base = rodape_padrao(payload)
-            rodape_grafico = st.text_area(
-                "Ficha técnica (rodapé)",
-                f"{rodape_base} | {nota_comb}" if nota_comb else rodape_base,
-                key="alerta_rodape", height=90)
+            secao("Ajustes", cor=MARINHO, menor=True,
+                  explicacao="O gráfico sai por código, sempre no mesmo layout. "
+                             "Aqui só se escolhe orientação, fundo, escala, título "
+                             "e rodapé.")
+            with st.container(key="ap_caixa_ajustes"):
+                # Horizontal por padrão: nome de candidato é longo e cabe deitado
+                # sem girar rótulo nem encolher fonte.
+                orientacao = st.radio("Orientação", ["horizontal", "vertical"],
+                                      key="alerta_orientacao", horizontal=True,
+                                      format_func=lambda o: ("Barras deitadas"
+                                                             if o == "horizontal"
+                                                             else "Barras em pé"))
+                incluir_logo = st.checkbox(
+                    "Logo da Eixo na prévia", True, key="alerta_logo",
+                    help="Só muda a prévia: o arquivo baixado sai sempre nas duas "
+                         "versões, com e sem logo.")
+                fundo_transparente = st.checkbox(
+                    "Fundo transparente", False, key="alerta_fundo",
+                    help="Desligado (padrão), o gráfico sai com fundo branco. Ligado, "
+                         "sai sem fundo e assenta direto em slide ou story de "
+                         "qualquer cor, mas o texto continua escuro, então pede "
+                         "fundo claro.")
+                escala_cheia = st.checkbox(
+                    "Escala de 0 a 100%", True, key="alerta_escala",
+                    help="Ligado, todo gráfico usa a mesma escala e dois gráficos ficam "
+                         "comparáveis. Desligado, o topo aperta até um pouco acima do "
+                         "maior valor. A base fica no zero nos dois casos.")
+                # Base do número, no título. A peça de válidos e a de total
+                # mostram o mesmo candidato com percentuais diferentes: sem dizer a
+                # base, quem recebe as duas não tem como saber qual é qual.
+                validos_padrao = _parece_votos_validos(itens_editados)
+                votos_validos = st.checkbox(
+                    "Votos válidos no título", validos_padrao,
+                    # A composição da lista muda o padrão; chave fixa deixaria a
+                    # caixa presa no que valia para o cenário anterior.
+                    key=f"alerta_validos_{int(validos_padrao)}",
+                    help='Escreve "(votos válidos)" no título do gráfico e do '
+                         "alerta. Vem marcada quando a lista não tem branco, nulo "
+                         "nem indeciso e a soma fecha em 100%. Confira no "
+                         "relatório: a extração não registra em que base o "
+                         "instituto publicou.")
+                # Trocar a base muda o título padrão, e o Streamlit devolveria o
+                # texto anterior pela chave do widget.
+                if st.session_state.get("alerta_validos_visto") != votos_validos:
+                    st.session_state["alerta_validos_visto"] = votos_validos
+                    for chave in ("alerta_titulo", "alerta_titulo_envio"):
+                        st.session_state.pop(chave, None)
+                titulo_grafico = st.text_input(
+                    "Título do gráfico",
+                    titulo_padrao(payload, cenario_final, votos_validos),
+                    key="alerta_titulo")
+                # Gráfico de cenários combinados tem que dizer isso na ficha: quem
+                # lê a peça precisa saber que o número não é um cenário publicado.
+                COMBINACAO_RODAPE = {"media": "Média dos cenários estimulados",
+                                     "soma": "1º + 2º voto somados"}
+                nota_comb = COMBINACAO_RODAPE.get(
+                    (cenario_final.get("combinacao") or {}).get("modo"), "")
+                rodape_base = rodape_padrao(payload)
+                rodape_grafico = st.text_area(
+                    "Ficha técnica (rodapé)",
+                    f"{rodape_base} | {nota_comb}" if nota_comb else rodape_base,
+                    key="alerta_rodape", height=90)
 
         try:
             with col_prev:
-                st.image(gerar_grafico_pesquisa(
-                    titulo_grafico, itens_editados, rodape_grafico,
-                    orientacao=orientacao, incluir_logo=incluir_logo,
-                    escala_cheia=escala_cheia,
-                    fundo_transparente=fundo_transparente),
-                    use_container_width=True)
+                secao("Prévia", cor=MARINHO, menor=True)
+                with st.container(key="ap_caixa_previa"):
+                    st.image(gerar_grafico_pesquisa(
+                        titulo_grafico, itens_editados, rodape_grafico,
+                        orientacao=orientacao, incluir_logo=incluir_logo,
+                        escala_cheia=escala_cheia,
+                        fundo_transparente=fundo_transparente),
+                        use_container_width=True)
 
-            st.markdown("---")
-            e1, e2 = st.columns([2, 1])
-            escala = e1.radio(
-                "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
-                index=list(ESCALAS_EXPORT).index(2), key="alerta_escala_export",
-                format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}",
-            )
-            larg, alt = resolucao(escala)
-            e1.caption(f"Resolução: {larg} × {alt}px. O SVG é vetor: a escala não "
-                       "muda nada nele.")
+            secao("Baixar o gráfico",
+                  explicacao="Um zip com quatro arquivos: PNG e SVG, cada um com e "
+                             "sem a logo. Quem monta card usa a versão com logo; "
+                             "quem monta slide da casa, a sem.")
+            with st.container(key="ap_caixa_baixar"):
+                e1, e2 = st.columns([2, 1], vertical_alignment="center")
+                escala = e1.radio(
+                    "Tamanho do PNG", list(ESCALAS_EXPORT), horizontal=True,
+                    index=list(ESCALAS_EXPORT).index(2), key="alerta_escala_export",
+                    format_func=lambda e: f"{e}× {ESCALAS_EXPORT[e]}",
+                )
+                larg, alt = resolucao(escala)
+                e1.caption(f"PNG em {larg} × {alt} px. O SVG é vetor e não muda com "
+                           "o tamanho.")
 
-            # Quem monta card usa a versão com logo; quem monta slide da casa
-            # usa a sem. Baixar as duas de uma vez evita voltar aqui pra clicar
-            # de novo com a caixinha desmarcada.
-            nomes = {
-                f"{suf}_{fmt}": slug_arquivo(payload, cenario_final, fmt, suf)
-                for suf in ("com-logo", "sem-logo") for fmt in ("png", "svg")
-            }
-            assinatura = json.dumps({
-                # A logo não é argumento do desenho, é arquivo no disco, e o
-                # cache do zip vive no processo: trocar a marca sem reiniciar
-                # devolvia o pacote antigo. Marcar o arquivo na assinatura faz
-                # a troca invalidar sozinha, sem depender de alguém lembrar de
-                # mexer num número de versão na mão.
-                "logo": _marca_da_logo(),
-                "titulo": titulo_grafico, "rodape": rodape_grafico,
-                "itens": itens_editados, "orientacao": orientacao,
-                "escala_cheia": escala_cheia, "escala": escala,
-                "fundo_transparente": fundo_transparente, "nomes": nomes,
-            }, sort_keys=True, ensure_ascii=False)
+                # Quem monta card usa a versão com logo; quem monta slide da casa
+                # usa a sem. Baixar as duas de uma vez evita voltar aqui pra clicar
+                # de novo com a caixinha desmarcada.
+                nomes = {
+                    f"{suf}_{fmt}": slug_arquivo(payload, cenario_final, fmt, suf)
+                    for suf in ("com-logo", "sem-logo") for fmt in ("png", "svg")
+                }
+                assinatura = json.dumps({
+                    # A logo não é argumento do desenho, é arquivo no disco, e o
+                    # cache do zip vive no processo: trocar a marca sem reiniciar
+                    # devolvia o pacote antigo. Marcar o arquivo na assinatura faz
+                    # a troca invalidar sozinha, sem depender de alguém lembrar de
+                    # mexer num número de versão na mão.
+                    "logo": _marca_da_logo(),
+                    "titulo": titulo_grafico, "rodape": rodape_grafico,
+                    "itens": itens_editados, "orientacao": orientacao,
+                    "escala_cheia": escala_cheia, "escala": escala,
+                    "fundo_transparente": fundo_transparente, "nomes": nomes,
+                }, sort_keys=True, ensure_ascii=False)
 
-            # Travado, o zip nem é montado: são quatro desenhos do matplotlib
-            # para um botão que ninguém pode clicar.
-            if travando:
-                e2.button("Baixar tudo (.zip)", disabled=True,
-                          use_container_width=True, type="primary",
-                          help="Falta " + ", ".join(travando) + " na ficha técnica")
-                e2.caption("Complete a ficha na aba 2. Revisão.")
-            else:
-                e2.download_button(
-                    "Baixar tudo (.zip)", _pacote_graficos(assinatura),
-                    file_name=slug_arquivo(payload, cenario_final, "zip"),
-                    mime="application/zip", use_container_width=True, type="primary",
-                    help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
-                e2.caption("PNG e SVG, com e sem logo.")
+                # Travado, o zip nem é montado: são quatro desenhos do matplotlib
+                # para um botão que ninguém pode clicar.
+                if travando:
+                    e2.button("Baixar tudo (.zip)", disabled=True,
+                              use_container_width=True, type="primary",
+                              icon=":material/download:",
+                              help="Falta " + ", ".join(travando) + " na ficha técnica")
+                    e2.caption("Complete a ficha na aba 2. Revisão.")
+                else:
+                    e2.download_button(
+                        "Baixar tudo (.zip)", _pacote_graficos(assinatura),
+                        file_name=slug_arquivo(payload, cenario_final, "zip"),
+                        mime="application/zip", use_container_width=True, type="primary",
+                        icon=":material/download:",
+                        help="Quatro arquivos: PNG e SVG, cada um com e sem a logo")
+                    e2.caption("PNG e SVG, com e sem logo.")
         except Exception as exc:
-            st.error(f"Falha ao gerar o gráfico: {exc}")
+            st.error(f"Não foi possível gerar o gráfico ({exc}). Confira os números "
+                     "e o título; se repetir, recarregue a página.")
 
 
 with aba_alerta:
     if not itens_editados:
-        st.info(AVISO_SEM_DADOS if not payload else
-                "Marque ao menos um item na aba **2. Revisão**.")
+        vazio(AVISO_SEM_DADOS if not payload else AVISO_SEM_ITENS)
     else:
         travando = _travar_por_ficha(payload)
         if travando:
-            st.error("Ficha incompleta: falta " + ", ".join(travando) +
-                     ". O texto do alerta cita a ficha técnica, então complete na "
-                     "aba **2. Revisão** antes de gerar.")
+            st.error("Falta " + ", ".join(travando) + " na ficha técnica. O texto "
+                     "do alerta cita a ficha, então complete na aba 2. Revisão "
+                     "antes de gerar.")
 
-        if st.button("Gerar texto do alerta", type="primary", disabled=bool(travando)):
+        tem_texto = bool(st.session_state.get("alerta_texto"))
+        secao("Texto do alerta",
+              explicacao="O Gemini escreve com o mesmo modelo de texto de pesquisa "
+                         "eleitoral do Gerador de Envios. Os números saem só da "
+                         "revisão; a matéria colada entra como contexto da disputa.")
+        if st.button("Gerar outro texto" if tem_texto else "Gerar texto do alerta",
+                     type="secondary" if tem_texto else "primary",
+                     icon=":material/refresh:" if tem_texto else None,
+                     disabled=bool(travando)):
             with st.spinner("Redigindo…"):
                 try:
                     st.session_state["alerta_texto"] = gerar_texto_alerta_pesquisa(
@@ -826,24 +906,26 @@ with aba_alerta:
                         texto_fonte=st.session_state.get("alerta_texto_fonte", ""),
                     )
                 except Exception as exc:
-                    st.error(f"Falha ao gerar o texto: {exc}")
+                    st.error(f"Não foi possível gerar o texto ({exc}). Tente de novo "
+                             "em alguns segundos.")
 
         if st.session_state.get("alerta_texto"):
-            col_edit, col_prev = st.columns(2)
+            col_edit, col_prev = st.columns(2, gap="large")
             with col_edit:
-                texto = st.text_area("Texto (edite à vontade)",
-                                     st.session_state["alerta_texto"], height=260,
-                                     key="alerta_texto_edit")
-                titulo_alerta = st.text_input(
-                    "Título do alerta",
-                    titulo_padrao(payload, cenario_final, votos_validos),
-                    key="alerta_titulo_envio")
-                link_alerta = st.text_input("Link",
-                                            st.session_state.get("alerta_url") or "",
-                                            key="alerta_link_envio")
-                encurtar = st.checkbox("Encurtar o link", True, key="alerta_encurtar",
-                                       help="Passa pelo TinyURL, igual ao Gerador "
-                                            "de Envios")
+                with st.container(key="ap_caixa_texto"):
+                    texto = st.text_area("Texto (edite à vontade)",
+                                         st.session_state["alerta_texto"], height=260,
+                                         key="alerta_texto_edit")
+                    titulo_alerta = st.text_input(
+                        "Título do alerta",
+                        titulo_padrao(payload, cenario_final, votos_validos),
+                        key="alerta_titulo_envio")
+                    link_alerta = st.text_input("Link",
+                                                st.session_state.get("alerta_url") or "",
+                                                key="alerta_link_envio")
+                    encurtar = st.checkbox("Encurtar o link", True, key="alerta_encurtar",
+                                           help="Passa pelo TinyURL, igual ao Gerador "
+                                                "de Envios")
 
             link_final = normalizar_link(link_alerta or "")
             if link_alerta.strip() and not link_final:
@@ -852,13 +934,14 @@ with aba_alerta:
                 link_final = _link_curto(link_final)
 
             with col_prev:
-                st.caption("Prévia do envio")
+                secao("Prévia do envio", cor=MARINHO, menor=True)
+                explica("Pronto para copiar pelo ícone no canto da caixa.")
                 st.code(compilar_alerta_pesquisa(
                     texto, titulo_alerta,
                     uf=(cenario_final.get("uf") or payload.get("uf") or ""),
                     link=link_final or "",
                     data_envio=datetime.now(BRT).strftime("%d/%m/%Y"),
-                ), language=None)
-        else:
-            st.info("Os números da revisão já estão prontos. Clique em gerar para "
-                    "escrever o texto.")
+                ), language=None, wrap_lines=True)
+        elif not travando:
+            vazio("Os números da revisão já estão prontos. Clique em Gerar texto do "
+                  "alerta para escrever o texto.")

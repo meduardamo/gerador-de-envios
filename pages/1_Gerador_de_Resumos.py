@@ -14,57 +14,36 @@ import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 
+from estilo_paginas import cabecalho, secao, explica, chip, vazio, esc
+
 st.set_page_config(page_title="Gerador de Resumos", layout="wide")
 
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-:root { --eixo-vinho: #962E4D; }
 html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
 [data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 0 2rem 3rem !important; background: #F4F3EF; }
+.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
 * { box-sizing: border-box; }
 body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"] { display: none; }
-[data-testid="stDecoration"] { display: none; }
+[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
 [data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
 [data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important;
-}
-footer { display: none !important; }
-#MainMenu { display: none !important; }
-[data-testid="stButton"] > button {
-    font-family: 'Montserrat', sans-serif !important; font-size: 11px !important;
-    font-weight: 500 !important; letter-spacing: 0.1em !important;
-    text-transform: uppercase !important; border-radius: 0 !important;
-    border: 1px solid #962E4D !important; background: transparent !important;
-    color: #962E4D !important; padding: 5px 14px !important;
-    transition: background 0.15s, color 0.15s !important;
-}
-[data-testid="stButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] > button { border: 1px solid #962E4D !important; color: #962E4D !important; }
-[data-testid="stSidebar"] [data-testid="stButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-[data-testid="stRadio"] > label, [data-testid="stSelectbox"] > label,
-[data-testid="stMultiSelect"] > label, [data-testid="stTextInput"] > label,
-[data-testid="stNumberInput"] > label, [data-testid="stTextArea"] > label {
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important; color: #767672 !important;
-}
-[data-testid="stTabs"] [role="tablist"] { border-bottom: 1px solid #DADAD4 !important; gap: 0 !important; }
-[data-testid="stTabs"] [role="tab"] {
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.12em !important;
-    text-transform: uppercase !important; color: #767672 !important;
-    padding: 10px 20px 9px !important; border-bottom: 2px solid transparent !important;
-    background: transparent !important; border-radius: 0 !important;
-}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #962E4D !important; border-bottom-color: #962E4D !important; }
-div[data-testid="stCodeBlock"] > pre { max-height: 520px !important; overflow: auto !important; border-radius: 0 !important; }
-.ge-hero { background: #962E4D; display: flex; align-items: center; padding: 36px 48px; margin: 0 -2rem 32px -2rem; }
-.ge-hero-title { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.01em; }
-.ge-rule { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #962E4D; border-top: 1.5px solid #962E4D; padding-top: 8px; margin: 20px 0 14px; }
+    letter-spacing: normal !important; text-transform: none !important; }
+footer, #MainMenu { display: none !important; }
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
+.st-key-gr_config, .st-key-gr_resultado { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; }
+.st-key-gr_resultado div[data-testid="stCodeBlock"] > pre { max-height: 520px !important; overflow: auto !important; border-radius: 8px !important;
+    background: #FAFAF7 !important; border: 1px solid #ECEBE6; }
+.st-key-gr_resultado div[data-testid="stCodeBlock"] code { white-space: pre-wrap !important; font-size: 13.5px !important; line-height: 1.65 !important; }
+.gr-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; }
+.gr-meta .n { color: #4A4A4A; font-size: 12.5px; margin-left: 4px; }
+.gr-wa { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13.5px; font-weight: 700; color: #962E4D !important;
+    text-decoration: none; }
+.gr-wa:hover { text-decoration: underline; }
+.gr-wa .s { font-weight: 400; color: #4A4A4A; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -80,7 +59,7 @@ def _load_auth_config():
 
 _auth_cfg = _load_auth_config()
 if not _auth_cfg:
-    st.error("Auth não configurado. Defina AUTH_CONFIG nos Secrets ou crie config.yaml local.")
+    st.error("O login não está configurado neste servidor. Avise a equipe de dados.")
     st.stop()
 
 authenticator = stauth.Authenticate(
@@ -243,6 +222,12 @@ LEITURA_PDF = [
     "Texto (PyMuPDF)",
     "Imagem (Gemini visão)",
 ]
+# O valor acima é o que processar_pdf compara; na tela vai o rótulo abaixo.
+LEITURA_PDF_ROTULO = {
+    LEITURA_PDF[0]: "Automático: texto do PDF ou leitura da imagem, se for digitalizado",
+    LEITURA_PDF[1]: "Só o texto do PDF (mais rápido, até 10 páginas)",
+    LEITURA_PDF[2]: "Ler as páginas como imagem (PDF digitalizado)",
+}
 
 
 # ── estilos ───────────────────────────────────────────────────────────────────
@@ -256,8 +241,8 @@ LEITURA_PDF = [
 def get_gemini_client():
     if not GEMINI_API_KEY.strip():
         raise RuntimeError(
-            "Faltou a GEMINI_API_KEY. Configure nos Secrets do Streamlit Cloud "
-            "ou crie .streamlit/secrets.toml local."
+            "A chave do Gemini não está configurada neste servidor. "
+            "Avise a equipe de dados."
         )
     return genai.Client(api_key=GEMINI_API_KEY)
 
@@ -1026,13 +1011,13 @@ def processar_pdf(pdf_bytes: bytes, modo: str, page_indices: list[int]) -> str:
         txt = extrair_texto_pdf(pdf_bytes, page_indices[:10])
         return txt or "PDF sem texto extraível (possível scan)."
     elif modo == "Imagem (Gemini visão)":
-        with st.spinner("Enviando imagens para o Gemini..."):
+        with st.spinner("Lendo as páginas como imagem..."):
             return extrair_pdf_imagem(pdf_bytes, page_indices)
     else:  # Auto
         txt = extrair_texto_pdf(pdf_bytes, page_indices)
         if txt and len(txt.strip()) >= 800:
             return txt
-        with st.spinner("PDF parece ser scan — usando visão do Gemini..."):
+        with st.spinner("O PDF parece digitalizado; lendo as páginas como imagem..."):
             return extrair_pdf_imagem(pdf_bytes, page_indices)
 
 
@@ -1060,13 +1045,13 @@ with st.sidebar:
         'margin:10px 0 0 0;background:transparent;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         'color:#111;line-height:1.65;margin:0;">'
-        'Cole o texto ou suba um PDF, selecione o cliente e o tipo de documento, '
-        'e o app gera um <strong>resumo personalizado com IA</strong>.'
+        'Cole o texto ou suba o PDF de um documento, escolha o cliente e o tipo, '
+        'e o app escreve um <strong>resumo em dois parágrafos</strong> com o que importa para o cliente.'
         '</p></div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    if st.button("↻ Recarregar dados", use_container_width=True):
+    if st.button("Atualizar dados", icon=":material/refresh:", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
     st.markdown("---")
@@ -1077,65 +1062,75 @@ with st.sidebar:
 
 # ── página principal ──────────────────────────────────────────────────────────
 
-st.markdown(
-    '<div class="ge-hero"><div class="ge-hero-title">Gerador de Resumos</div></div>',
-    unsafe_allow_html=True,
-)
+cabecalho("Gerador de Resumos",
+          "Resumo em dois parágrafos de um projeto, norma, notícia ou estudo, escrito para o cliente escolhido.")
 
-col_esq, col_dir = st.columns([1.25, 1])
+col_esq, col_dir = st.columns([1.25, 1], gap="large")
 
 with col_esq:
-    st.markdown('<div class="ge-rule">Configuração</div>', unsafe_allow_html=True)
+    secao("1. Cliente e tipo de documento",
+          explicacao="O resumo usa o perfil do cliente para dizer se o documento mexe com a agenda dele, "
+                     "e o tipo define o que o texto precisa trazer (autoria, tramitação, valores, resultados).")
 
-    # ── Seleção de cliente ────────────────────────────────────────────────────
-    cliente_opcoes = {v[0]: k for k, v in CLIENTE_DESCRICOES.items()}
-    cliente_label = st.selectbox(
-        "Cliente",
-        list(cliente_opcoes.keys()),
-        key="cliente_select",
-    )
-    cliente_key = cliente_opcoes[cliente_label]
+    with st.container(key="gr_config"):
+        c_cli, c_tipo = st.columns(2)
+        # ── Seleção de cliente ────────────────────────────────────────────────
+        cliente_opcoes = {v[0]: k for k, v in CLIENTE_DESCRICOES.items()}
+        with c_cli:
+            cliente_label = st.selectbox(
+                "Cliente",
+                list(cliente_opcoes.keys()),
+                key="cliente_select",
+            )
+        cliente_key = cliente_opcoes[cliente_label]
 
-    # mostra descrição resumida do cliente
-    with st.expander("Ver perfil do cliente", expanded=False):
-        st.caption(CLIENTE_DESCRICOES[cliente_key][1])
+        # ── Seleção de tipo de documento ──────────────────────────────────────
+        with c_tipo:
+            tipo_label = st.selectbox(
+                "Tipo de documento",
+                list(TIPOS_DOCUMENTO.keys()),
+                key="tipo_select",
+            )
+        tipo_key = TIPOS_DOCUMENTO[tipo_label]
 
-    # ── Seleção de tipo de documento ──────────────────────────────────────────
-    tipo_label = st.selectbox(
-        "Tipo de documento",
-        list(TIPOS_DOCUMENTO.keys()),
-        key="tipo_select",
-    )
-    tipo_key = TIPOS_DOCUMENTO[tipo_label]
+        # mostra descrição resumida do cliente
+        with st.expander("Ver o perfil do cliente usado no resumo", expanded=False):
+            st.caption(CLIENTE_DESCRICOES[cliente_key][1])
 
-    st.markdown("---")
+    secao("2. Texto do documento",
+          explicacao="Cole o texto no campo abaixo ou, se tiver o PDF, extraia o texto primeiro e revise antes de gerar. "
+                     "O contexto adicional é opcional e vai junto para orientar o resumo.")
 
     # ── Upload de PDF ─────────────────────────────────────────────────────────
-    with st.expander("Carregar texto a partir de PDF", expanded=False):
-        pdf_file = st.file_uploader("Upload do PDF", type=["pdf"], key="pdf_uploader")
+    with st.expander("Extrair o texto de um PDF", expanded=False, icon=":material/picture_as_pdf:"):
+        pdf_file = st.file_uploader("Arquivo PDF", type=["pdf"], key="pdf_uploader")
 
         if pdf_file is not None:
             pdf_bytes = pdf_file.getvalue()
             with fitz.open(stream=pdf_bytes, filetype="pdf") as d:
                 total_pages = d.page_count
 
-            modo_pdf = st.selectbox("Modo de leitura", LEITURA_PDF, index=0, key="modo_pdf")
+            explica(f"{pdf_file.name}: {total_pages} página{'s' if total_pages != 1 else ''}.")
+
+            modo_pdf = st.selectbox("Como ler o PDF", LEITURA_PDF, index=0, key="modo_pdf",
+                                    format_func=lambda m: LEITURA_PDF_ROTULO.get(m, m))
 
             tab_intervalo, tab_avulsas = st.tabs(["Intervalo", "Páginas avulsas"])
 
             with tab_intervalo:
                 ci1, ci2 = st.columns(2)
                 with ci1:
-                    pag_ini = int(st.number_input("Pág. inicial", min_value=1, max_value=total_pages, value=1, key="pag_ini"))
+                    pag_ini = int(st.number_input("Página inicial", min_value=1, max_value=total_pages, value=1, key="pag_ini"))
                 with ci2:
-                    pag_fim = int(st.number_input("Pág. final", min_value=1, max_value=total_pages, value=total_pages, key="pag_fim"))
+                    pag_fim = int(st.number_input("Página final", min_value=1, max_value=total_pages, value=total_pages, key="pag_fim"))
                 if pag_fim < pag_ini:
                     pag_fim = pag_ini
                 page_indices_intervalo = list(range(pag_ini - 1, pag_fim))
 
             with tab_avulsas:
-                st.caption(f"Páginas separadas por vírgula. Total: {total_pages}.")
-                avulsas_raw = st.text_input("Páginas (ex: 1, 3, 5)", value="", key="pag_avulsas")
+                avulsas_raw = st.text_input("Páginas (ex.: 1, 3, 5)", value="", key="pag_avulsas",
+                                            help=f"Números separados por vírgula, de 1 a {total_pages}. "
+                                                 "Se preencher aqui, o intervalo é ignorado.")
                 page_indices_avulsas = []
                 if avulsas_raw.strip():
                     for tok in avulsas_raw.split(","):
@@ -1150,34 +1145,47 @@ with col_esq:
 
             page_indices = page_indices_avulsas if page_indices_avulsas else page_indices_intervalo
 
-            if st.button("Extrair texto do PDF", use_container_width=True):
+            n_pag = len(page_indices)
+            if st.button(f"Extrair texto de {n_pag} página{'s' if n_pag != 1 else ''}",
+                         icon=":material/description:", width="stretch"):
                 try:
-                    with st.spinner("Extraindo texto..."):
+                    with st.spinner("Extraindo o texto..."):
                         texto_extraido = processar_pdf(pdf_bytes, modo_pdf, page_indices)
                     st.session_state["texto_fonte"] = texto_extraido
-                    st.success("Texto carregado. Revise abaixo e clique em Gerar.")
+                    # O campo tem key: no Streamlit atual ele ignora mudança de value=,
+                    # então o texto extraído entra pela session_state do próprio campo.
+                    st.session_state["texto_input"] = texto_extraido
+                    n_car = len(texto_extraido)
+                    st.success(f"Texto extraído ({n_car:,} caracteres). Revise no campo abaixo e clique em Gerar resumo."
+                               .replace(",", "."))
+                    if n_car > 15_000:
+                        st.warning("O texto passa de 15 mil caracteres. Escolha menos páginas para o resumo "
+                                   "ler o documento inteiro.")
                 except Exception as e:
-                    st.error(f"Erro ao extrair PDF: {e}")
+                    st.error("Não consegui ler o PDF. Tente o modo de leitura como imagem ou escolha menos páginas.")
+                    with st.expander("Detalhe do erro"):
+                        st.caption(str(e))
 
     # ── Formulário principal ──────────────────────────────────────────────────
     with st.form("form_resumo", clear_on_submit=False):
         texto = st.text_area(
-            "Texto do documento (até 15 mil caracteres)",
+            "Texto do documento",
             max_chars=15_000,
             height=260,
-            placeholder="Cole aqui o texto do documento... (ou use o PDF acima)",
-            value=st.session_state.get("texto_fonte", ""),
+            placeholder="Cole aqui o texto do documento, ou extraia de um PDF acima.",
             key="texto_input",
+            help="Até 15 mil caracteres.",
         )
 
         contexto_extra = st.text_area(
-            "Contexto adicional para o analista (opcional)",
+            "Contexto adicional (opcional)",
             height=80,
-            placeholder="Ex.: Este PL está travado há 3 meses e o cliente pediu atenção especial ao art. 5º...",
+            placeholder="Ex.: o PL está parado há 3 meses e o cliente pediu atenção ao art. 5º.",
             key="contexto_input",
+            help="Vai junto do texto para orientar o resumo. Não aparece no resultado.",
         )
 
-        submitted = st.form_submit_button("Gerar resumo", use_container_width=True)
+        submitted = st.form_submit_button("Gerar resumo", type="primary", width="stretch")
 
     if submitted:
         erros = []
@@ -1187,7 +1195,7 @@ with col_esq:
             for e in erros:
                 st.error(e)
         else:
-            with st.spinner("Gerando resumo com IA..."):
+            with st.spinner("Gerando o resumo..."):
                 try:
                     resumo = gerar_resumo(
                         texto=texto,
@@ -1199,42 +1207,48 @@ with col_esq:
                     st.session_state["resumo_gerado"] = resumo
                     st.session_state["cliente_selecionado"] = cliente_label
                     st.session_state["tipo_selecionado"] = tipo_label
-                    st.success("Resumo gerado.")
+                    st.success("Resumo pronto. Confira no quadro Resumo.")
                 except Exception as e:
-                    st.error(f"Erro ao gerar resumo: {e}")
+                    st.error("Não consegui gerar o resumo. Tente de novo em alguns segundos; "
+                             "se repetir, avise a equipe de dados.")
+                    with st.expander("Detalhe do erro"):
+                        st.caption(str(e))
 
 
 # ── coluna direita: resultado ─────────────────────────────────────────────────
 
 with col_dir:
-    st.markdown('<div class="ge-rule">Resultado</div>', unsafe_allow_html=True)
+    secao("3. Resumo",
+          explicacao="Dois parágrafos: o primeiro com os fatos do documento, o segundo com tramitação e "
+                     "relevância para o cliente. Leia antes de enviar.")
 
     if not st.session_state["resumo_gerado"].strip():
-        st.info("Preencha o formulário e clique em \"Gerar resumo\".")
+        vazio("Escolha o cliente, cole o texto do documento e clique em Gerar resumo. "
+              "O resultado aparece aqui, pronto para copiar ou enviar no WhatsApp.")
     else:
-        st.markdown(f"**{datetime.now().strftime('%d/%m/%Y')}**")
-        st.markdown("---")
+        with st.container(key="gr_resultado"):
+            n_palavras = len(st.session_state["resumo_gerado"].split())
+            st.markdown(
+                '<div class="gr-meta">'
+                + chip(st.session_state["cliente_selecionado"], "org")
+                + chip(st.session_state["tipo_selecionado"])
+                + chip(datetime.now().strftime('%d/%m/%Y'), "data")
+                + f'<span class="n">{n_palavras} palavras</span></div>',
+                unsafe_allow_html=True,
+            )
 
-        st.code(st.session_state["resumo_gerado"], language="text")
+            st.code(st.session_state["resumo_gerado"], language="text", wrap_lines=True)
 
-        wa_text = (
-            f"*Resumo | {st.session_state['cliente_selecionado']}*\n"
-            f"{datetime.now().strftime('%d/%m/%Y')}\n\n"
-            f"{st.session_state['resumo_gerado']}"
-        )
-        wa_url = f"https://wa.me/?text={quote(wa_text)}"
-        st.markdown(
-            f'<a href="{wa_url}" target="_blank">'
-            f'<button style="'
-            f'width:100%;'
-            f'border-radius:12px;'
-            f'border:1px solid rgba(255,255,255,0.14);'
-            f'background:linear-gradient(90deg,#962E4D,rgba(150,46,77,0.75));'
-            f'color:white;'
-            f'font-weight:600;'
-            f'padding:10px 14px;'
-            f'cursor:pointer;'
-            f'font-size:0.875rem;'
-            f'">Enviar no WhatsApp</button></a>',
-            unsafe_allow_html=True,
-        )
+            wa_text = (
+                f"*Resumo | {st.session_state['cliente_selecionado']}*\n"
+                f"{datetime.now().strftime('%d/%m/%Y')}\n\n"
+                f"{st.session_state['resumo_gerado']}"
+            )
+            wa_url = f"https://wa.me/?text={quote(wa_text)}"
+            st.markdown(
+                f'<a class="gr-wa" href="{esc(wa_url)}" target="_blank" rel="noopener">Enviar no WhatsApp '
+                f'<span class="s">(abre em outra aba)</span></a>',
+                unsafe_allow_html=True,
+            )
+            explica("Para copiar, use o ícone no canto do quadro do resumo.")
+

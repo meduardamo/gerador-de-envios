@@ -16,6 +16,7 @@ import streamlit_authenticator as stauth
 
 import agenda_semana_core as ag
 import importlib
+from estilo_paginas import MARINHO, VINHO, cabecalho, chip, esc, explica, resumo, secao, vazio
 
 # o Streamlit Cloud às vezes mantém o módulo velho depois de um push; recarrega a cada rodada
 ag = importlib.reload(ag)
@@ -23,102 +24,61 @@ ag = importlib.reload(ag)
 
 st.set_page_config(page_title="Agenda da Semana", layout="wide")
 
+# Base da página (fundo, fonte, cabeçalho do Streamlit escondido) e o que é só da Agenda:
+# cartão branco por reunião, pílulas de cliente menores e à direita, texto de cada item.
+# Botões, abas, pílulas, chave e títulos vêm do CSS_PAGINAS (carregado depois, no CSS_MENU).
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-:root { --eixo-vinho: #962E4D; }
 html, body, [data-testid="stAppViewContainer"] { background: #F4F3EF !important; }
 [data-testid="stAppViewContainer"] > section > div { background: #F4F3EF; }
-.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 0 2rem 3rem !important; background: #F4F3EF; }
+.block-container, [data-testid="stMainBlockContainer"] { max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: #F4F3EF; }
 * { box-sizing: border-box; }
 body, p, span, div, label, input, select, textarea { font-family: 'Montserrat', sans-serif !important; }
-[data-testid="stHeader"] { display: none; }
-[data-testid="stDecoration"] { display: none; }
+[data-testid="stHeader"], [data-testid="stDecoration"] { display: none; }
 [data-testid="stSidebar"] { background: #F4F3EF !important; border-right: 1px solid #DADAD4 !important; }
 [data-testid="stSidebar"] * { font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important;
-}
-footer { display: none !important; }
-#MainMenu { display: none !important; }
-[data-testid="stButton"] button, [data-testid="stFormSubmitButton"] > button, [data-testid="stDownloadButton"] > button {
-    font-size: 11px !important; font-weight: 500 !important; letter-spacing: 0.1em !important;
-    text-transform: uppercase !important; border-radius: 0 !important;
-    border: 1px solid #962E4D !important; background: transparent !important;
-    color: #962E4D !important; padding: 5px 14px !important;
-    transition: background 0.15s, color 0.15s !important;
-}
-[data-testid="stButton"] button:hover, [data-testid="stFormSubmitButton"] > button:hover,
-[data-testid="stDownloadButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-/* ação principal (gerar e baixar) cheia, como o download do Gerador de Gráficos */
-[data-testid="stFormSubmitButton"] > button[kind="primaryFormSubmit"], [data-testid="stDownloadButton"] > button {
-    background: #962E4D !important; color: #fff !important; font-weight: 700 !important; }
-[data-testid="stFormSubmitButton"] > button[kind="primaryFormSubmit"]:hover,
-[data-testid="stDownloadButton"] > button:hover { background: #7A2640 !important; border-color: #7A2640 !important; }
-[data-testid="stSelectbox"] > label {
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important; color: #767672 !important;
-}
-.ge-hero { background: #962E4D; display: flex; align-items: center; padding: 36px 48px; margin: 0 -2rem 32px -2rem; }
-.ge-hero-title { font-family: 'Montserrat', sans-serif; font-size: 48px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.01em; }
-.ge-rule { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #962E4D; border-top: 2px solid #962E4D; padding-top: 10px; margin: 28px 0 6px; }
-[data-testid="stTabs"] [role="tablist"] { border-bottom: 1px solid #DADAD4 !important; gap: 0 !important; }
-[data-testid="stTabs"] [role="tab"] {
-    font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0.04em !important;
-    color: #767672 !important; padding: 12px 22px 11px !important; border-bottom: 2px solid transparent !important;
-    background: transparent !important; border-radius: 0 !important;
-}
-[data-testid="stTabs"] [role="tab"] p { font-size: 13px !important; font-weight: 600 !important; }
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #962E4D !important; border-bottom-color: #962E4D !important; }
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: #962E4D !important; }
-/* clientes: botões de alternar no lugar de seis caixas */
-[data-testid="stButtonGroup"] button {
-    border-radius: 999px !important; border: 1px solid #DADAD4 !important; background: #fff !important;
-    color: #767672 !important; font-size: 11.5px !important; padding: 2px 9px !important; min-height: 26px !important;
-}
-[data-testid="stButtonGroup"] button p { font-size: 11.5px !important; font-weight: 600 !important; }
-/* os sete clientes numa linha só, alinhados à direita */
-[data-testid="stElementContainer"]:has(> [data-testid="stButtonGroup"]), [data-testid="stButtonGroup"] { width: 100% !important; }
-[data-testid="stButtonGroup"] [role="toolbar"] { width: 100% !important; max-width: none !important; gap: 4px !important; justify-content: flex-end !important; }
-[data-testid="stButtonGroup"] button[kind="pillsActive"], [data-testid="stButtonGroup"] button[aria-pressed="true"] {
-    background: #962E4D !important; border-color: #962E4D !important; color: #fff !important;
-}
-[data-testid="stButtonGroup"] button[kind="pillsActive"] p, [data-testid="stButtonGroup"] button[aria-pressed="true"] p { color: #fff !important; }
-.ag-resumo { font-size: 14px; color: #111; line-height: 1.7; margin: 4px 0 2px; }
-.ag-resumo b { font-weight: 700; }
-.ag-sub { font-size: 12.5px; color: #767672; margin: 0 0 8px; }
-.ag-org { font-size: 16px; font-weight: 700; color: #192D4E; margin: 34px 0 6px; line-height: 1.4; }
-.ag-org.ag-primeira { margin-top: 14px; }
-.ag-org a { color: #192D4E; text-decoration: none; }
-.ag-org a:hover { text-decoration: underline; }
-.ag-org span { font-weight: 500; color: #767672; font-size: 13px; }
-.ag-tit { font-size: 14px; font-weight: 700; margin: 0; line-height: 1.45;
+    letter-spacing: normal !important; text-transform: none !important; }
+footer, #MainMenu { display: none !important; }
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) { display: none; }
+.st-key-ag_barra { gap: 24px !important; margin-bottom: 4px; }
+.ag-clis { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #4A4A4A; margin: 0 0 12px; }
+.ag-clis .r { font-size: 0.72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #4E5A6E; margin-right: 4px; }
+.st-key-ag_entrega { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; gap: 12px !important; }
+.st-key-ag_entrega [data-testid="stMarkdownContainer"] p { margin-bottom: 0 !important; }
+.st-key-ag_novos { margin: 0 0 6px; }
+[data-testid="stMain"] div[data-testid="stForm"]:has(.st-key-ag_salvar_fim) { border: 0 !important; background: transparent !important; padding: 0 !important; }
+.st-key-ag_acoes, .st-key-ag_acoes_fim { gap: 10px !important; }
+.st-key-ag_acoes { margin-bottom: 6px; }
+.st-key-ag_acoes_fim { margin-top: 18px; padding-top: 16px; border-top: 1px solid #DADAD4; }
+div[class*="st-key-ag_reu_"] { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; gap: .45rem; }
+div[class*="st-key-ag_reu_"] [data-testid="stMarkdownContainer"], div[class*="st-key-ag_reu_"] [data-testid="stMarkdown"] { margin-bottom: 0 !important; }
+div[class*="st-key-ag_reu_"] [data-testid="stElementContainer"]:has(> [data-testid="stButtonGroup"]), div[class*="st-key-ag_reu_"] [data-testid="stButtonGroup"] { width: 100% !important; }
+div[class*="st-key-ag_reu_"] [data-testid="stButtonGroup"] [role="toolbar"] { width: 100% !important; max-width: none !important; gap: 4px !important; justify-content: flex-end !important; }
+div[class*="st-key-ag_reu_"] [data-testid="stButtonGroup"] button { padding: 2px 10px !important; min-height: 28px !important; }
+div[class*="st-key-ag_reu_"] [data-testid="stButtonGroup"] button p { font-size: 12px !important; }
+.ag-org { font-size: 15.5px; font-weight: 700; color: #192D4E; line-height: 1.4; margin: 0; }
+.ag-org a, .ag-org a:visited { color: #192D4E !important; text-decoration: none !important; }
+.ag-org a:hover { color: #962E4D !important; text-decoration: underline !important; text-underline-offset: 3px; }
+.ag-org-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12.5px; color: #4A4A4A;
+    margin: 3px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #ECEBE6; }
+.ag-top { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 5px; }
+p.ag-tit { font-size: 14px !important; font-weight: 700; margin: 0 !important; line-height: 1.45 !important;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.ag-tit a { color: #962E4D; text-decoration: none; }
-.ag-tit a:hover { text-decoration: underline; }
-.ag-ementa { font-size: 13px; color: #333; margin: 3px 0 0; line-height: 1.5;
+.ag-tit a, .ag-tit a:visited { color: #192D4E !important; text-decoration: none !important; }
+.ag-tit a:hover { color: #962E4D !important; text-decoration: underline !important; text-underline-offset: 3px; }
+p.ag-ementa { font-size: 13px !important; color: #3A3A3A !important; margin: 3px 0 0 !important; line-height: 1.5 !important;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.ag-meta { font-size: 12px; color: #767672; margin: 4px 0 0; }
-.ag-conv { font-size: 12px; color: #767672; margin: 4px 0 0; line-height: 1.5;
+p.ag-meta { font-size: 12px !important; color: #6A6A66 !important; margin: 5px 0 0 !important; line-height: 1.5 !important; }
+p.ag-conv { font-size: 12px !important; color: #6A6A66 !important; margin: 4px 0 0 !important; line-height: 1.5 !important;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ag-conv b, .ag-meta b { font-weight: 600; color: #333; }
-.ag-org span.ag-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-    color: #fff; background: #962E4D; border-radius: 3px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
-.ag-fora .ag-tit a, .ag-fora .ag-tit { color: #9A9A95; text-decoration: line-through; }
-.ag-fora .ag-ementa { color: #9A9A95; }
-.ag-nota { font-size: 12.5px; color: #767672; margin: 4px 0 0; }
-.ag-tit span.ag-novo { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-    color: #192D4E; border: 1px solid #192D4E; border-radius: 3px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
-/* chave "só os novos" em vinho, não no vermelho padrão */
-.st-key-ag_novos label:has(input:checked) > div:first-of-type { background-color: #962E4D !important; }
-/* download por cliente em contorno; o zip com todos fica cheio */
-.st-key-ag_por_cliente [data-testid="stDownloadButton"] > button {
-    background: transparent !important; color: #962E4D !important; font-weight: 500 !important; }
-.st-key-ag_por_cliente [data-testid="stDownloadButton"] > button:hover { background: #962E4D !important; color: #fff !important; }
-.ag-fim { border-top: 1px solid #DADAD4; margin: 36px 0 18px; }
-.ag-fio { border-bottom: 1px solid #DADAD4; margin: 10px 0 12px; }
+.ag-fora { opacity: .55; }
+.ag-fora .ag-tit a, .ag-fora .ag-tit { text-decoration: line-through !important; }
+p.ag-nota { font-size: 12px !important; color: #962E4D !important; font-weight: 600; margin: 4px 0 0 !important; text-align: right; }
+.ag-fio { border-bottom: 1px solid #ECEBE6; margin: 6px 0 4px; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -201,10 +161,10 @@ def _carregar_google_creds_dict():
 @st.cache_resource
 def _aba_selecao():
     if not SELECAO_SHEET_ID:
-        raise RuntimeError("AGENDA_SHEET_ID não configurado nos Secrets")
+        raise RuntimeError("planilha da Agenda não configurada")
     creds = _carregar_google_creds_dict()
     if not creds:
-        raise RuntimeError("Credencial do Google não configurada.")
+        raise RuntimeError("credencial do Google não configurada")
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     gc = gspread.authorize(Credentials.from_service_account_info(creds, scopes=scopes))
     return gc.open_by_key(SELECAO_SHEET_ID).worksheet(SELECAO_ABA)
@@ -344,14 +304,16 @@ with st.sidebar:
         'color:#111;line-height:1.65;margin:0;">'
         'Pauta da <strong>Câmara</strong> e do <strong>Senado</strong>, coletada toda segunda cedo. '
         'Marque os clientes de cada item e gere a <strong>Agenda da Semana</strong> em Word, '
-        'um arquivo por cliente. A seleção salva é a mesma para toda a equipe.'
+        'um arquivo por cliente. A seleção salva vale para toda a equipe.'
         '</p></div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    atualizar = st.button("↻ Buscar pauta de novo", use_container_width=True, key="ag_atualizar",
+    atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", use_container_width=True,
+                          key="ag_atualizar",
                           help="A pauta muda ao longo da semana. Busca de novo na Câmara e no Senado.")
-    recarregar = st.button("↻ Ver seleção da equipe", use_container_width=True, key="ag_recarregar",
+    recarregar = st.button("Ver seleção da equipe", icon=":material/group:", use_container_width=True,
+                           key="ag_recarregar",
                            help="Traz o que a equipe salvou desde que você abriu a página. "
                                 "Marcações suas ainda não salvas são descartadas.")
     st.markdown("---")
@@ -361,12 +323,17 @@ with st.sidebar:
     authenticator.logout("Sair", "sidebar")
 
 
+def _plural(n: int, um: str, varios: str) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
 # ========= MAIN =========
-st.markdown('<div class="ge-hero"><div class="ge-hero-title">Agenda da Semana</div></div>',
-            unsafe_allow_html=True)
+cabecalho("Agenda da Semana",
+          "Pauta da Câmara e do Senado: marque os clientes de cada item e gere a agenda em Word, um arquivo por cliente.")
 
 if semanas:
-    sid = st.selectbox("Semana", semanas, format_func=_rotulo_semana, key="ag_semana")
+    with st.container(horizontal=True, vertical_alignment="bottom", key="ag_barra"):
+        sid = st.selectbox("Semana", semanas, format_func=_rotulo_semana, key="ag_semana", width=360)
 else:
     seg, _ = ag.semana_seguinte(dt.date.today() - dt.timedelta(days=7))
     sid = seg.isoformat()
@@ -389,15 +356,17 @@ if sid in vivas:
 elif sid in semanas:
     semana = _ler_semana(sid)
 else:
-    st.info(f"Ainda não há pauta salva. Use “Buscar pauta de novo” para a semana de {_rotulo_semana(sid)}.")
+    vazio(f"Ainda não há pauta salva para a semana de {_rotulo_semana(sid)}. "
+          "Clique em Buscar pauta de novo, na barra lateral, para trazer a pauta da Câmara e do Senado.")
     st.stop()
 
 for erro in semana.get("erros") or []:
-    st.warning(f"Parte da pauta não veio. {erro}")
+    st.warning(f"Parte da pauta não veio. {erro} Para tentar de novo, use Buscar pauta de novo, na barra lateral.")
 
 itens = semana["itens"]
 if not itens:
-    st.info("A pauta desta semana ainda não foi publicada. Tente “Buscar pauta de novo” mais tarde.")
+    vazio("A pauta desta semana ainda não foi publicada pela Câmara e pelo Senado. "
+          "Tente Buscar pauta de novo, na barra lateral, mais tarde.")
     st.stop()
 
 # As escolhas nascem com a seleção salva. Depois de salvar, a página recarrega com a
@@ -412,7 +381,8 @@ elif chave_base not in st.session_state or recarregar or atualizar:
         salvo = _ler_selecao(sid)
     except Exception as e:
         salvo = st.session_state.get(chave_base, {})
-        st.warning(f"Não consegui ler a seleção salva da equipe ({e}).")
+        st.warning(f"Não consegui ler a seleção salva da equipe ({e}). "
+                   "Use Ver seleção da equipe, na barra lateral, para tentar de novo.")
     st.session_state[chave_base] = salvo
     _marcar_caixas(sid, itens, salvo)
 
@@ -421,7 +391,7 @@ dias_com = [d for d in semana["dias"] if any(i["dia"] == d for i in itens)]
 dias_sem = [d for d in semana["dias"] if d not in dias_com]
 base = st.session_state.get(chave_base, {})
 por_cliente = {c: sum(1 for v in base.values() if c in v) for c in ag.CLIENTES}
-marcados = " · ".join(f"{c} {n}" for c, n in por_cliente.items() if n) or "nenhum item ainda"
+n_marc = sum(1 for v in base.values() if v)
 
 
 def _lista_e(xs: list[str]) -> str:
@@ -434,17 +404,104 @@ def _curto(iso: str) -> str:
 
 ativos = [i for i in itens if not i.get("situacao")]
 fora = len(itens) - len(ativos)
+novos = ag.novos_desde_segunda(semana)
+pacote_pronto = bool(st.session_state.get("ag_pacote")) and st.session_state["ag_pacote"][0] == sid
+
+
+resumo(
+    [(len(ativos), "item na pauta" if len(ativos) == 1 else "itens na pauta")]
+    + ([(fora, "em reunião cancelada ou adiada", True)] if fora else [])
+    + ([(len(novos), "novo desde segunda" if len(novos) == 1 else "novos desde segunda")] if novos else [])
+    + [(n_marc, "com cliente marcado")]
+)
+clis = "".join(chip(f"{c} · {n}", "org") for c, n in por_cliente.items() if n)
 st.markdown(
-    f'<p class="ag-resumo"><b>{len(ativos)} itens</b> na pauta'
-    + (f' e {fora} em reunião cancelada ou adiada' if fora else "")
-    + (f', sem pauta na {_lista_e([_curto(d) for d in dias_sem])}' if dias_sem else "")
-    + f'. Seleção da equipe: {marcados}.</p>'
-    f'<p class="ag-sub">Pauta coletada em {semana.get("coletadoEm", "")}.</p>',
+    '<div class="ag-clis"><span class="r">Seleção da equipe</span>'
+    + (clis or "<span>nenhum item marcado ainda</span>")
+    + "</div>",
     unsafe_allow_html=True,
 )
+explica(f"Pauta coletada em {semana.get('coletadoEm', '')}."
+        + (f" Sem pauta na {_lista_e([_curto(d) for d in dias_sem])}." if dias_sem else ""))
+
+msgs_vindas = st.session_state.pop("ag_msg", [])
+for tipo, msg in msgs_vindas:
+    getattr(st, tipo)(msg)
+# quem clicou no botão do fim da página continua lá embaixo depois de recarregar
+if msgs_vindas and pacote_pronto:
+    st.toast("Word pronto. Os botões de baixar estão no alto da página.", icon=":material/download:")
+elif any(t == "success" for t, _ in msgs_vindas):
+    st.toast("Seleção salva.", icon=":material/check:")
+
+if pacote_pronto:
+    _, pacote, arquivos, contagem, atualizacao = st.session_state["ag_pacote"]
+    extra = f" (atualização {dt.date.fromisoformat(atualizacao):%d.%m})" if atualizacao else ""
+    secao("Word pronto",
+          _plural(len(contagem), "cliente", "clientes")
+          + (f" · atualização {dt.date.fromisoformat(atualizacao):%d.%m}" if atualizacao else ""),
+          "#1F5E43",
+          "Um documento por cliente, só com os itens marcados para ele. "
+          "Item de reunião cancelada ou adiada fica de fora.")
+    with st.container(key="ag_entrega"):
+        st.download_button(
+            f"Baixar todos{' os ' + str(len(contagem)) if len(contagem) > 1 else ''} (.zip)",
+            data=pacote,
+            file_name=f"Agenda da Semana {semana['periodo']}{extra}.zip",
+            mime="application/zip",
+            type="primary",
+            icon=":material/download:",
+            key="ag_baixar",
+        )
+        explica("Ou baixe só o de um cliente. O número é a quantidade de itens no arquivo.")
+        # um botão por cliente, para baixar só o documento de um
+        with st.container(key="ag_por_cliente"):
+            cols = st.columns(len(ag.CLIENTES))
+            for col, (nome, dados), (cli, n) in zip(cols, arquivos.items(), contagem.items()):
+                col.download_button(f"{cli} · {n}", data=dados, file_name=nome, use_container_width=True,
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    icon=":material/download:", key=f"ag_baixar_{cli}",
+                                    help=f"{_plural(n, 'item', 'itens')} no Word de {cli}")
+
+
+# ── seleção ──────────────────────────────────────────────────────────────────
+def _item(it: dict, fio: bool) -> None:
+    texto, escolha = st.columns([3, 2], gap="large", vertical_alignment="top")
+    with texto:
+        meta = [f"<b>{r}:</b> {esc(it[k])}" for r, k in (("Autoria", "autor"), ("Relatoria", "relator")) if it.get(k)]
+        titulo = it["titulo"]
+        ementa = it.get("ementa") if it.get("ementa") and it["ementa"] != titulo else ""
+        if ementa and titulo in (it.get("reuniao"), it.get("rotulo")):
+            # audiência do Senado: o título repetia o tipo da reunião, que já está no cabeçalho
+            titulo, ementa = ementa, ""
+        conv = "; ".join(it.get("convidados") or [])
+        st.markdown(
+            f'<div class="{"ag-fora" if it.get("situacao") else ""}">'
+            + (f'<div class="ag-top">{chip("Novo desde segunda", "alerta")}</div>' if it["id"] in novos else "")
+            + f'<p class="ag-tit" title="{esc(titulo)}">{_a(titulo, it.get("tituloLink"))}</p>'
+            + (f'<p class="ag-ementa" title="{esc(ementa)}">{esc(ementa)}</p>' if ementa else "")
+            + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else "")
+            + (f'<p class="ag-conv" title="{esc(conv)}"><b>Convidados:</b> {esc(conv)}</p>' if conv else "")
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+    with escolha:
+        st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
+                 label_visibility="collapsed")
+        if it.get("situacao"):
+            st.markdown(f'<p class="ag-nota">Reunião {esc(it["situacao"].lower())}, fica fora do Word.</p>',
+                        unsafe_allow_html=True)
+    if fio:
+        st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
+
+
+COR_CASA = {"CD": MARINHO, "SF": VINHO}
+
+secao("Pauta por dia", f"{_plural(len(itens), 'item', 'itens')} em {_plural(len(dias_com), 'dia', 'dias')}", MARINHO,
+      "Marcar um cliente não grava nada nem recarrega a página. Salvar seleção grava só o que você mudou, "
+      "por cima do que o resto da equipe já salvou, e registra no histórico. Salvar e gerar Word grava e "
+      "monta um arquivo por cliente.")
 
 # ── o que entrou depois de segunda ───────────────────────────────────────────
-novos = ag.novos_desde_segunda(semana)
 so_novos = False
 if novos:
     so_novos = st.container(key="ag_novos").toggle(
@@ -455,67 +512,12 @@ if novos:
              "num arquivo de atualização.",
     )
     if so_novos:
-        st.info("Com a chave ligada, a tela e o Word mostram só os itens novos. Os outros continuam marcados; "
+        explica("A tela e o Word mostram só os itens novos. Os outros continuam marcados; "
                 "para ver ou gerar a agenda completa, desligue a chave.")
 
-for tipo, msg in st.session_state.pop("ag_msg", []):
-    getattr(st, tipo)(msg)
-
-if st.session_state.get("ag_pacote") and st.session_state["ag_pacote"][0] == sid:
-    _, pacote, arquivos, contagem, atualizacao = st.session_state["ag_pacote"]
-    extra = f" (atualização {dt.date.fromisoformat(atualizacao):%d.%m})" if atualizacao else ""
-    st.download_button(
-        f"⬇ Baixar todos{' os ' + str(len(contagem)) if len(contagem) > 1 else ''}"
-        + (f" · atualização {dt.date.fromisoformat(atualizacao):%d.%m}" if atualizacao else "") + " (.zip)",
-        data=pacote,
-        file_name=f"Agenda da Semana {semana['periodo']}{extra}.zip",
-        mime="application/zip",
-        use_container_width=True,
-        key="ag_baixar",
-    )
-    # um botão por cliente, para baixar só o documento de um
-    with st.container(key="ag_por_cliente"):
-        cols = st.columns(len(ag.CLIENTES))
-        for col, (nome, dados), (cli, n) in zip(cols, arquivos.items(), contagem.items()):
-            col.download_button(f"⬇ {cli} · {n}", data=dados, file_name=nome, use_container_width=True,
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                key=f"ag_baixar_{cli}")
-
-
-# ── seleção ──────────────────────────────────────────────────────────────────
-def _item(it: dict, fio: bool) -> None:
-    texto, escolha = st.columns([3, 2], gap="large")
-    with texto:
-        meta = [f"<b>{r}:</b> {_html.escape(it[k])}" for r, k in (("Autoria", "autor"), ("Relatoria", "relator")) if it.get(k)]
-        titulo = it["titulo"]
-        ementa = it.get("ementa") if it.get("ementa") and it["ementa"] != titulo else ""
-        if ementa and titulo in (it.get("reuniao"), it.get("rotulo")):
-            # audiência do Senado: o título repetia o tipo da reunião, que já está no cabeçalho
-            titulo, ementa = ementa, ""
-        conv = "; ".join(it.get("convidados") or [])
-        st.markdown(
-            f'<div class="{"ag-fora" if it.get("situacao") else ""}">'
-            f'<p class="ag-tit" title="{_html.escape(titulo)}">'
-            + ('<span class="ag-novo">novo</span>' if it["id"] in novos else "")
-            + f'{_a(titulo, it.get("tituloLink"))}</p>'
-            + (f'<p class="ag-ementa" title="{_html.escape(ementa)}">{_html.escape(ementa)}</p>' if ementa else "")
-            + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else "")
-            + (f'<p class="ag-conv" title="{_html.escape(conv)}"><b>Convidados:</b> {_html.escape(conv)}</p>' if conv else "")
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-    with escolha:
-        st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
-                 label_visibility="collapsed")
-        if it.get("situacao"):
-            st.markdown(
-                f'<p class="ag-nota" style="color:#962E4D;font-weight:600;margin:2px 0 0;">'
-                f'Reunião {it["situacao"].lower()}, fica fora do Word.</p>',
-                unsafe_allow_html=True,
-            )
-    if fio:
-        st.markdown('<div class="ag-fio"></div>', unsafe_allow_html=True)
-
+if not (st.session_state.get("ag_quem") or "").strip():
+    explica("Escreva seu nome no campo Seu nome, na barra lateral, antes de salvar: ele entra no histórico "
+            "junto com o login da equipe.")
 
 # Com a chave de novos ligada, os outros itens saem da tela. O Streamlit esquece o valor
 # de widget que não foi desenhado, então quem volta à tela nasce de novo da seleção salva.
@@ -527,40 +529,47 @@ dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
 
 # Tudo dentro de um formulário: marcar um cliente não recarrega a página.
 with st.form("ag_form", border=False):
-    a1, a2, _ = st.columns([1, 1, 2])
-    salvar = a1.form_submit_button("Salvar seleção", use_container_width=True)
-    gerar = a2.form_submit_button("Salvar e gerar Word", use_container_width=True, type="primary")
+    with st.container(horizontal=True, vertical_alignment="center", key="ag_acoes"):
+        salvar = st.form_submit_button("Salvar seleção", icon=":material/save:")
+        gerar = st.form_submit_button("Salvar e gerar Word", type="primary", icon=":material/description:")
 
-    abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in visiveis if i['dia'] == d)}" for d in dias_vis])
-    for aba, dia in zip(abas, dias_vis):
-        with aba:
-            do_dia = [i for i in visiveis if i["dia"] == dia]
-            for casa, casa_nome in ag.CASAS[:2]:
-                da_casa = [i for i in do_dia if i["casa"] == casa]
-                if not da_casa:
-                    continue
-                st.markdown(f'<div class="ge-rule">{casa_nome}</div>', unsafe_allow_html=True)
-                reuniao = None
-                for k, it in enumerate(da_casa):
-                    if it["reuniaoLink"] != reuniao:
-                        primeira = reuniao is None
-                        reuniao = it["reuniaoLink"]
-                        detalhe = " · ".join(x for x in (it.get("reuniao") or it.get("rotulo"), it.get("hora")) if x)
-                        tag = f'<span class="ag-tag">{it["situacao"]}</span>' if it.get("situacao") else ""
-                        st.markdown(
-                            f'<div class="ag-org{" ag-primeira" if primeira else ""}">{_a(ag.nome_colegiado(it["colegiado"]), reuniao)}'
-                            f' <span>· {_html.escape(detalhe)}</span>{tag}</div>',
-                            unsafe_allow_html=True,
-                        )
-                    # fio só entre itens da mesma reunião; entre reuniões, o espaço separa
-                    proximo = da_casa[k + 1] if k + 1 < len(da_casa) else None
-                    _item(it, fio=bool(proximo) and proximo["reuniaoLink"] == it["reuniaoLink"])
+    if not dias_vis:
+        vazio("Nenhum item para mostrar. Desligue a chave de itens novos para ver a pauta completa.")
+    else:
+        abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in visiveis if i['dia'] == d)}" for d in dias_vis])
+        for aba, dia in zip(abas, dias_vis):
+            with aba:
+                do_dia = [i for i in visiveis if i["dia"] == dia]
+                for casa, casa_nome in ag.CASAS[:2]:
+                    da_casa = [i for i in do_dia if i["casa"] == casa]
+                    if not da_casa:
+                        continue
+                    secao(casa_nome, _plural(len(da_casa), "item", "itens"), COR_CASA.get(casa, MARINHO), menor=True)
+                    # uma reunião por cartão; itens seguidos da mesma reunião ficam juntos
+                    grupos: list[list[dict]] = []
+                    for it in da_casa:
+                        if grupos and grupos[-1][-1]["reuniaoLink"] == it["reuniaoLink"]:
+                            grupos[-1].append(it)
+                        else:
+                            grupos.append([it])
+                    for g, grupo in enumerate(grupos):
+                        it0 = grupo[0]
+                        detalhe = " · ".join(x for x in (it0.get("reuniao") or it0.get("rotulo"), it0.get("hora")) if x)
+                        with st.container(key=f"ag_reu_{dia}_{casa}_{g}"):
+                            st.markdown(
+                                f'<p class="ag-org">{_a(ag.nome_colegiado(it0["colegiado"]), it0["reuniaoLink"])}</p>'
+                                f'<div class="ag-org-meta"><span>{esc(detalhe)}</span>'
+                                + (chip(f"Reunião {it0['situacao'].lower()}", "erro") if it0.get("situacao") else "")
+                                + "</div>",
+                                unsafe_allow_html=True,
+                            )
+                            for k, it in enumerate(grupo):
+                                _item(it, fio=k + 1 < len(grupo))
 
-    st.markdown('<div class="ag-fim"></div>', unsafe_allow_html=True)
-    b1, b2, _ = st.columns([1, 1, 2])
-    salvar = b1.form_submit_button("Salvar seleção", use_container_width=True, key="ag_salvar_fim") or salvar
-    gerar = b2.form_submit_button("Salvar e gerar Word", use_container_width=True, type="primary",
-                                  key="ag_gerar_fim") or gerar
+    with st.container(horizontal=True, vertical_alignment="center", key="ag_acoes_fim"):
+        salvar = st.form_submit_button("Salvar seleção", icon=":material/save:", key="ag_salvar_fim") or salvar
+        gerar = st.form_submit_button("Salvar e gerar Word", type="primary", icon=":material/description:",
+                                      key="ag_gerar_fim") or gerar
 
 if salvar or gerar:
     msgs = []
@@ -580,13 +589,14 @@ if salvar or gerar:
                          + ". Se não foi de propósito, marque de novo e salve."))
     except Exception as e:
         selecao = atual
-        msgs.append(("error", f"Não consegui salvar na planilha ({e}). Os documentos usam só o que está na sua tela."))
+        msgs.append(("error", f"Não consegui salvar a seleção da equipe ({e}). Os documentos usam só o que está "
+                     "na sua tela. Tente salvar de novo em alguns minutos."))
     st.session_state.pop("ag_pacote", None)
     if gerar:
         if not selecao:
-            msgs.append(("warning", "Nenhum item marcado."))
+            msgs.append(("warning", "Nenhum item marcado. Marque ao menos um cliente em algum item e gere de novo."))
         elif not MODELO.exists():
-            msgs.append(("error", "O modelo do Word não está no repositório."))
+            msgs.append(("error", "O modelo do Word não foi encontrado. Avise a equipe de dados."))
         else:
             atualizacao = ""
             if so_novos:
@@ -601,7 +611,7 @@ if salvar or gerar:
             if sairam:
                 msgs.append(("info", f"Ficaram fora do Word por reunião cancelada ou adiada: {_lista_e(sairam)}."))
             if not contagem:
-                msgs.append(("warning", "Nenhum item novo está marcado." if so_novos else
+                msgs.append(("warning", "Nenhum item novo está marcado. Marque os clientes nos itens novos ou desligue a chave." if so_novos else
                              "Todos os itens marcados são de reunião cancelada ou adiada."))
     st.session_state["ag_aplicar"] = (sid, selecao)
     st.session_state["ag_msg"] = msgs

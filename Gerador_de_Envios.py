@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from datetime import datetime
 from urllib.parse import quote
 import os
@@ -27,6 +26,7 @@ from alerta_pesquisa_core import (
     normalizar_link,
     padronizar_politicos_no_texto,
 )
+from estilo_paginas import cabecalho, chip, explica, secao, vazio
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Gerador de Envios", layout="wide")
@@ -41,160 +41,33 @@ EIXO = {
     "marinho":  "#192D4E",
 }
 
-LOGO_PATH        = "logo_eixo_gov_magenta.png"
-LOGO_BRANCA_PATH = "Marca_eixo_vetor_Logo horizontal branca.png"
+LOGO_PATH = "logo_eixo_gov_magenta.png"
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────
+# Botões, rótulos, abas, caixas e cabeçalho vêm do CSS compartilhado (estilo_paginas,
+# carregado junto do CSS_MENU). Aqui fica só o que é desta página.
 st.markdown(f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-:root {{ --eixo-vinho: {EIXO["vinho"]}; --eixo-gelo: {EIXO["gelo"]}; --eixo-borda: {EIXO["borda"]}; }}
 html, body, [data-testid="stAppViewContainer"] {{ background: {EIXO["gelo"]} !important; }}
 [data-testid="stAppViewContainer"] > section > div {{ background: {EIXO["gelo"]}; }}
-.block-container, [data-testid="stMainBlockContainer"] {{
-    max-width: 1320px !important;
-    padding: 0 2rem 3rem !important;
-    background: {EIXO["gelo"]};
-    overflow-x: hidden;
-}}
+.block-container, [data-testid="stMainBlockContainer"] {{ max-width: 1320px !important; padding: 1.8rem 2.5rem 4rem !important; background: {EIXO["gelo"]}; }}
 * {{ box-sizing: border-box; }}
 body, p, span, div, label, input, select, textarea {{ font-family: 'Montserrat', sans-serif !important; }}
-[data-testid="stHeader"] {{ display: none; }}
-[data-testid="stDecoration"] {{ display: none; }}
+[data-testid="stHeader"], [data-testid="stDecoration"] {{ display: none; }}
 [data-testid="stSidebar"] {{ background: {EIXO["gelo"]} !important; border-right: 1px solid {EIXO["borda"]} !important; }}
 [data-testid="stSidebar"] * {{ font-family: 'Montserrat', sans-serif !important; font-size: 13px !important; }}
-/* Streamlit usa texto com fonte Material para ícones; não sobrescreva essa fonte. */
 span.material-symbols-rounded, span.material-symbols-outlined, span.material-icons,
 [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] * {{
     font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
-    letter-spacing: normal !important; text-transform: none !important;
-}}
-footer {{ display: none !important; }}
-#MainMenu {{ display: none !important; }}
-
-/* Buttons */
-[data-testid="stButton"] > button {{
-    font-family: 'Montserrat', sans-serif !important;
-    font-size: 11px !important; font-weight: 500 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important;
-    border-radius: 0 !important;
-    border: 1px solid {EIXO["vinho"]} !important;
-    background: transparent !important;
-    color: {EIXO["vinho"]} !important;
-    padding: 5px 14px !important;
-    transition: background 0.15s, color 0.15s !important;
-}}
-[data-testid="stButton"] > button:hover {{
-    background: {EIXO["vinho"]} !important; color: #fff !important;
-}}
-[data-testid="stSidebar"] button {{
-    text-align: center !important; display: flex !important;
-    align-items: center !important; justify-content: center !important;
-    padding: 10px 14px !important; line-height: 1 !important; min-height: 38px !important;
-}}
-[data-testid="stSidebar"] [data-testid="stButton"] > button {{
-    border: 1px solid {EIXO["vinho"]} !important;
-    color: {EIXO["vinho"]} !important;
-    display: inline-flex !important; align-items: center !important; justify-content: center !important;
-}}
-[data-testid="stSidebar"] [data-testid="stButton"] > button:hover {{
-    background: {EIXO["vinho"]} !important; color: #fff !important;
-}}
-
-/* Labels */
-[data-testid="stRadio"] > label,
-[data-testid="stSelectbox"] > label,
-[data-testid="stMultiSelect"] > label,
-[data-testid="stTextInput"] > label,
-[data-testid="stNumberInput"] > label,
-[data-testid="stTextArea"] > label {{
-    font-family: 'Montserrat', sans-serif !important;
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important;
-    color: {EIXO["subtexto"]} !important; margin-bottom: 6px !important;
-}}
-[data-testid="stRadio"] > label p,
-[data-testid="stSelectbox"] > label p,
-[data-testid="stMultiSelect"] > label p,
-[data-testid="stTextInput"] > label p,
-[data-testid="stNumberInput"] > label p,
-[data-testid="stTextArea"] > label p {{
-    font-size: 11px !important; font-weight: 700 !important;
-    letter-spacing: 0.1em !important; text-transform: uppercase !important;
-    color: {EIXO["subtexto"]} !important;
-}}
-
-/* Radios */
-[data-testid="stRadio"] [role="radiogroup"] {{ gap: 14px !important; }}
-[data-testid="stRadio"] [role="radiogroup"] label p {{
-    font-family: 'Montserrat', sans-serif !important;
-    font-size: 14px !important; color: {EIXO["tinta"]} !important;
-}}
-
-/* Tabs */
-[data-testid="stTabs"] [role="tablist"] {{
-    border-bottom: 1px solid {EIXO["borda"]} !important;
-    gap: 0 !important; background: transparent;
-}}
-[data-testid="stTabs"] [role="tab"] {{
-    font-family: 'Montserrat', sans-serif !important;
-    font-size: 11px !important; font-weight: 500 !important;
-    letter-spacing: 0.12em !important; text-transform: uppercase !important;
-    color: {EIXO["subtexto"]} !important; padding: 10px 20px 9px !important;
-    border-bottom: 2px solid transparent !important;
-    background: transparent !important; border-radius: 0 !important;
-}}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] {{
-    color: {EIXO["vinho"]} !important; border-bottom-color: {EIXO["vinho"]} !important;
-}}
-
-/* Form */
-div[data-testid="stForm"] {{
-    border: 1px solid {EIXO["borda"]};
-    border-radius: 0; padding: 20px 20px 12px 20px; background: #fff;
-}}
-
-/* Code block */
-div[data-testid="stCodeBlock"] > pre {{
-    max-height: 520px !important; overflow: auto !important; border-radius: 0 !important;
-}}
-
-/* Hero banner */
-.ge-hero {{
-    background: {EIXO["vinho"]};
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 36px 48px; margin: 0 -2rem 32px -2rem;
-}}
-.ge-hero-title {{
-    font-family: 'Montserrat', sans-serif;
-    font-size: 48px; font-weight: 800; color: #fff;
-    line-height: 1; letter-spacing: -0.01em;
-}}
-.ge-hero-logo {{ height: 90px; width: auto; object-fit: contain; }}
-
-/* Section rule */
-.ge-rule {{
-    font-size: 12px; font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; color: {EIXO["vinho"]};
-    border-top: 1.5px solid {EIXO["vinho"]};
-    padding-top: 8px; margin: 20px 0 14px;
-}}
-
-/* Result card */
-.ge-result-card {{
-    background: #fff; border: 1px solid {EIXO["borda"]}; padding: 20px 24px; margin-top: 4px;
-}}
-
-/* UF chips */
-.uf-chips-wrap {{ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }}
-.uf-chip {{
-    display: inline-block; padding: 3px 10px;
-    border-radius: 0; border: 1px solid {EIXO["borda"]};
-    font-size: 12px; font-weight: 500; cursor: pointer; user-select: none;
-    background: #fff; color: {EIXO["subtexto"]}; transition: all 0.12s;
-}}
-.uf-chip.uf-sel {{
-    background: {EIXO["vinho"]}; border-color: {EIXO["vinho"]}; color: #fff;
-}}
+    letter-spacing: normal !important; text-transform: none !important; }}
+footer, #MainMenu {{ display: none !important; }}
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {{ display: none; }}
+.st-key-ge_classif, .st-key-ge_resultado {{ background: #fff; border: 1px solid {EIXO["borda"]}; border-radius: 8px; padding: 16px 20px; }}
+.st-key-ge_ufs_topo {{ gap: 12px !important; margin-top: 4px; }}
+.st-key-ge_ufs_topo [data-testid="stButton"] button {{ min-height: 30px !important; padding: 2px 12px !important; }}
+.ge-rot {{ font-size: 0.72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #4E5A6E; margin: 0 0 4px; }}
+.ge-chips {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }}
+div[data-testid="stCodeBlock"] > pre {{ max-height: 520px !important; overflow: auto !important; border-radius: 8px !important; }}
 </style>""", unsafe_allow_html=True)
 
 
@@ -264,13 +137,13 @@ with st.sidebar:
         f'margin:10px 0 0 0;background:transparent;">'
         f'<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
         f'color:{EIXO["tinta"]};line-height:1.65;margin:0;">'
-        f'Cole o texto da notícia ou suba um PDF, escolha tipo e área, '
-        f'e o app gera um <strong>envio/alerta padronizado com IA</strong>.'
+        f'Cole o texto de uma notícia ou suba um PDF, escolha tipo, área e formato, '
+        f'e o app escreve o <strong>envio ou alerta</strong> no padrão da Eixo, pronto para o WhatsApp.'
         f'</p></div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    if st.button("↻ Atualizar dados", use_container_width=True):
+    if st.button("Atualizar dados", icon=":material/refresh:", use_container_width=True):
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
@@ -430,21 +303,12 @@ def gerar_resumo_seguro(resp) -> str:
         raise RuntimeError("O Gemini não retornou texto. Tente novamente ou reduza o conteúdo enviado.")
     return texto
 
-def _logo_b64(path: str) -> str:
-    try:
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    except Exception:
-        return ""
-
-
 # ─── Clientes de API ──────────────────────────────────────────────────────────
 @st.cache_resource
 def get_gemini_client():
     if not GEMINI_API_KEY.strip():
         raise RuntimeError(
-            "Faltou a GEMINI_API_KEY. Configure nos Secrets do Streamlit Cloud "
-            "(App settings → Secrets) ou crie .streamlit/secrets.toml local."
+            "A chave do Gemini não está configurada neste app. Avise a equipe de dados."
         )
     return genai.Client(api_key=GEMINI_API_KEY)
 
@@ -467,7 +331,7 @@ def get_sheets_client():
         credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         return gspread.authorize(credentials)
     except Exception as e:
-        st.warning(f"Google Sheets não configurado: {e}")
+        st.warning(f"Não consegui conectar à planilha de envios. Detalhe: {e}")
         return None
 
 
@@ -485,7 +349,7 @@ def salvar_no_sheets(tipo, area, uf, formato, cliente, titulo, resumo, analise_e
         sheet.insert_row(linha, index=2)
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar no Sheets: {e}")
+        st.error(f"Não consegui gravar na planilha de envios. Tente de novo em alguns segundos. Detalhe: {e}")
         return False
 
 
@@ -763,125 +627,131 @@ for k, v in [
     ("pdf_preview_png", None),
     ("ufs_selecionadas", []),
     ("reset_titulo", False),
+    ("envio_salvo", False),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
 
 
-# ─── Hero banner ──────────────────────────────────────────────────────────────
-_b64 = _logo_b64(LOGO_BRANCA_PATH)
-_logo_html = (
-    f'<img class="ge-hero-logo" src="data:image/png;base64,{_b64}" alt="Eixo">'
-    if _b64 else ""
+# ─── Cabeçalho ──────────────────────────────────────────────
+cabecalho(
+    "Gerador de Envios",
+    "Transforma uma notícia ou um PDF em envio ou alerta padronizado para o WhatsApp, com o corpo escrito pela IA.",
 )
-st.markdown(f"""
-<div class="ge-hero">
-  <div class="ge-hero-title">Gerador de Envios</div>
-  {_logo_html}
-</div>
-""", unsafe_allow_html=True)
+
+MODO_PDF_ROTULO = {
+    "Auto (texto se tiver; imagem se for scan)": "Automático: texto do arquivo e, se for digitalizado, leitura da imagem",
+    "Texto (PyMuPDF)": "Só o texto do arquivo",
+    "Imagem (Gemini visão)": "Leitura da imagem pela IA (gráficos e páginas digitalizadas)",
+}
 
 
 # ─── Layout principal ─────────────────────────────────────────────────────────
-col_esq, col_dir = st.columns([1.25, 1])
+col_esq, col_dir = st.columns([1.25, 1], gap="large")
 
 with col_esq:
-    st.markdown('<div class="ge-rule">Preenchimento</div>', unsafe_allow_html=True)
-
-    # ── Classificação ────────────────────────────────────────────────────────
-    st.markdown(
-        f'<p style="font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;'
-        f'letter-spacing:0.1em;text-transform:uppercase;color:{EIXO["subtexto"]};margin-bottom:6px;">Classificação</p>',
-        unsafe_allow_html=True,
+    secao(
+        "1. Classificação",
+        explicacao="Tipo, área e abrangência montam o cabeçalho do texto. Alerta sai curto (até 90 palavras); "
+                   "envio vai até 160. Pesquisa eleitoral segue o modelo próprio de pesquisa.",
     )
 
-    is_alerta = st.radio(
-        "Tipo", ["Envio", "Alerta"], index=0, horizontal=True, key="tipo_radio"
-    ) == "Alerta"
+    with st.container(key="ge_classif"):
+        is_alerta = st.radio(
+            "Tipo", ["Envio", "Alerta"], index=0, horizontal=True, key="tipo_radio"
+        ) == "Alerta"
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        area = st.selectbox("Área", AREAS, index=0, key="area_select")
-    with c2:
-        formato = st.selectbox("Formato", FORMATOS, index=0, key="formato_select")
-    with c3:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            area = st.selectbox("Área", AREAS, index=0, key="area_select")
+        with c2:
+            formato = st.selectbox("Formato", FORMATOS, index=0, key="formato_select")
+        with c3:
+            if area == "Eleições":
+                st.markdown('<p class="ge-rot">Abrangência</p>', unsafe_allow_html=True)
+                st.caption("Em eleições, o recorte é escolhido logo abaixo.")
+                abrangencia_geral = "Não especificar"
+            else:
+                abrangencia_geral = st.selectbox(
+                    "Abrangência",
+                    ABRANGENCIAS_OPCIONAIS,
+                    index=0,
+                    key="abrangencia_select",
+                )
+
+        escopo_eleicoes = ""
+
         if area == "Eleições":
-            st.markdown(
-                f'<p style="font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;'
-                f'letter-spacing:0.1em;text-transform:uppercase;color:{EIXO["subtexto"]};margin-bottom:2px;">Abrangência</p>',
-                unsafe_allow_html=True,
-            )
-            st.caption("Para eleições, o recorte é definido logo abaixo.")
-            abrangencia_geral = "Não especificar"
-        else:
-            abrangencia_geral = st.selectbox(
-                "Abrangência",
-                ABRANGENCIAS_OPCIONAIS,
+            escopo_eleicoes = st.radio(
+                "Recorte das eleições",
+                ["Gov. Federal", "Subnacional"],
                 index=0,
-                key="abrangencia_select",
+                horizontal=True,
+                key="eleicoes_escopo_radio",
             )
-
-    escopo_eleicoes = ""
-
-    if area == "Eleições":
-        escopo_eleicoes = st.radio(
-            "Recorte das eleições",
-            ["Gov. Federal", "Subnacional"],
-            index=0,
-            horizontal=True,
-            key="eleicoes_escopo_radio",
+        contexto = obter_contexto_classificacao(
+            area=area,
+            abrangencia_geral=abrangencia_geral,
+            escopo_eleicoes=escopo_eleicoes,
         )
-    contexto = obter_contexto_classificacao(
-        area=area,
-        abrangencia_geral=abrangencia_geral,
-        escopo_eleicoes=escopo_eleicoes,
+        abrangencia = contexto["abrangencia"]
+        area_header = contexto["area_header"]
+
+        # ── Estados ──────────────────────────────────────────────────────────
+        ufs_selecionadas: list[str] = []
+        mostrar_ufs = contexto["mostrar_ufs"]
+
+        if mostrar_ufs:
+            with st.container(horizontal=True, vertical_alignment="center", key="ge_ufs_topo"):
+                st.markdown(
+                    '<p class="ge-rot">Estados' + (" (obrigatório)" if contexto["uf_obrigatoria"] else "") + "</p>",
+                    unsafe_allow_html=True,
+                )
+                if st.button("Limpar", key="ufs_clear", width="content"):
+                    for estado in UFS:
+                        st.session_state[f"uf_chip_{estado}"] = False
+                    st.rerun()
+
+            cols_uf = st.columns(9)
+            for i, estado in enumerate(UFS):
+                with cols_uf[i % 9]:
+                    if st.checkbox(estado, key=f"uf_chip_{estado}", label_visibility="visible"):
+                        ufs_selecionadas.append(estado)
+
+            if ufs_selecionadas:
+                st.markdown(
+                    '<div class="ge-chips">' + "".join(chip(u, "org") for u in ufs_selecionadas) + "</div>",
+                    unsafe_allow_html=True,
+                )
+            elif contexto["uf_obrigatoria"]:
+                explica("Marque ao menos um estado: em eleições subnacionais ele entra no cabeçalho.")
+
+        # ── Cliente ──────────────────────────────────────────────────────────
+        usar_cliente = st.toggle("Personalizar para cliente", value=False, key="usar_cliente",
+                                 help="A IA prioriza os temas do cliente ao escrever, sem citar o nome dele no texto.")
+
+        cliente_key = None
+        if usar_cliente:
+            cliente_opcoes = {v[0]: k for k, v in CLIENTE_DESCRICOES.items()}
+            cliente_label = st.selectbox(
+                "Cliente",
+                list(cliente_opcoes.keys()),
+                key="cliente_select",
+            )
+            cliente_key = cliente_opcoes[cliente_label]
+            with st.expander("Ver perfil do cliente", expanded=False):
+                st.caption(CLIENTE_DESCRICOES[cliente_key][1])
+
+    secao(
+        "2. Texto da notícia",
+        explicacao="A IA escreve só o corpo do texto. Cabeçalho, data, título, análise e link entram exatamente "
+                   "como você preencher. Para PDF de pesquisa eleitoral, escolha o formato Pesquisa eleitoral antes de extrair.",
     )
-    abrangencia = contexto["abrangencia"]
-    area_header = contexto["area_header"]
 
-    # ── Chips de UF ──────────────────────────────────────────────────────────
-    ufs_selecionadas: list[str] = []
-    mostrar_ufs = contexto["mostrar_ufs"]
-
-    if mostrar_ufs:
-        st.caption("Selecione a(s) UF(s):")
-        ac1, _ = st.columns([1, 8])
-        with ac1:
-            if st.button("Limpar", key="ufs_clear", use_container_width=True):
-                for estado in UFS:
-                    st.session_state[f"uf_chip_{estado}"] = False
-                st.rerun()
-
-        cols_uf = st.columns(9)
-        for i, estado in enumerate(UFS):
-            with cols_uf[i % 9]:
-                if st.checkbox(estado, key=f"uf_chip_{estado}", label_visibility="visible"):
-                    ufs_selecionadas.append(estado)
-
-        if ufs_selecionadas:
-            st.caption(f"Selecionadas: {', '.join(ufs_selecionadas)}")
-
-    # ── Toggle de cliente ────────────────────────────────────────────────────
-    usar_cliente = st.toggle("Personalizar para cliente", value=False, key="usar_cliente")
-
-    cliente_key = None
-    if usar_cliente:
-        cliente_opcoes = {v[0]: k for k, v in CLIENTE_DESCRICOES.items()}
-        cliente_label = st.selectbox(
-            "Cliente",
-            list(cliente_opcoes.keys()),
-            key="cliente_select",
-        )
-        cliente_key = cliente_opcoes[cliente_label]
-        with st.expander("Ver perfil do cliente", expanded=False):
-            st.caption(CLIENTE_DESCRICOES[cliente_key][1])
-
-    st.markdown("---")
-
-    # ── Upload de PDF ─────────────────────────────────────────────────────────
-    with st.expander("Carregar texto a partir de PDF", expanded=False):
+    # ── PDF ──────────────────────────────────────────────────────────────────
+    with st.expander("Extrair o texto de um PDF", icon=":material/upload_file:", expanded=False):
         pdf_file = st.file_uploader(
-            "Upload do PDF", type=["pdf"], accept_multiple_files=False, key="pdf_uploader"
+            "Arquivo em PDF", type=["pdf"], accept_multiple_files=False, key="pdf_uploader"
         )
 
         if pdf_file is not None:
@@ -889,23 +759,24 @@ with col_esq:
             with fitz.open(stream=pdf_bytes, filetype="pdf") as d:
                 total_pages = d.page_count
 
-            modo_pdf = st.selectbox("Modo de leitura", LEITURA_PDF, index=0, key="modo_pdf")
+            modo_pdf = st.selectbox("Modo de leitura", LEITURA_PDF, index=0, key="modo_pdf",
+                                    format_func=lambda m: MODO_PDF_ROTULO.get(m, m))
 
             tab_intervalo, tab_avulsas = st.tabs(["Intervalo", "Páginas avulsas"])
 
             with tab_intervalo:
                 ci1, ci2 = st.columns(2)
                 with ci1:
-                    pagina_ini = int(st.number_input("Pág. inicial", min_value=1, max_value=total_pages, value=1, key="pag_ini"))
+                    pagina_ini = int(st.number_input("Página inicial", min_value=1, max_value=total_pages, value=1, key="pag_ini"))
                 with ci2:
-                    pagina_fim = int(st.number_input("Pág. final", min_value=1, max_value=total_pages, value=total_pages, key="pag_fim"))
+                    pagina_fim = int(st.number_input("Página final", min_value=1, max_value=total_pages, value=total_pages, key="pag_fim"))
                 if pagina_fim < pagina_ini:
                     pagina_fim = pagina_ini
                 page_indices_intervalo = list(range(pagina_ini - 1, pagina_fim))
 
             with tab_avulsas:
-                st.caption(f"Digite os números separados por vírgula. Total de páginas: {total_pages}.")
-                avulsas_raw = st.text_input("Páginas (ex: 4, 7, 11)", value="", key="pag_avulsas")
+                explica(f"Números separados por vírgula. O arquivo tem {total_pages} página(s). Quando preenchido, vale no lugar do intervalo.")
+                avulsas_raw = st.text_input("Páginas", value="", placeholder="Ex.: 4, 7, 11", key="pag_avulsas")
                 page_indices_avulsas = []
                 if avulsas_raw.strip():
                     for tok in avulsas_raw.split(","):
@@ -918,17 +789,17 @@ with col_esq:
                                     page_indices_avulsas.append(idx)
                     page_indices_avulsas.sort()
                     if page_indices_avulsas:
-                        st.caption(f"{len(page_indices_avulsas)} página(s) selecionada(s): {[p+1 for p in page_indices_avulsas]}")
+                        st.caption(f"{len(page_indices_avulsas)} página(s): {', '.join(str(p + 1) for p in page_indices_avulsas)}")
                     else:
-                        st.warning("Nenhuma página válida informada.")
+                        st.warning(f"Nenhuma página válida. Use números de 1 a {total_pages}, separados por vírgula.")
 
             page_indices = page_indices_avulsas if page_indices_avulsas else page_indices_intervalo
             n_paginas = len(page_indices)
 
             if modo_pdf != "Texto (PyMuPDF)" and n_paginas > 5:
                 st.warning(
-                    f"Atenção: {n_paginas} páginas selecionadas para leitura por imagem. "
-                    "Para pesquisas eleitorais, recomenda-se 2–3 páginas."
+                    f"{n_paginas} páginas selecionadas. Se o arquivo for lido como imagem, a leitura demora mais; "
+                    "para pesquisa eleitoral, 2 ou 3 páginas costumam bastar."
                 )
 
             if st.button("Extrair texto do PDF", use_container_width=True):
@@ -942,30 +813,24 @@ with col_esq:
                         formato=formato,
                     )
                     st.session_state["texto_gerador"] = texto_extraido
-                    st.success("Texto carregado no campo abaixo. Preencha o título e clique em Gerar.")
+                    st.success("Texto extraído e colocado no campo abaixo. Confira, dê um título e clique em Gerar.")
                     if st.session_state.get("pdf_preview_png"):
                         st.image(
                             st.session_state["pdf_preview_png"],
-                            caption="Prévia da primeira página renderizada",
+                            caption="Primeira página lida como imagem",
                             use_container_width=True,
                         )
                 except Exception as e:
-                    st.error(f"Erro ao extrair do PDF: {e}")
+                    st.error(f"Não consegui extrair o texto do PDF. Tente outro modo de leitura ou menos páginas. Detalhe: {e}")
 
     # ── Formulário principal ──────────────────────────────────────────────────
     with st.form("form_envio", clear_on_submit=False):
         texto = st.text_area(
-            "Texto da notícia (até 10 mil caracteres)",
+            "Texto da notícia",
             max_chars=10_000,
             height=240,
-            placeholder="Cole aqui o texto da notícia... (ou use o PDF acima para preencher automaticamente)",
+            placeholder="Cole aqui o texto da notícia, até 10 mil caracteres, ou extraia de um PDF acima.",
             value=st.session_state.get("texto_gerador", ""),
-        )
-
-        st.markdown(
-            f'<p style="font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;'
-            f'letter-spacing:0.1em;text-transform:uppercase;color:{EIXO["subtexto"]};margin:14px 0 6px;">Campos</p>',
-            unsafe_allow_html=True,
         )
 
         if st.session_state.get("reset_titulo"):
@@ -975,39 +840,41 @@ with col_esq:
         titulo = st.text_input(
             "Título (obrigatório)",
             value=st.session_state.get("titulo_gerador", ""),
-            placeholder="Ex.: Percent divulga pesquisa para governo em MT...",
+            placeholder="Ex.: Percent divulga pesquisa para governo em MT",
             key="titulo_gerador",
         )
 
         analise_eixo = st.text_area(
             "Análise Eixo (opcional)",
             height=100,
-            placeholder="Se quiser, escreva aqui uma análise curta e objetiva.",
+            placeholder="Uma análise curta e objetiva, se quiser. Entra no fim, sob o título ANÁLISE EIXO.",
         )
 
         link = st.text_input("Link (opcional)", value="", placeholder="Ex.: https://...")
 
-        submitted = st.form_submit_button("Gerar envio/alerta", use_container_width=True)
+        submitted = st.form_submit_button(
+            "Gerar alerta" if is_alerta else "Gerar envio", type="primary", use_container_width=True
+        )
 
     if submitted:
         erros = []
         if not texto.strip():
-            erros.append("Cole o texto da notícia (ou extraia de um PDF acima).")
+            erros.append("Cole o texto da notícia ou extraia de um PDF acima.")
         if not titulo.strip():
-            erros.append("Preencha o título (obrigatório).")
+            erros.append("Preencha o título.")
         if contexto["uf_obrigatoria"] and not ufs_selecionadas:
-            erros.append("Selecione ao menos uma UF para eleições subnacionais.")
+            erros.append("Marque ao menos um estado em Classificação: é obrigatório em eleições subnacionais.")
         link_norm = normalizar_link(link)
         if link_norm:
             link_norm = encurtar_link(link_norm)
         if link.strip() and not link_norm:
-            erros.append("O link parece inválido. Cole uma URL completa (http/https).")
+            erros.append("O link parece inválido. Cole a URL completa, começando com http ou https.")
 
         if erros:
             for e in erros:
                 st.error(e)
         else:
-            with st.spinner("Gerando resumo com IA e compilando o envio..."):
+            with st.spinner("Escrevendo o texto com a IA e montando o envio..."):
                 try:
                     resumo = gerar_resumo_gemini(
                         texto=texto,
@@ -1040,52 +907,58 @@ with col_esq:
                         "texto": texto,
                     }
                     st.session_state["reset_titulo"] = True
-                    st.success("Envio gerado.")
+                    st.session_state["envio_salvo"] = False
+                    st.success("Pronto. O texto está em Resultado.")
                 except Exception as e:
-                    st.error(f"Erro ao gerar com Gemini: {e}")
+                    st.error(f"Não consegui gerar o texto com a IA. Tente de novo; se repetir, avise a equipe de dados. Detalhe: {e}")
 
 
 # ─── Coluna direita: resultado ────────────────────────────────────────────────
 with col_dir:
-    st.markdown('<div class="ge-rule">Resultado</div>', unsafe_allow_html=True)
+    secao(
+        "3. Resultado",
+        explicacao="Texto no formato do WhatsApp: os asteriscos viram negrito ao colar. Confira nomes e números antes de enviar.",
+    )
 
     if not st.session_state["resultado_final"].strip():
-        st.markdown(
-            f'<div class="ge-result-card">'
-            f'<p style="font-family:Montserrat,sans-serif;font-size:13px;color:{EIXO["subtexto"]};margin:0;">'
-            f'Preencha o formulário e clique em <strong style="color:{EIXO["tinta"]};">Gerar envio/alerta</strong>.'
-            f'</p></div>',
-            unsafe_allow_html=True,
-        )
+        vazio("Nada gerado ainda. Preencha a classificação, cole o texto, dê um título e clique em Gerar; o texto pronto aparece aqui.")
     else:
-        st.markdown(
-            f'<p style="font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;'
-            f'letter-spacing:0.08em;text-transform:uppercase;color:{EIXO["subtexto"]};margin-bottom:6px;">Copiar:</p>',
-            unsafe_allow_html=True,
-        )
-        st.code(st.session_state["resultado_final"], language="text")
+        dados = st.session_state["dados_envio"]
+        with st.container(key="ge_resultado"):
+            etiquetas = [chip(dados.get("tipo", ""), "data"), chip(dados.get("area", ""), "org")]
+            if dados.get("uf"):
+                etiquetas.append(chip(dados["uf"], "org"))
+            if dados.get("formato") and dados["formato"] != "Padrão":
+                etiquetas.append(chip(dados["formato"]))
+            if dados.get("cliente") and dados["cliente"] != "Geral":
+                etiquetas.append(chip(dados["cliente"]))
+            if st.session_state.get("envio_salvo"):
+                etiquetas.append(chip("Salvo na planilha", "ok"))
+            st.markdown('<div class="ge-chips">' + "".join(etiquetas) + "</div>", unsafe_allow_html=True)
+            explica("Para copiar, use o botão no canto do quadro.")
 
-        c1, c2 = st.columns(2)
+            st.code(st.session_state["resultado_final"], language="text")
 
-        with c1:
-            if st.button("Enviar no WhatsApp", use_container_width=True):
-                dialog_whatsapp(st.session_state["resultado_final"])
+            c1, c2 = st.columns(2)
 
-        with c2:
-            if st.button("Salvar no Sheets", use_container_width=True):
-                if get_sheets_client():
-                    with st.spinner("Salvando..."):
-                        dados = st.session_state["dados_envio"]
-                        sucesso = salvar_no_sheets(
-                            tipo=dados["tipo"], area=dados["area"], uf=dados["uf"],
-                            formato=dados["formato"], cliente=dados.get("cliente"),
-                            titulo=dados["titulo"], resumo=dados["resumo"],
-                            analise_eixo=dados["analise_eixo"],
-                            link=dados["link"], texto_completo=dados["texto"],
-                        )
-                        if sucesso:
-                            st.success("Salvo no Google Sheets!")
-                        else:
-                            st.error("Erro ao salvar")
-                else:
-                    st.error("Google Sheets não configurado. Veja a sidebar.")
+            with c1:
+                if st.button("Enviar no WhatsApp", use_container_width=True):
+                    dialog_whatsapp(st.session_state["resultado_final"])
+
+            with c2:
+                if st.button("Salvar na planilha", use_container_width=True,
+                             help="Registra o envio na planilha de envios da equipe."):
+                    if get_sheets_client():
+                        with st.spinner("Salvando..."):
+                            sucesso = salvar_no_sheets(
+                                tipo=dados["tipo"], area=dados["area"], uf=dados["uf"],
+                                formato=dados["formato"], cliente=dados.get("cliente"),
+                                titulo=dados["titulo"], resumo=dados["resumo"],
+                                analise_eixo=dados["analise_eixo"],
+                                link=dados["link"], texto_completo=dados["texto"],
+                            )
+                            if sucesso:
+                                st.session_state["envio_salvo"] = True
+                                st.success("Salvo na planilha de envios.")
+                    else:
+                        st.error("A planilha de envios não está configurada neste app. Avise a equipe de dados.")
