@@ -295,7 +295,12 @@ secao("1. Divisão semanal", cor="#962E4D", info="No Docs: Arquivo > Fazer downl
 arq = st.file_uploader("Divisão semanal - Saúde", type=["docx", "pdf"], label_visibility="collapsed")
 if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
     SS["sint_arquivo"] = (arq.name, arq.size)
-    SS["sint_div"] = ss.ler_divisao(arq.getvalue(), arq.name)
+    try:
+        SS["sint_div"] = ss.ler_divisao(arq.getvalue(), arq.name)
+    except Exception:  # noqa: BLE001
+        SS.pop("sint_div", None)
+        SS.pop("sint_arquivo", None)  # o aviso volta a cada clique enquanto o arquivo ruim estiver lá
+        st.error("Não consegui abrir o arquivo. Baixe a Divisão de novo no Docs (Arquivo > Fazer download > PDF ou .docx) e envie outra vez.")
     for k in ("sint_noticias", "sint_bullets", "sint_dou", "sint_arquivos", "sint_emails", "sint_acomp_ok",
               "sint_acomp_n", "sint_movs_xls"):
         SS.pop(k, None)
@@ -304,6 +309,9 @@ if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
 
 div = SS.get("sint_div")
 if not div:
+    _parar()
+if not div["noticias"] and not div["proposicoes"]:
+    st.warning("O arquivo não tem links de notícia nem a tabela de novas proposições. Confira se é a Divisão semanal - Saúde.")
     _parar()
 
 nots = div["noticias"]
@@ -413,11 +421,15 @@ if AGENDA_SHEET_ID:
         except Exception as e:  # noqa: BLE001
             st.warning(f"Não consegui pôr as novas proposições na lista de acompanhadas: {e}")
         SS["sint_acomp_ok"] = True
-    with st.spinner("Consultando a tramitação na Câmara e no Senado (na primeira vez da semana leva até 2 minutos)..."):
+    with st.spinner("Consultando a tramitação na Câmara e no Senado (na primeira vez da semana leva cerca de 1 minuto)..."):
         try:
             movs_por_cli = _movs_da_semana(INI, FIM, SS.get("sint_acomp_n", 0))
         except Exception as e:  # noqa: BLE001
             st.warning(f"Movimentações: {e}")
+    if (movs_por_cli or {}).get(ss.SEM_RESPOSTA):
+        n_sr = len(movs_por_cli[ss.SEM_RESPOSTA])
+        st.warning(f"{plural(n_sr, 'proposição acompanhada não respondeu', 'proposições acompanhadas não responderam')} "
+                   "na Câmara ou no Senado e pode faltar na tabela de movimentações. Confira no XLS do Inteligov.")
 if SS.get("sint_acomp_n"):
     st.markdown(f'<p class="eg-explica">{plural(SS["sint_acomp_n"], "proposição nova da Divisão entrou", "proposições novas da Divisão entraram")} '
                 'na lista de acompanhadas.</p>', unsafe_allow_html=True)

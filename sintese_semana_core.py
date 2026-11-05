@@ -155,7 +155,7 @@ def cliente_da_celula(txt: str) -> list[tuple[str, bool]]:
         if not p:
             continue
         duvida = "?" in p
-        chave = _APELIDOS.get(p.replace("?", "").strip().lower())
+        chave = _APELIDOS.get(re.sub(r"[?.()*]", "", p).strip().lower())
         if chave and chave not in [c for c, _ in out]:
             out.append((chave, duvida))
     return out
@@ -243,6 +243,7 @@ def _ler_divisao_docx(dados: bytes) -> dict:
                for k in ("PROPOSI", "EMENTA", "AUTOR", "CLIENTE")}
         for row in t.rows[1:]:
             cel = [c.text.strip() for c in row.cells]
+            pega = lambda k: cel[idx[k]] if idx[k] is not None and idx[k] < len(cel) else ""  # noqa: E731
             link = ""
             for h in row.cells[idx["PROPOSI"]]._tc.iter(W + "hyperlink"):
                 rid = h.get(R + "id")
@@ -251,9 +252,9 @@ def _ler_divisao_docx(dados: bytes) -> dict:
             if not cel[idx["PROPOSI"]]:
                 continue
             m_p = _PROP.match(cel[idx["PROPOSI"]])
-            props.append({"proposicao": f"{m_p.group(1)} {m_p.group(2)}/{m_p.group(3)}" if m_p else cel[idx["PROPOSI"]], "ementa": cel[idx["EMENTA"]],
-                          "autor": cel[idx["AUTOR"]], "link": link,
-                          "clientes": cliente_da_celula(cel[idx["CLIENTE"]])})
+            props.append({"proposicao": f"{m_p.group(1)} {m_p.group(2)}/{m_p.group(3)}" if m_p else cel[idx["PROPOSI"]],
+                          "ementa": pega("EMENTA"), "autor": pega("AUTOR"), "link": link,
+                          "clientes": cliente_da_celula(pega("CLIENTE"))})
     return {"noticias": _dedup(noticias), "proposicoes": props}
 
 
@@ -496,7 +497,8 @@ NOTÍCIAS DA SEMANA:
 """ + "\n\n".join(blocos)
 
 
-_PROIBIDOS = [(re.compile(r"\s*[—–]\s*"), ", "), (re.compile(r"\bjunto a(o|os|as)?\b", re.I), "com")]
+_PROIBIDOS = [(re.compile(r"(\d)\s*[—–]\s*(\d)"), r"\1 a \2"),  # 2020–2024 -> 2020 a 2024
+              (re.compile(r"\s*[—–]\s*"), ", "), (re.compile(r"\bjunto a(o|os|as)?\b", re.I), "com")]
 
 
 def _limpar(txt: str) -> str:
@@ -505,10 +507,32 @@ def _limpar(txt: str) -> str:
         t = rx.sub(rep, t)
     # data com zero à esquerda: 07/03/2026 -> 7/3/2026
     # parlamentar como (PARTIDO/UF), nunca com hífen
-    t = re.sub(r"\(([A-Za-zÀ-ú ]{2,20})\s*[-–]\s*([A-Z]{2})\)", r"(\1/\2)", t)
+    t = re.sub(r"\(\s*([A-Za-zÀ-ú]+(?: [A-Za-zÀ-ú]+)*)\s*[-–]\s*([A-Z]{2})\s*\)", r"(\1/\2)", t)
     t = re.sub(r"\b0(\d)/(\d{1,2})/(\d{4})\b", r"\1/\2/\3", t)
     t = re.sub(r"\b(\d{1,2})/0(\d)/(\d{4})\b", r"\1/\2/\3", t)
     return re.sub(r"\s{2,}", " ", t)
+
+
+def _json_da_resposta(texto: str | None) -> list:
+    """Lista de bullets da resposta, aceitando cerca de código, texto em volta e lista solta."""
+    bruto = re.sub(r"^```(?:json)?|```$", "", (texto or "").strip()).strip()
+    if not bruto:
+        return []
+    try:
+        dados = json.loads(bruto)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", bruto, re.S)
+        if not m:
+            if bruto.startswith(("{", "[")):
+                raise ValueError("o Gemini devolveu JSON incompleto; rode de novo") from None
+            raise ValueError("o Gemini não devolveu JSON") from None
+        try:
+            dados = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            raise ValueError("o Gemini devolveu JSON incompleto; rode de novo") from None
+    if isinstance(dados, dict):
+        dados = dados.get("bullets")
+    return dados if isinstance(dados, list) else []
 
 
 def gerar_bullets(client, modelo: str, cliente: str, noticias: list[dict]) -> list[dict]:
@@ -516,25 +540,37 @@ def gerar_bullets(client, modelo: str, cliente: str, noticias: list[dict]) -> li
     validas = [n for n in noticias if n.get("texto") and not secao_de_clipping(n.get("secao", ""))]
     if not validas:
         return []
-    resp = client.models.generate_content(
-        model=modelo, contents=montar_prompt(cliente, validas),
-        config=types.GenerateContentConfig(temperature=0.2, response_mime_type="application/json"))
-    bruto = (resp.text or "").strip()
-    bruto = re.sub(r"^```(?:json)?|```$", "", bruto).strip()
-    dados = json.loads(bruto or "{}")
+    prompt = montar_prompt(cliente, validas)
+    for tentativa in range(2):  # 429/503 do Gemini costumam passar na segunda
+        try:
+            resp = client.models.generate_content(
+                model=modelo, contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.2, response_mime_type="application/json"))
+            break
+        except Exception as e:  # noqa: BLE001
+            if tentativa == 1 or not re.search(r"429|500|503|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE", str(e)):
+                raise
+            time.sleep(15)
+    dados = _json_da_resposta(resp.text)
     secoes = secoes_do_cliente(cliente)
     out = []
-    for b in dados.get("bullets", []):
-        try:
-            n = validas[int(b["noticia"]) - 1]
-        except (KeyError, ValueError, IndexError, TypeError):
+    for b in dados:
+        if not isinstance(b, dict):
             continue
+        try:
+            i = int(b["noticia"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if not 1 <= i <= len(validas):  # 0 ou negativo pegaria a notícia errada pelo fim da lista
+            continue
+        n = validas[i - 1]
         sec = b.get("secao") if b.get("secao") in secoes else secoes[0]
         texto_fonte = n.get("texto", "")
-        docs = [d for d in (b.get("documentos") or [])
-                if d.get("url") and d.get("nome") and d["url"] in texto_fonte]  # link tem de estar na notícia
-        out.append({"url": n["url"], "secao": sec, "tema": b.get("tema", ""),
-                    "titulo": _limpar(b.get("titulo", "")), "texto": _limpar(b.get("texto", "")),
+        docs = [d for d in (b.get("documentos") if isinstance(b.get("documentos"), list) else [])
+                if isinstance(d, dict) and d.get("url") and d.get("nome")
+                and d["url"] in texto_fonte]  # link tem de estar na notícia
+        out.append({"url": n["url"], "secao": sec, "tema": b.get("tema") or "",
+                    "titulo": _limpar(b.get("titulo") or ""), "texto": _limpar(b.get("texto") or ""),
                     "documentos": docs, "fonte_titulo": n.get("titulo", "")})
     ordem = {s: i for i, s in enumerate(secoes)}
     out.sort(key=lambda b: ordem.get(b["secao"], 99))
@@ -700,18 +736,44 @@ def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
             "teor": doc.get("url") or ""}
 
 
+def _ids_camara_no_periodo(ini: dt.date, fim: dt.date) -> set[str] | None:
+    """IDs de toda proposição com tramitação na Câmara no período (None se a listagem falhar)."""
+    try:
+        primeira = _get(f"{CAMARA}/proposicoes", dataInicio=ini.isoformat(), dataFim=fim.isoformat(),
+                        itens=100, pagina=1) or {}
+        ultimo = next((l["href"] for l in primeira.get("links") or [] if l.get("rel") == "last"), "")
+        n_pag = int(re.search(r"pagina=(\d+)", ultimo).group(1)) if "pagina=" in ultimo else 1
+
+        def pagina(p):
+            d = primeira if p == 1 else _get(f"{CAMARA}/proposicoes", dataInicio=ini.isoformat(),
+                                               dataFim=fim.isoformat(), itens=100, pagina=p)
+            return [str(x["id"]) for x in (d or {}).get("dados") or []]
+        with ThreadPoolExecutor(8) as ex:
+            return {i for lista in ex.map(pagina, range(1, n_pag + 1)) for i in lista}
+    except Exception:  # noqa: BLE001
+        return None
+
+
+SEM_RESPOSTA = "_sem_resposta"  # chave do resultado com as proposições que as APIs não responderam
+
+
 def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers: int = 16,
                          progresso=None) -> dict[str, list[dict]]:
     """Cliente -> movimentações da semana (uma linha por proposição, o último andamento)."""
     unicos = {(a["Casa"], a["ID na Casa"]) for a in acomp if a.get("ID na Casa")}
+    na_camara = _ids_camara_no_periodo(ini, fim)
+    if na_camara is not None:  # sem a listagem, consulta todas como antes
+        unicos = {(c, i) for c, i in unicos if not c.startswith("Câmara") or i in na_camara}
     feitos = [0]
+
+    falhou = object()
 
     def um(chave):
         casa, id_ = chave
         try:
             m = _mov_camara(id_, ini, fim) if casa.startswith("Câmara") else _mov_senado(id_, ini, fim)
         except Exception:  # noqa: BLE001
-            m = None
+            m = falhou
         feitos[0] += 1
         if progresso:
             progresso(feitos[0], len(unicos))
@@ -719,6 +781,14 @@ def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers:
 
     with ThreadPoolExecutor(workers) as ex:
         res = dict(ex.map(um, unicos))
+    # a Câmara devolve 429 sob carga: quem falhou é consultado de novo, devagar
+    repetir = [k for k, v in res.items() if v is falhou]
+    if repetir:
+        time.sleep(5)
+        with ThreadPoolExecutor(4) as ex:
+            res.update(dict(ex.map(um, repetir)))
+    sem_resposta = sorted(k for k, v in res.items() if v is falhou)
+    res = {k: (None if v is falhou else v) for k, v in res.items()}
     out: dict[str, list[dict]] = {}
     for a in acomp:
         m = res.get((a["Casa"], a.get("ID na Casa")))
@@ -726,6 +796,8 @@ def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers:
             out.setdefault(a["Cliente"], []).append(m)
     for v in out.values():
         v.sort(key=lambda m: tuple(reversed([int(x) for x in m["data"].split("/")])))
+    if sem_resposta:  # a página avisa; as chaves de cliente seguem intactas
+        out[SEM_RESPOSTA] = [{"casa": c, "id": i} for c, i in sem_resposta]
     return out
 
 
@@ -989,7 +1061,8 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, bullets: list[dict],
             for a in atos:
                 cab = f"{a['ato']} | Publicado em: {a.get('publicado', '')} | {a.get('orgao', '')}".rstrip(" |")
                 add_par("ato", [(cab, True, a["link"])])
-                add_par("desc", [(a.get("resumo", ""), False, None)])
+                if (a.get("resumo") or "").strip():
+                    add_par("desc", [(a["resumo"], False, None)])
     # mantém os parágrafos vazios antes do título (espaço do logo do cabeçalho)
     filhos = list(corpo)
     i_tit = filhos.index(P["titulo"]._p)
