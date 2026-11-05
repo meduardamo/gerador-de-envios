@@ -231,6 +231,7 @@ with st.sidebar:
         'Síntese semanal de <strong>saúde</strong>: lê a <strong>Divisão semanal</strong>, gera os bullets de cada '
         'cliente, consulta as <strong>movimentações</strong> na Câmara e no Senado e monta o Word, o PDF e o email.'
         '</p></div>', unsafe_allow_html=True)
+    st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
 

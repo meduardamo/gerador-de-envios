@@ -265,6 +265,7 @@ with st.sidebar:
                            key="ag_recarregar",
                            help="Traz o que a equipe salvou desde que você abriu a página. "
                                 "Marcações suas ainda não salvas são descartadas.")
+    st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
 
