@@ -39,6 +39,15 @@ st.markdown("""<style>
 .st-key-ag_acoes { margin-bottom: 6px; }
 [data-testid="stMain"] .st-key-ag_acoes [data-testid="stTextInput"] > label p { font-size: 0.72rem !important; font-weight: 600 !important; letter-spacing: .04em !important; text-transform: uppercase !important; color: #4E5A6E !important; }
 .st-key-ag_acoes_fim { margin-top: 18px; padding-top: 16px; border-top: 1px solid #DADAD4; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] details { border: 0 !important; background: transparent !important; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary { padding: 18px 0 8px !important; gap: 8px; background: transparent !important; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary:hover, div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary:focus-visible { background: transparent !important; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary::before { content: ""; width: 14px; height: 14px; border-radius: 4px; flex: none; background: #192D4E; order: -1; }
+div.st-key-ag_casa_SF [data-testid="stExpander"] summary::before, div[class*="st-key-ag_casa_SF"] [data-testid="stExpander"] summary::before { background: #962E4D; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary p { font-size: 15.5px !important; font-weight: 700 !important; color: #192D4E !important; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary p span { font-size: 13px; font-weight: 400; color: #6B6B6B !important; margin-left: 2px; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpander"] summary:hover p { color: #962E4D !important; }
+div[class*="st-key-ag_casa_"] [data-testid="stExpanderDetails"] { padding: 0 !important; }
 div[class*="st-key-ag_reu_"] { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; gap: .45rem; }
 div[class*="st-key-ag_reu_"] [data-testid="stMarkdownContainer"], div[class*="st-key-ag_reu_"] [data-testid="stMarkdown"] { margin-bottom: 0 !important; }
 div[class*="st-key-ag_reu_"] [data-testid="stElementContainer"]:has(> [data-testid="stButtonGroup"]), div[class*="st-key-ag_reu_"] [data-testid="stButtonGroup"] { width: 100% !important; }
@@ -479,7 +488,6 @@ with st.form("ag_form", border=False):
                     da_casa = [i for i in do_dia if i["casa"] == casa]
                     if not da_casa:
                         continue
-                    secao(casa_nome, _plural(len(da_casa), "item", "itens"), COR_CASA.get(casa, MARINHO), menor=True)
                     # uma reunião por cartão; itens seguidos da mesma reunião ficam juntos
                     grupos: list[list[dict]] = []
                     for it in da_casa:
@@ -487,19 +495,22 @@ with st.form("ag_form", border=False):
                             grupos[-1].append(it)
                         else:
                             grupos.append([it])
-                    for g, grupo in enumerate(grupos):
-                        it0 = grupo[0]
-                        detalhe = " · ".join(x for x in (it0.get("reuniao") or it0.get("rotulo"), it0.get("hora")) if x)
-                        with st.container(key=f"ag_reu_{dia}_{casa}_{g}"):
-                            st.markdown(
-                                f'<p class="ag-org">{_a(ag.nome_colegiado(it0["colegiado"]), it0["reuniaoLink"])}</p>'
-                                f'<div class="ag-org-meta"><span>{esc(detalhe)}</span>'
-                                + (chip(f"Reunião {it0['situacao'].lower()}", "erro") if it0.get("situacao") else "")
-                                + "</div>",
-                                unsafe_allow_html=True,
-                            )
-                            for k, it in enumerate(grupo):
-                                _item(it, fio=k + 1 < len(grupo))
+                    # A Casa abre e fecha: com a Câmara fechada o Senado sobe para o topo da aba.
+                    with st.container(key=f"ag_casa_{casa}_{dia}"), \
+                            st.expander(f"{casa_nome} :gray[{_plural(len(da_casa), 'item', 'itens')}]", expanded=True):
+                        for g, grupo in enumerate(grupos):
+                            it0 = grupo[0]
+                            detalhe = " · ".join(x for x in (it0.get("reuniao") or it0.get("rotulo"), it0.get("hora")) if x)
+                            with st.container(key=f"ag_reu_{dia}_{casa}_{g}"):
+                                st.markdown(
+                                    f'<p class="ag-org">{_a(ag.nome_colegiado(it0["colegiado"]), it0["reuniaoLink"])}</p>'
+                                    f'<div class="ag-org-meta"><span>{esc(detalhe)}</span>'
+                                    + (chip(f"Reunião {it0['situacao'].lower()}", "erro") if it0.get("situacao") else "")
+                                    + "</div>",
+                                    unsafe_allow_html=True,
+                                )
+                                for k, it in enumerate(grupo):
+                                    _item(it, fio=k + 1 < len(grupo))
 
     with st.container(horizontal=True, vertical_alignment="center", key="ag_acoes_fim"):
         salvar = st.form_submit_button("Salvar seleção", icon=":material/save:", key="ag_salvar_fim") or salvar
