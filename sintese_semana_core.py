@@ -17,6 +17,7 @@ import html as _html
 import io
 import json
 import re
+import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 
@@ -504,40 +505,53 @@ def _get(url, **params):
         except Exception:  # noqa: BLE001
             if tentativa == 2:
                 raise
+            time.sleep(2 * (tentativa + 1))
     return None
 
 
-def resolver_id(proposicao: str, casa: str) -> str:
+def _palavras(t: str) -> set:
+    return {w for w in re.findall(r"\w{4,}", (t or "").lower())}
+
+
+def _candidatos(proposicao: str) -> list[tuple[str, str, str]]:
+    """(casa, id, ementa) de cada casa onde existe essa sigla/número/ano."""
     m = re.match(r"(\w+)\s+(\d+)/(\d{4})", proposicao.strip())
     if not m:
-        return ""
+        return []
     sig, num, ano = m.groups()
-    if casa.startswith("Câmara"):
-        d = (_get(f"{CAMARA}/proposicoes", siglaTipo=sig, numero=num, ano=ano) or {}).get("dados") or []
-        return str(d[0]["id"]) if d else ""
-    d = _get(f"{SENADO}/processo", sigla=sig, numero=num, ano=ano) or []
-    return str(d[0]["id"]) if d else ""
+    out = []
+    for d in (_get(f"{CAMARA}/proposicoes", siglaTipo=sig, numero=num, ano=ano) or {}).get("dados") or []:
+        ementa = d.get("ementa", "")
+        out.append(("Câmara dos Deputados", str(d["id"]), ementa))
+    for d in _get(f"{SENADO}/processo", sigla=sig, numero=num, ano=ano) or []:
+        if d.get("casaIdentificadora") == "SF":
+            out.append(("Senado Federal", str(d["id"]), d.get("ementa", "")))
+    return out
 
 
-def casa_da_proposicao(link: str, proposicao: str) -> str:
-    if "senado" in (link or "").lower():
-        return "Senado Federal"
-    return "Câmara dos Deputados"
+def casa_e_id(proposicao: str, ementa: str = "") -> tuple[str, str]:
+    """Escolhe a casa pela ementa da Divisão quando o número existe nas duas."""
+    cands = _candidatos(proposicao)
+    if not cands:
+        return "Câmara dos Deputados", ""
+    if len(cands) > 1 and ementa:
+        alvo = _palavras(ementa)
+        cands.sort(key=lambda c: -len(alvo & _palavras(c[2])))
+    return cands[0][0], cands[0][1]
 
 
 def acrescentar_novas(ws, novas: list[dict], atuais: list[dict], hoje: str) -> int:
     """Põe na aba as novas proposições da Divisão (por cliente) que ainda não estão lá."""
-    tem = {(a["Cliente"], a["Proposição"].strip().upper(), a["Casa"]) for a in atuais}
+    tem = {(a["Cliente"], a["Proposição"].strip().upper()) for a in atuais}
     linhas = []
     for p in novas:
-        casa = casa_da_proposicao(p.get("link", ""), p["proposicao"])
-        for cli, _duvida in p["clientes"]:
-            chave = (cli, p["proposicao"].strip().upper(), casa)
-            if chave in tem:
-                continue
-            tem.add(chave)
-            linhas.append([cli, p["proposicao"].strip(), casa, resolver_id(p["proposicao"], casa),
-                           "Divisão semanal", hoje])
+        clis = [cli for cli, _d in p["clientes"] if (cli, p["proposicao"].strip().upper()) not in tem]
+        if not clis:
+            continue
+        casa, id_ = casa_e_id(p["proposicao"], p.get("ementa", ""))
+        for cli in clis:
+            tem.add((cli, p["proposicao"].strip().upper()))
+            linhas.append([cli, p["proposicao"].strip(), casa, id_, "Divisão semanal", hoje])
     if linhas:
         ws.append_rows(linhas, value_input_option="RAW")
     return len(linhas)
