@@ -29,10 +29,24 @@ import requests
 # Cada equipe vê na página só os clientes da sua área. A pauta coletada é a mesma para todas.
 AREAS = {
     "Saúde": ["IEPS", "Vital", "Umane", "IDEC", "Infinis", "UNFPA", "Coletivo"],
-    "Educação": ["FMCSV", "ISG", "IU", "Impulso", "Lemann", "MegaEdu", "Fundação Itaú"],
+    "Educação": ["FMCSV", "ISG", "IU", "Lemann", "MegaEdu", "Fundação Itaú"],
     "Esporte": ["REMS"],
 }
 CLIENTES = [c for cs in AREAS.values() for c in cs]
+# Comissões que a página já abre filtradas para cada área (sigla no fim do nome do colegiado).
+# Os Plenários entram sempre. É só o filtro inicial: dá para limpar e ver a pauta inteira.
+COMISSOES_AREA = {
+    "Saúde": {"CD": ["CSAUDE"], "SF": ["CAS"]},
+    "Educação": {"CD": ["CE"], "SF": ["CE"]},
+    "Esporte": {"CD": ["CESPO"], "SF": ["CE"]},
+}
+
+
+def comissao_da_area(casa: str, colegiado: str, area: str) -> bool:
+    nome = nome_colegiado(colegiado)
+    if nome.startswith("Plenário"):
+        return True
+    return any(nome.endswith(f"({s})") for s in COMISSOES_AREA.get(area, {}).get(casa, []))
 DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
 MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
          "agosto", "setembro", "outubro", "novembro", "dezembro"]

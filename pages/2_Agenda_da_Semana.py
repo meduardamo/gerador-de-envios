@@ -4,11 +4,14 @@ import datetime as dt
 import html as _html
 import json
 import os
+import unicodedata
 from pathlib import Path
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
 import gspread
 import streamlit as st
+import streamlit.components.v1 as components
 from google.oauth2.service_account import Credentials
 
 import agenda_semana_core as ag
@@ -34,10 +37,13 @@ st.markdown("""<style>
 .st-key-ag_entrega { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; gap: 12px !important; }
 .st-key-ag_entrega [data-testid="stMarkdownContainer"] p { margin-bottom: 0 !important; }
 .st-key-ag_novos { margin: 0 0 6px; }
-.st-key-ag_filtro { max-width: 720px; margin: 0 0 6px; }
+.st-key-ag_filtro { max-width: 1040px; margin: 0 0 6px; gap: 16px !important; }
+div.st-key-ag_filtro div[data-testid="stMultiSelect"] div[data-testid="stMultiSelectTagsContainer"] { flex-wrap: wrap !important; height: auto !important; max-height: none !important; overflow: visible !important; row-gap: 4px; padding: 4px 0 !important; }
+div.st-key-ag_filtro div[data-testid="stMultiSelect"] div:has(> div[data-testid="stMultiSelectTagsContainer"]), div.st-key-ag_filtro div[data-testid="stMultiSelect"] div:has(> div > div[data-testid="stMultiSelectTagsContainer"]) { height: auto !important; max-height: none !important; }
+.st-key-ag_barra .ag-coleta { font-size: 12.5px; color: #4A4A4A; line-height: 1.5; margin: 0 0 10px; }
 [data-testid="stMain"] div[data-testid="stForm"]:has(.st-key-ag_salvar_fim) { border: 0 !important; background: transparent !important; padding: 0 !important; }
 .st-key-ag_acoes, .st-key-ag_acoes_fim { gap: 10px !important; }
-.st-key-ag_acoes { margin-bottom: 6px; }
+.st-key-ag_acoes { margin: 10px 0 6px; padding-top: 14px; border-top: 1px solid #DADAD4; }
 [data-testid="stMain"] .st-key-ag_acoes [data-testid="stTextInput"] > label p { font-size: 0.72rem !important; font-weight: 600 !important; letter-spacing: .04em !important; text-transform: uppercase !important; color: #4E5A6E !important; }
 .st-key-ag_acoes_fim { margin-top: 18px; padding-top: 16px; border-top: 1px solid #DADAD4; }
 div[class*="st-key-ag_casa_"] [data-testid="stExpander"] details { border: 0 !important; background: transparent !important; }
@@ -251,25 +257,14 @@ def _a(texto: str, url: str | None) -> str:
 
 def _dia_extenso(iso: str) -> str:
     d = dt.date.fromisoformat(iso)
-    return f"{ag.DIAS_SEMANA[d.weekday()]} ({d:%d.%m})"
+    return f"{ag.DIAS_SEMANA[d.weekday()]} ({d:%d/%m})"
 
 
 # ========= SIDEBAR =========
 semanas = _semanas_salvas()
 
 with st.sidebar:
-    st.markdown(
-        '<div style="border-left:3px solid #962E4D;padding:10px 12px;'
-        'margin:10px 0 0 0;background:transparent;">'
-        '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;'
-        'color:#111;line-height:1.65;margin:0;">'
-        'Pauta da <strong>Câmara</strong> e do <strong>Senado</strong>, coletada toda segunda cedo. '
-        'Marque os clientes de cada item e gere a <strong>Agenda da Semana</strong> em Word, '
-        'um arquivo por cliente. A seleção salva vale para toda a equipe.'
-        '</p></div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
+    st.caption("Pauta coletada segunda e terça às 7h. A seleção salva vale para toda a equipe.")
     atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", width="stretch",
                           key="ag_atualizar",
                           help="A pauta muda ao longo da semana. Busca de novo na Câmara e no Senado.")
@@ -302,6 +297,7 @@ with st.container(horizontal=True, vertical_alignment="bottom", key="ag_barra"):
     else:
         seg, _ = ag.semana_seguinte(dt.date.today() - dt.timedelta(days=7))
         sid = seg.isoformat()
+    lugar_coleta = st.empty()  # preenchido depois que a semana é lida
 CLIS = ag.AREAS[area]
 
 # a busca na hora fica só na sessão; a do workflow de segunda fica salva no repositório
@@ -395,14 +391,15 @@ resumo(
     + [(n_marc, "com cliente marcado")]
 )
 clis = "".join(chip(f"{c} · {n}", "org") for c, n in por_cliente.items() if n)
-st.markdown(
-    '<div class="ag-clis"><span class="r">Seleção da equipe</span>'
-    + (clis or "<span>nenhum item marcado ainda</span>")
-    + "</div>",
+if clis:
+    st.markdown('<div class="ag-clis"><span class="r">Seleção da equipe</span>' + clis + "</div>",
+                unsafe_allow_html=True)
+lugar_coleta.markdown(
+    f'<p class="ag-coleta">Pauta coletada {esc(_quando(semana.get("coletadoEm", ""), artigo=True))}.'
+    + (f"<br>Sem pauta na {_lista_e([_curto(d) for d in dias_sem])}." if dias_sem else "")
+    + "</p>",
     unsafe_allow_html=True,
 )
-explica(f"Pauta coletada {_quando(semana.get('coletadoEm', ''), artigo=True)}."
-        + (f" Sem pauta na {_lista_e([_curto(d) for d in dias_sem])}." if dias_sem else ""))
 
 msgs_vindas = st.session_state.pop("ag_msg", [])
 for tipo, msg in msgs_vindas:
@@ -418,7 +415,7 @@ if pacote_pronto:
     extra = f" (atualização {dt.date.fromisoformat(atualizacao):%d.%m})" if atualizacao else ""
     secao("Word pronto",
           _plural(len(contagem), "cliente", "clientes")
-          + (f" · atualização {dt.date.fromisoformat(atualizacao):%d.%m}" if atualizacao else ""),
+          + (f" · atualização {dt.date.fromisoformat(atualizacao):%d/%m}" if atualizacao else ""),
           "#1F5E43",
           "Um documento por cliente, só com os itens marcados para ele. "
           "Item de reunião cancelada ou adiada fica de fora.")
@@ -476,7 +473,7 @@ def _item(it: dict, fio: bool) -> None:
 
 COR_CASA = {"CD": MARINHO, "SF": VINHO}
 
-secao("Pauta por dia", _plural(len(dias_com), "dia com reunião", "dias com reunião"), MARINHO,
+secao("Pauta por dia", "", MARINHO,
       "Marcar um cliente não grava nada nem recarrega a página. Salvar seleção grava só o que você mudou, "
       "por cima do que o resto da equipe já salvou, e registra no histórico. Salvar e gerar Word grava e "
       "monta um arquivo por cliente.")
@@ -485,7 +482,7 @@ secao("Pauta por dia", _plural(len(dias_com), "dia com reunião", "dias com reun
 so_novos = False
 if novos:
     so_novos = st.container(key="ag_novos").toggle(
-        f"Só {'o item novo' if len(novos) == 1 else f'os {len(novos)} itens novos'} desde a coleta de "
+        f"Só {'o item novo' if len(novos) == 1 else 'os itens novos'} desde a coleta de "
         f"{_quando(semana.get('coletadoSegunda', '')) or 'segunda'}",
         key=f"ag_so_novos_{sid}",
         help="Mostra só o que entrou na pauta depois de segunda. O Word sai só com esses itens, "
@@ -506,22 +503,74 @@ def _comissao(it: dict) -> str:
 
 comissoes = sorted({_comissao(i) for i in itens if not so_novos or i["id"] in novos},
                    key=lambda c: (c.rsplit(" · ", 1)[1] != "Câmara", c.startswith("Plenário"), c))
-filtro_key = f"ag_comissoes_{sid}"
+filtro_key = f"ag_comissoes_{sid}_{area}"
 if filtro_key in st.session_state:  # comissão que sumiu da pauta (ou da chave de novos) sai do filtro
     st.session_state[filtro_key] = [c for c in st.session_state[filtro_key] if c in comissoes]
-filtro = st.container(key="ag_filtro").multiselect(
-    "Comissões", comissoes, key=filtro_key, placeholder="Todas as comissões",
-    help="Mostra só as comissões escolhidas. Vazio mostra todas. O Word sai com tudo o que está marcado, "
-         "com ou sem filtro. Salve antes de trocar o filtro, senão as marcações não salvas se perdem.",
-)
+else:  # a página abre com as comissões da área e os Plenários
+    st.session_state[filtro_key] = sorted(
+        {_comissao(i) for i in itens if ag.comissao_da_area(i["casa"], i["colegiado"], area)} & set(comissoes),
+        key=comissoes.index)
 
-# Com a chave de novos ou o filtro, os outros itens saem da tela. O Streamlit esquece o valor
+
+def _sem_acento(t: str) -> str:
+    t = unicodedata.normalize("NFD", str(t or "").lower())
+    return " ".join("".join(c for c in t if not unicodedata.combining(c)).split())
+
+
+def _texto_item(it: dict) -> str:
+    partes = [it.get(k) or "" for k in ("titulo", "ementa", "autor", "relator", "rotulo", "reuniao")]
+    return _sem_acento(" ".join(partes + [ag.nome_colegiado(it["colegiado"])] + list(it.get("convidados") or [])))
+
+
+with st.container(horizontal=True, vertical_alignment="top", key="ag_filtro"):
+    busca = st.text_input(
+        "Buscar", key=f"ag_busca_{sid}", placeholder="número, autor ou palavra da ementa", width=300,
+        help="Procura no número, na ementa, na autoria, na relatoria, nos convidados e no nome da comissão. "
+             "Aperte Enter. Salve antes de buscar, senão as marcações não salvas se perdem.",
+    )
+    filtro = st.multiselect(
+        "Comissões", comissoes, key=filtro_key, placeholder="Todas as comissões",
+        help="Abre com as comissões da área e os Plenários. Limpe para ver a pauta inteira. "
+             "O Word sai com tudo o que está marcado, com ou sem filtro. Salve antes de trocar o filtro, "
+             "senão as marcações não salvas se perdem.",
+    )
+termos = _sem_acento(busca).split()
+
+# Com a chave de novos, o filtro ou a busca, os outros itens saem da tela. O Streamlit esquece o valor
 # de widget que não foi desenhado, então quem volta à tela nasce de novo da seleção salva.
-visiveis = [i for i in itens if (not so_novos or i["id"] in novos) and (not filtro or _comissao(i) in filtro)]
+universo = [i for i in itens if not so_novos or i["id"] in novos]
+visiveis = [i for i in universo if (not filtro or _comissao(i) in filtro)
+            and all(t in _texto_item(i) for t in termos)]
+if len(visiveis) < len(universo):
+    # a busca também acha o que está fora das comissões escolhidas; avisa para não parecer que não existe
+    achados_fora = sum(1 for i in universo if filtro and _comissao(i) not in filtro
+                       and all(t in _texto_item(i) for t in termos)) if termos else 0
+    explica(f"Mostrando {len(visiveis)} de {_plural(len(universo), 'item', 'itens')}."
+            + (f" A busca acha mais {achados_fora} em outras comissões; limpe o filtro de comissões para ver."
+               if achados_fora else "")
+            + " O Word sai com tudo o que está marcado, inclusive o que está fora da tela.")
 for it in visiveis:
     if _chave(sid, area, it["id"]) not in st.session_state:
         st.session_state[_chave(sid, area, it["id"])] = _da_area(base.get(it["id"]), area)
 dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
+
+# O nome fica num cookie do navegador e volta preenchido na próxima visita.
+COOKIE_QUEM = "ag_quem"
+if "ag_quem" not in st.session_state:
+    try:
+        _cookie = st.context.cookies.get(COOKIE_QUEM)
+    except Exception:
+        _cookie = None
+    if isinstance(_cookie, str) and _cookie:
+        st.session_state["ag_quem"] = unquote(_cookie)
+_gravar_quem = st.session_state.pop("ag_gravar_quem", None)
+if _gravar_quem is not None:
+    components.html(
+        "<script>window.parent.document.cookie = " + json.dumps(COOKIE_QUEM + "=")
+        + " + encodeURIComponent(" + json.dumps(_gravar_quem) + ") + '; path=/; max-age=31536000; SameSite=Lax';"
+        + "</script>",
+        height=0,
+    )
 
 # Tudo dentro de um formulário: marcar um cliente não recarrega a página.
 with st.form("ag_form", border=False):
@@ -532,8 +581,8 @@ with st.form("ag_form", border=False):
         gerar = st.form_submit_button("Salvar e gerar Word", type="primary", icon=":material/description:")
 
     if not dias_vis:
-        vazio("Nenhum item para mostrar. Limpe o filtro de comissões ou desligue a chave de itens novos "
-              "para ver a pauta completa.")
+        vazio("Nenhum item para mostrar. Limpe a busca e o filtro de comissões ou desligue a chave de "
+              "itens novos para ver a pauta completa.")
     else:
         abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in visiveis if i['dia'] == d)}" for d in dias_vis])
         for aba, dia in zip(abas, dias_vis):
@@ -581,6 +630,8 @@ if salvar or gerar:
     try:
         login = st.session_state.get("name") or st.session_state.get("username") or ""
         nome = (st.session_state.get("ag_quem") or "").strip()
+        if nome:
+            st.session_state["ag_gravar_quem"] = nome
         selecao, desmarcados = _salvar_selecao(sid, semana, base, atual, f"{login} ({nome})" if nome else login)
         msgs.append(("success", "Seleção salva. A tela mostra também o que o resto da equipe salvou."))
         if desmarcados:
