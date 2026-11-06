@@ -34,6 +34,7 @@ st.markdown("""<style>
 .st-key-ag_entrega { background: #fff; border: 1px solid #DADAD4; border-radius: 8px; padding: 16px 20px; gap: 12px !important; }
 .st-key-ag_entrega [data-testid="stMarkdownContainer"] p { margin-bottom: 0 !important; }
 .st-key-ag_novos { margin: 0 0 6px; }
+.st-key-ag_filtro { max-width: 720px; margin: 0 0 6px; }
 [data-testid="stMain"] div[data-testid="stForm"]:has(.st-key-ag_salvar_fim) { border: 0 !important; background: transparent !important; padding: 0 !important; }
 .st-key-ag_acoes, .st-key-ag_acoes_fim { gap: 10px !important; }
 .st-key-ag_acoes { margin-bottom: 6px; }
@@ -480,9 +481,29 @@ if novos:
         explica("A tela e o Word mostram só os itens novos. Os outros continuam marcados; "
                 "para ver ou gerar a agenda completa, desligue a chave.")
 
-# Com a chave de novos ligada, os outros itens saem da tela. O Streamlit esquece o valor
+# ── filtro por comissão (só a tela; o Word continua com tudo o que está marcado) ──
+def _comissao(it: dict) -> str:
+    nome = ag.nome_colegiado(it["colegiado"])
+    if len(nome) > 80:  # comissão especial traz a ementa inteira no nome; fica o começo e a sigla
+        sigla = nome[nome.rfind(" ("):] if nome.endswith(")") else ""
+        nome = nome[:70].rsplit(" ", 1)[0] + "…" + sigla
+    return f'{nome} · {"Câmara" if it["casa"] == "CD" else "Senado"}'
+
+
+comissoes = sorted({_comissao(i) for i in itens if not so_novos or i["id"] in novos},
+                   key=lambda c: (c.rsplit(" · ", 1)[1] != "Câmara", c.startswith("Plenário"), c))
+filtro_key = f"ag_comissoes_{sid}"
+if filtro_key in st.session_state:  # comissão que sumiu da pauta (ou da chave de novos) sai do filtro
+    st.session_state[filtro_key] = [c for c in st.session_state[filtro_key] if c in comissoes]
+filtro = st.container(key="ag_filtro").multiselect(
+    "Comissões", comissoes, key=filtro_key, placeholder="Todas as comissões",
+    help="Mostra só as comissões escolhidas. Vazio mostra todas. O Word sai com tudo o que está marcado, "
+         "com ou sem filtro. Salve antes de trocar o filtro, senão as marcações não salvas se perdem.",
+)
+
+# Com a chave de novos ou o filtro, os outros itens saem da tela. O Streamlit esquece o valor
 # de widget que não foi desenhado, então quem volta à tela nasce de novo da seleção salva.
-visiveis = [i for i in itens if not so_novos or i["id"] in novos]
+visiveis = [i for i in itens if (not so_novos or i["id"] in novos) and (not filtro or _comissao(i) in filtro)]
 for it in visiveis:
     if _chave(sid, area, it["id"]) not in st.session_state:
         st.session_state[_chave(sid, area, it["id"])] = _da_area(base.get(it["id"]), area)
@@ -497,7 +518,8 @@ with st.form("ag_form", border=False):
         gerar = st.form_submit_button("Salvar e gerar Word", type="primary", icon=":material/description:")
 
     if not dias_vis:
-        vazio("Nenhum item para mostrar. Desligue a chave de itens novos para ver a pauta completa.")
+        vazio("Nenhum item para mostrar. Limpe o filtro de comissões ou desligue a chave de itens novos "
+              "para ver a pauta completa.")
     else:
         abas = st.tabs([f"{_dia_extenso(d)} · {sum(1 for i in visiveis if i['dia'] == d)}" for d in dias_vis])
         for aba, dia in zip(abas, dias_vis):
