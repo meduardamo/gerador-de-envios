@@ -26,7 +26,12 @@ from xml.sax.saxutils import escape
 
 import requests
 
-CLIENTES = ["IEPS", "Vital", "Umane", "IDEC", "Infinis", "UNFPA", "Coletivo"]
+# Cada equipe vê na página só os clientes da sua área. A pauta coletada é a mesma para todas.
+AREAS = {
+    "Saúde": ["IEPS", "Vital", "Umane", "IDEC", "Infinis", "UNFPA", "Coletivo"],
+    "Educação": ["FMCSV", "ISG", "IU", "Impulso", "Lemann", "MegaEdu", "Itaú", "REMS"],
+}
+CLIENTES = [c for cs in AREAS.values() for c in cs]
 DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
 MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
          "agosto", "setembro", "outubro", "novembro", "dezembro"]
@@ -765,15 +770,17 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, dias: list[str], itens
 
 
 def gerar_pacote(modelo: bytes, semana: dict, selecao: dict[str, list[str]],
-                 so_ids: set[str] | None = None, atualizacao: str = "") -> tuple[bytes, dict[str, bytes], dict[str, int]]:
+                 so_ids: set[str] | None = None, atualizacao: str = "",
+                 clientes: list[str] | None = None) -> tuple[bytes, dict[str, bytes], dict[str, int]]:
     """Um .docx por cliente que tenha ao menos um item marcado, soltos e num zip.
 
     Com `so_ids` (atualização de terça), entram só esses itens e só os dias que têm algum deles.
+    Com `clientes`, só esses (a área de quem gerou).
     """
     contagem, arquivos = {}, {}
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for cli in CLIENTES:
+        for cli in clientes or CLIENTES:
             itens = [i for i in semana["itens"] if cli in selecao.get(i["id"], []) and not i.get("situacao")
                      and (so_ids is None or i["id"] in so_ids)]
             if not itens:

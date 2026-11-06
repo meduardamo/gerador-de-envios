@@ -201,19 +201,30 @@ def _salvar_selecao(sid: str, semana: dict, base: dict, atual: dict, quem: str) 
     return {k: [c for c in ag.CLIENTES if c in v] for k, v in salvo.items() if v}, desmarcados
 
 
-def _chave(sid: str, item_id: str) -> str:
-    return f"ag_{sid}_{item_id}"
+# A caixa de cada item tem uma chave por área: ao trocar de área, a caixa da outra
+# área nasce de novo da seleção salva, só com os clientes dela.
+def _chave(sid: str, area: str, item_id: str) -> str:
+    return f"ag_{sid}_{area}_{item_id}"
 
 
-def _marcar_caixas(sid: str, itens: list[dict], selecao: dict) -> None:
+def _da_area(clientes, area: str) -> list[str]:
+    return [c for c in ag.AREAS[area] if c in (clientes or [])]
+
+
+def _marcar_caixas(sid: str, area: str, itens: list[dict], selecao: dict) -> None:
     for it in itens:
-        st.session_state[_chave(sid, it["id"])] = list(selecao.get(it["id"], []))
+        for a in ag.AREAS:
+            st.session_state.pop(_chave(sid, a, it["id"]), None)
+        st.session_state[_chave(sid, area, it["id"])] = _da_area(selecao.get(it["id"]), area)
 
 
-def _selecao_na_tela(sid: str, itens: list[dict], base: dict) -> dict[str, list[str]]:
+def _selecao_na_tela(sid: str, area: str, itens: list[dict], base: dict) -> dict[str, list[str]]:
+    """O que está na tela para os clientes da área, somado aos clientes das outras áreas como estavam salvos."""
     out = {}
     for it in itens:
-        marcados = [c for c in ag.CLIENTES if c in (st.session_state.get(_chave(sid, it["id"])) or [])]
+        tela = set(_da_area(st.session_state.get(_chave(sid, area, it["id"])), area))
+        outras = {c for c in base.get(it["id"], []) if c not in ag.AREAS[area]}
+        marcados = [c for c in ag.CLIENTES if c in tela | outras]
         if marcados:
             out[it["id"]] = marcados
     return out
@@ -278,12 +289,19 @@ def _plural(n: int, um: str, varios: str) -> str:
 cabecalho("Agenda da Semana",
           "Pauta da Câmara e do Senado: marque os clientes de cada item e gere a agenda em Word, um arquivo por cliente.")
 
-if semanas:
-    with st.container(horizontal=True, vertical_alignment="bottom", key="ag_barra"):
+AREAS = list(ag.AREAS)
+# ?area=educacao no endereço abre direto na área (para cada equipe salvar o seu link)
+_area_url = str(st.query_params.get("area", "")).lower()
+_area_ini = next((i for i, a in enumerate(AREAS) if a.lower().startswith(_area_url[:3])), 0) if _area_url else 0
+with st.container(horizontal=True, vertical_alignment="bottom", key="ag_barra"):
+    area = st.selectbox("Área", AREAS, index=_area_ini, key="ag_area", width=200,
+                        help="Mostra só os clientes da área. A pauta é a mesma para todas.")
+    if semanas:
         sid = st.selectbox("Semana", semanas, format_func=_rotulo_semana, key="ag_semana", width=360)
-else:
-    seg, _ = ag.semana_seguinte(dt.date.today() - dt.timedelta(days=7))
-    sid = seg.isoformat()
+    else:
+        seg, _ = ag.semana_seguinte(dt.date.today() - dt.timedelta(days=7))
+        sid = seg.isoformat()
+CLIS = ag.AREAS[area]
 
 # a busca na hora fica só na sessão; a do workflow de segunda fica salva no repositório
 vivas = st.session_state.setdefault("ag_vivas", {})
@@ -322,7 +340,7 @@ chave_base = f"ag_base_{sid}"
 aplicar = st.session_state.pop("ag_aplicar", None)
 if aplicar and aplicar[0] == sid:
     st.session_state[chave_base] = aplicar[1]
-    _marcar_caixas(sid, itens, aplicar[1])
+    _marcar_caixas(sid, area, itens, aplicar[1])
 elif chave_base not in st.session_state or recarregar or atualizar:
     try:
         salvo = _ler_selecao(sid)
@@ -331,14 +349,14 @@ elif chave_base not in st.session_state or recarregar or atualizar:
         st.warning(f"Não consegui ler a seleção salva da equipe ({e}). "
                    "Use Ver seleção da equipe, na barra lateral, para tentar de novo.")
     st.session_state[chave_base] = salvo
-    _marcar_caixas(sid, itens, salvo)
+    _marcar_caixas(sid, area, itens, salvo)
 
 # ── resumo da semana ─────────────────────────────────────────────────────────
 dias_com = [d for d in semana["dias"] if any(i["dia"] == d for i in itens)]
 dias_sem = [d for d in semana["dias"] if d not in dias_com]
 base = st.session_state.get(chave_base, {})
-por_cliente = {c: sum(1 for v in base.values() if c in v) for c in ag.CLIENTES}
-n_marc = sum(1 for v in base.values() if v)
+por_cliente = {c: sum(1 for v in base.values() if c in v) for c in CLIS}
+n_marc = sum(1 for v in base.values() if _da_area(v, area))
 
 
 def _lista_e(xs: list[str]) -> str:
@@ -352,7 +370,7 @@ def _curto(iso: str) -> str:
 ativos = [i for i in itens if not i.get("situacao")]
 fora = len(itens) - len(ativos)
 novos = ag.novos_desde_segunda(semana)
-pacote_pronto = bool(st.session_state.get("ag_pacote")) and st.session_state["ag_pacote"][0] == sid
+pacote_pronto = bool(st.session_state.get("ag_pacote")) and st.session_state["ag_pacote"][:2] == (sid, area)
 
 
 resumo(
@@ -381,7 +399,7 @@ elif any(t == "success" for t, _ in msgs_vindas):
     st.toast("Seleção salva.", icon=":material/check:")
 
 if pacote_pronto:
-    _, pacote, arquivos, contagem, atualizacao = st.session_state["ag_pacote"]
+    _, _, pacote, arquivos, contagem, atualizacao = st.session_state["ag_pacote"]
     extra = f" (atualização {dt.date.fromisoformat(atualizacao):%d.%m})" if atualizacao else ""
     secao("Word pronto",
           _plural(len(contagem), "cliente", "clientes")
@@ -402,7 +420,7 @@ if pacote_pronto:
         explica("Ou baixe só o de um cliente. O número é a quantidade de itens no arquivo.")
         # um botão por cliente, para baixar só o documento de um
         with st.container(key="ag_por_cliente"):
-            cols = st.columns(len(ag.CLIENTES))
+            cols = st.columns(len(CLIS))
             for col, (nome, dados), (cli, n) in zip(cols, arquivos.items(), contagem.items()):
                 col.download_button(f"{cli} · {n}", data=dados, file_name=nome, width="stretch",
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -432,7 +450,7 @@ def _item(it: dict, fio: bool) -> None:
             unsafe_allow_html=True,
         )
     with escolha:
-        st.pills("Clientes", ag.CLIENTES, selection_mode="multi", key=_chave(sid, it["id"]),
+        st.pills("Clientes", CLIS, selection_mode="multi", key=_chave(sid, area, it["id"]),
                  label_visibility="collapsed")
         if it.get("situacao"):
             st.markdown(f'<p class="ag-nota">Reunião {esc(it["situacao"].lower())}, fica fora do Word.</p>',
@@ -466,8 +484,8 @@ if novos:
 # de widget que não foi desenhado, então quem volta à tela nasce de novo da seleção salva.
 visiveis = [i for i in itens if not so_novos or i["id"] in novos]
 for it in visiveis:
-    if _chave(sid, it["id"]) not in st.session_state:
-        st.session_state[_chave(sid, it["id"])] = list(base.get(it["id"], []))
+    if _chave(sid, area, it["id"]) not in st.session_state:
+        st.session_state[_chave(sid, area, it["id"])] = _da_area(base.get(it["id"]), area)
 dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
 
 # Tudo dentro de um formulário: marcar um cliente não recarrega a página.
@@ -523,7 +541,7 @@ if salvar or gerar:
     base = st.session_state.get(chave_base, {})
     ids_vis = {i["id"] for i in visiveis}
     # item fora da tela fica como estava salvo
-    atual = {k: v for k, v in base.items() if k not in ids_vis} | _selecao_na_tela(sid, visiveis, base)
+    atual = {k: v for k, v in base.items() if k not in ids_vis} | _selecao_na_tela(sid, area, visiveis, base)
     try:
         login = st.session_state.get("name") or st.session_state.get("username") or ""
         nome = (st.session_state.get("ag_quem") or "").strip()
@@ -540,7 +558,7 @@ if salvar or gerar:
                      "na sua tela. Tente salvar de novo em alguns minutos."))
     st.session_state.pop("ag_pacote", None)
     if gerar:
-        if not selecao:
+        if not any(_da_area(v, area) for v in selecao.values()):
             msgs.append(("warning", "Nenhum item marcado. Marque ao menos um cliente em algum item e gere de novo."))
         elif not MODELO.exists():
             msgs.append(("error", "O modelo do Word não foi encontrado. Avise a equipe de dados."))
@@ -551,10 +569,10 @@ if salvar or gerar:
                 atualizacao = dt.date(int(sid[:4]), int(mes), int(dia)).isoformat()
             pacote, arquivos, contagem = ag.gerar_pacote(MODELO.read_bytes(), semana, selecao,
                                                          so_ids=novos if so_novos else None,
-                                                         atualizacao=atualizacao)
+                                                         atualizacao=atualizacao, clientes=CLIS)
             if contagem:
-                st.session_state["ag_pacote"] = (sid, pacote, arquivos, contagem, atualizacao)
-            sairam = [i["titulo"] for i in itens if i.get("situacao") and selecao.get(i["id"])]
+                st.session_state["ag_pacote"] = (sid, area, pacote, arquivos, contagem, atualizacao)
+            sairam = [i["titulo"] for i in itens if i.get("situacao") and _da_area(selecao.get(i["id"]), area)]
             if sairam:
                 msgs.append(("info", f"Ficaram fora do Word por reunião cancelada ou adiada: {_lista_e(sairam)}."))
             if not contagem:
