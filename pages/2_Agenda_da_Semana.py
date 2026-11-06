@@ -368,6 +368,20 @@ def _curto(iso: str) -> str:
     return ag.DIAS_SEMANA[dt.date.fromisoformat(iso).weekday()].split("-")[0].lower()
 
 
+def _quando(coleta: str, artigo: bool = False) -> str:
+    """'03/11 13:44' -> 'terça-feira, 03/11, às 13:44' (com artigo: 'na terça-feira, ...')."""
+    try:
+        data, hora = coleta.split()
+        dia, mes = (int(x) for x in data.split("/"))
+        ano = int(sid[:4]) + (1 if mes < int(sid[5:7]) else 0)
+        d = dt.date(ano, mes, dia)
+    except (ValueError, AttributeError):
+        return coleta
+    nome = ag.DIAS_SEMANA[d.weekday()].lower()
+    txt = f"{nome}, {data}, às {hora}"
+    return (("no " if d.weekday() >= 5 else "na ") + txt) if artigo else txt
+
+
 ativos = [i for i in itens if not i.get("situacao")]
 fora = len(itens) - len(ativos)
 novos = ag.novos_desde_segunda(semana)
@@ -387,7 +401,7 @@ st.markdown(
     + "</div>",
     unsafe_allow_html=True,
 )
-explica(f"Pauta coletada em {semana.get('coletadoEm', '')}."
+explica(f"Pauta coletada {_quando(semana.get('coletadoEm', ''), artigo=True)}."
         + (f" Sem pauta na {_lista_e([_curto(d) for d in dias_sem])}." if dias_sem else ""))
 
 msgs_vindas = st.session_state.pop("ag_msg", [])
@@ -472,7 +486,7 @@ so_novos = False
 if novos:
     so_novos = st.container(key="ag_novos").toggle(
         f"Só {'o item novo' if len(novos) == 1 else f'os {len(novos)} itens novos'} desde a coleta de "
-        f"{semana.get('coletadoSegunda', 'segunda')}",
+        f"{_quando(semana.get('coletadoSegunda', '')) or 'segunda'}",
         key=f"ag_so_novos_{sid}",
         help="Mostra só o que entrou na pauta depois de segunda. O Word sai só com esses itens, "
              "num arquivo de atualização.",
