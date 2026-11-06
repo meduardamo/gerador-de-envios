@@ -40,7 +40,9 @@ st.markdown("""<style>
 .st-key-ag_filtro { max-width: 1040px; margin: 0 0 6px; gap: 16px !important; }
 div.st-key-ag_filtro div[data-testid="stMultiSelect"] div[data-testid="stMultiSelectTagsContainer"] { flex-wrap: wrap !important; height: auto !important; max-height: none !important; overflow: visible !important; row-gap: 4px; padding: 4px 0 !important; }
 div.st-key-ag_filtro div[data-testid="stMultiSelect"] div:has(> div[data-testid="stMultiSelectTagsContainer"]), div.st-key-ag_filtro div[data-testid="stMultiSelect"] div:has(> div > div[data-testid="stMultiSelectTagsContainer"]) { height: auto !important; max-height: none !important; }
-.st-key-ag_barra .ag-coleta { font-size: 12.5px; color: #4A4A4A; line-height: 1.5; margin: 0 0 10px; }
+p.ag-sb { font-size: 12px !important; color: #4A4A4A !important; line-height: 1.55 !important; margin: 0 0 12px !important; }
+/* texto da coleta centrado na altura das caixas de Área e Semana (o -16px do markdown é compensado) */
+.st-key-ag_barra p.ag-coleta { font-size: 12.5px; color: #4A4A4A; line-height: 1.5; height: 38px; margin: 0 0 17px !important; display: flex; flex-direction: column; justify-content: center; }
 [data-testid="stMain"] div[data-testid="stForm"]:has(.st-key-ag_salvar_fim) { border: 0 !important; background: transparent !important; padding: 0 !important; }
 .st-key-ag_acoes, .st-key-ag_acoes_fim { gap: 10px !important; }
 .st-key-ag_acoes { margin: 10px 0 6px; padding-top: 14px; border-top: 1px solid #DADAD4; }
@@ -264,7 +266,9 @@ def _dia_extenso(iso: str) -> str:
 semanas = _semanas_salvas()
 
 with st.sidebar:
-    st.caption("Pauta coletada segunda e terça às 7h. A seleção salva vale para toda a equipe.")
+    # st.caption na sidebar ganha fio em cima (CSS comum, feito para a linha do usuário); aqui é texto solto
+    st.markdown('<p class="ag-sb">Pauta coletada segunda e terça às 7h. '
+                'A seleção salva vale para toda a equipe.</p>', unsafe_allow_html=True)
     atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", width="stretch",
                           key="ag_atualizar",
                           help="A pauta muda ao longo da semana. Busca de novo na Câmara e no Senado.")
@@ -395,8 +399,8 @@ if clis:
     st.markdown('<div class="ag-clis"><span class="r">Seleção da equipe</span>' + clis + "</div>",
                 unsafe_allow_html=True)
 lugar_coleta.markdown(
-    f'<p class="ag-coleta">Pauta coletada {esc(_quando(semana.get("coletadoEm", ""), artigo=True))}.'
-    + (f"<br>Sem pauta na {_lista_e([_curto(d) for d in dias_sem])}." if dias_sem else "")
+    f'<p class="ag-coleta"><span>Pauta coletada {esc(_quando(semana.get("coletadoEm", ""), artigo=True))}.</span>'
+    + (f"<span>Sem pauta na {_lista_e([_curto(d) for d in dias_sem])}.</span>" if dias_sem else "")
     + "</p>",
     unsafe_allow_html=True,
 )
