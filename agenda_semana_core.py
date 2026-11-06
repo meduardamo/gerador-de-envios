@@ -29,7 +29,8 @@ import requests
 # Cada equipe vê na página só os clientes da sua área. A pauta coletada é a mesma para todas.
 AREAS = {
     "Saúde": ["IEPS", "Vital", "Umane", "IDEC", "Infinis", "UNFPA", "Coletivo"],
-    "Educação": ["FMCSV", "ISG", "IU", "Impulso", "Lemann", "MegaEdu", "Itaú", "REMS"],
+    "Educação": ["FMCSV", "ISG", "IU", "Impulso", "Lemann", "MegaEdu", "Fundação Itaú"],
+    "Esporte": ["REMS"],
 }
 CLIENTES = [c for cs in AREAS.values() for c in cs]
 DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
