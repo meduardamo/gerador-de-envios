@@ -5,7 +5,7 @@ corrente (ou a seguinte, se rodar no fim de semana); com AAAA-MM-DD, a semana
 que começa na segunda daquela data.
 
 A rodada de segunda (ou anterior) fixa a foto da pauta em `idsSegunda`; as rodadas
-seguintes da mesma semana (terça) mantêm a foto, e a página marca como novo o que
+seguintes da mesma semana (terça e quarta) mantêm a foto, e a página marca como novo o que
 não estava nela.
 """
 import datetime as dt
