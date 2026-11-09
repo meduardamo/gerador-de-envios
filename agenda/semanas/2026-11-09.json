@@ -27,7 +27,7 @@
     "Senadora Teresa Leitão, Autora do PL 1010/2025, que estabelece normas gerais de caráter nacional para a educação midiática e digital.",
     "Senador Alessandro Vieira",
     "Kátia Schweickardt, Secretária de Educação Básica do Ministério da Educação",
-    "David Almansa Bernardo, Diretor no Departamento de Direitos na Rede e Educação Midiática da Secretaria de Políticas Digitais da Presidência da República.",
+    "João Brant, Secretário de Políticas Digitais da Secretaria de Comunicação Social da Presidência da República",
     "Fernando Oliveira Paulino, Professor na Universidade de Brasília",
     "Carla Azevedo de Aragão, Diretora de Inovação e Tecnologia do Instituto Anísio Teixeira",
     "Cristiane Parente de Sá Barreto, Sócia fundadora da Associação Brasileira de Pesquisadores e Profissionais em Educomunicação - ABPEducom"
@@ -3459,7 +3459,7 @@
    "rotulo": "Deliberativa",
    "titulo": "REQ 89/2026 - CI",
    "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/175866",
-   "ementa": "Requer uma cópia do processo de desestatização da Rota Agro Central – BR-070/MT, BR-174/MT e BR-364/MT/RO.",
+   "ementa": "Requer cópia integral dos autos do Processo TC nº 013.045/2025-3 e do Acórdão 2205/2026 - Plenário, que tratam do acompanhamento do processo de desestatização da Rota Agro Central – BR-070/MT, BR-174/MT e BR-364/MT/RO.",
    "autor": "Jaime Bagattoli (PL/RO)",
    "relator": "",
    "parecer": "",
@@ -3756,10 +3756,30 @@
    "convidados": [
     "Eduardo Vedor de Paula, Coordenador do Laboratório de Geoprocessamento e Estudos Ambientais da Universidade Federal do Paraná - UFPR",
     "Sávio Túlio Oselieri Raeder, Analista em Ciência e Tecnologia da Coordenação-Geral de Ciência do Clima do Ministério da Ciência, Tecnologia e Inovação – MCTI",
-    "Lincoln Muniz Alves, Coordenador-Geral de Integração Multinível e Análise de Risco do Ministério do Meio Ambiente e Mudança do Clima - MMA",
+    "Pedro Alexandre Rodrigues Christ, Analista Ambiental e Chefe de divisão do Ministério do Meio Ambiente e Mudança do Clima - MMA",
     "Luiz Alberto Arend Filho, Coordenador de Soluções Baseadas na Natureza do Departamento de Mitigação e Prevenção de Risco da Secretaria Nacional de Periferias do Ministério das Cidades - MCID",
     "Thaís Araújo Cavendish, Analista Técnica de Políticas Sociais do Ministério da Saúde - MS"
    ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-10",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "COMISSÃO MISTA DA MEDIDA PROVISÓRIA N° 1376, DE 2026 (CMMPV 1376/2026)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/2872/reuniao/15027",
+   "situacao": "",
+   "reuniao": "Reunião Reunião",
+   "id": "SF-15027-112937",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "MPV 1376/2026",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/175190",
+   "ementa": "Autoriza a criação de linhas de crédito para composição de dívidas para liquidação ou amortização de operações de crédito rural e de Cédulas de Produto Rural e autoriza a participação da União em fundo garantidor destinado à cobertura de operações de crédito rural contratadas por produtores rurais afetados por eventos climáticos adversos.",
+   "autor": "Presidência da República",
+   "relator": "Paulo Pimenta (PT/RS)",
+   "parecer": "",
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -8698,7 +8718,7 @@
    "autor": "Rodrigo Cunha (UNIÃO/AL)",
    "relator": "Paulo Paim (PT/RS)",
    "parecer": "Pela aprovação nos termos do substitutivo que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/aabef771-d0a7-4a78-9785-5cf161b75e25"
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/ad1983d6-d940-4d35-a48c-802859fea85b"
   },
   {
    "casa": "SF",
@@ -9247,6 +9267,32 @@
    "dia": "2026-11-11",
    "ordem": "14:00",
    "hora": "14h",
+   "colegiado": "COMISSÃO DE EDUCAÇÃO E CULTURA (CE)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/47/reuniao/15026",
+   "situacao": "",
+   "reuniao": "Audiência Pública Interativa",
+   "id": "SF-15026-19352",
+   "tipo": "audiencia",
+   "rotulo": "Audiência Pública Interativa",
+   "titulo": "Audiência Pública Interativa",
+   "tituloLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/47/reuniao/15026",
+   "ementa": "Discutir a instituição do Dia Nacional da Cachaça Brasileira.",
+   "convidados": [
+    "Sr. Laudemir André Muller, Presidente da Agência Brasileira de Promoção de Exportações e Investimentos (ApexBrasil)",
+    "Sr. Leonardo Barci Castriota, Representante do Conselho Internacional de Monumentos e Sítios (ICOMOS)",
+    "Sra. Andressa Beig Jordão, Diretora Executiva do do Instituto Brasileiro da Cachaça (IBRAC) e representante da Associação dos Produtores e Amigos da Cachaça do Rio de Janeiro (APACERJ)",
+    "Sr. Lúcio Gama Freire, Presidente da Associação dos Produtores e Amigos da Cachaça Artesanal de Paraty",
+    "Sr. José Emílio Bertazi, Diretor Superintendente da Companhia Müller de Bebidas",
+    "Sra. Fernanda Cesar de Morais, Representante comercial da Indústria e Comércio de Bebidas Seleta",
+    "Sr. Divino Édson Cesar de Morais, Representante comercial da Indústria e Comércio de Bebidas Seleta",
+    "Sra. Ariani Missiato, Diretora-Executiva da Cachaça Jamel Indústria e Comércio"
+   ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-11",
+   "ordem": "14:00",
+   "hora": "14h",
    "colegiado": "PLENÁRIO",
    "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594175",
    "situacao": "",
@@ -9313,8 +9359,10 @@
    "ementa": "Celebrar o Centenário do Movimento Pestalozziano no Brasil."
   }
  ],
- "erros": [],
- "coletadoEm": "09/11 10:11",
+ "erros": [
+  "Câmara: 504 Server Error: Gateway Timeout for url: https://dadosabertos.camara.leg.br/api/v2/deputados/208297 (mantida a pauta da coleta de 09/11 10:11)"
+ ],
+ "coletadoEm": "09/11 16:23",
  "idsSegunda": [
   "SF-14985-19306",
   "SF-PLEN-562781",
@@ -9772,7 +9820,9 @@
   "CD-83160-2538288",
   "CD-83160-2598960",
   "CD-83160-2298516",
-  "CD-83160-2594589"
+  "CD-83160-2594589",
+  "SF-15027-112937",
+  "SF-15026-19352"
  ],
  "coletadoSegunda": "09/11 10:04"
 }
