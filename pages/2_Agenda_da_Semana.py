@@ -296,11 +296,11 @@ _area_ini = next((i for i, a in enumerate(AREAS) if a.lower().startswith(_area_u
 with st.container(horizontal=True, vertical_alignment="bottom", key="ag_barra"):
     area = st.selectbox("Área", AREAS, index=_area_ini, key="ag_area", width=200,
                         help="Mostra só os clientes da área. A pauta é a mesma para todas.")
-    if semanas:
-        sid = st.selectbox("Semana", semanas, format_func=_rotulo_semana, key="ag_semana", width=360)
-    else:
-        seg, _ = ag.semana_seguinte(dt.date.today() - dt.timedelta(days=7))
-        sid = seg.isoformat()
+    # a semana corrente aparece sempre, mesmo sem coleta salva: se a das 7h falhar,
+    # Buscar pauta de novo traz a pauta dela (e não a da semana anterior)
+    _corrente = ag.semana_seguinte(dt.datetime.now(ZoneInfo("America/Recife")).date() - dt.timedelta(days=7))[0].isoformat()
+    _opcoes = sorted(set(semanas) | {_corrente}, reverse=True)
+    sid = st.selectbox("Semana", _opcoes, format_func=_rotulo_semana, key="ag_semana", width=360)
     lugar_coleta = st.empty()  # preenchido depois que a semana é lida
 CLIS = ag.AREAS[area]
 
