@@ -200,6 +200,7 @@ def info(texto: str) -> str:
 GRUPOS = {
     "Gerador de Envios": "Dia a dia",
     "Gerador de Resumos": "Dia a dia",
+    "Notícias": "Dia a dia",
     "Agenda da Semana": "Entrega semanal",
     "Síntese da Semana": "Entrega semanal · Saúde",
     "Automações": "Consulta",
