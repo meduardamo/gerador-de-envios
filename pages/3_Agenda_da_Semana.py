@@ -535,7 +535,7 @@ def _item(it: dict, fio: bool) -> None:
         st.markdown(
             f'<div class="{"ag-fora" if it.get("situacao") else ""}">'
             + (f'<div class="ag-top">{chip("Novo desde segunda", "alerta")}</div>' if it["id"] in novos else "")
-            + f'<p class="ag-tit" title="{esc(titulo)}">{_a(titulo, it.get("tituloLink"))}</p>'
+            + f'<p class="ag-tit" title="{esc(titulo)}">{_a(titulo, it.get("tituloLink") or it.get("reuniaoLink"))}</p>'
             + (f'<p class="ag-ementa" title="{esc(ementa)}">{esc(ementa)}</p>' if ementa else "")
             + (f'<p class="ag-meta">{" · ".join(meta)}</p>' if meta else "")
             + (f'<p class="ag-conv" title="{esc(conv)}"><b>Convidados:</b> {esc(conv)}</p>' if conv else "")

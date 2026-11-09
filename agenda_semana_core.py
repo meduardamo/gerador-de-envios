@@ -301,9 +301,10 @@ def coletar_camara(ini: dt.date, fim: dt.date) -> list[dict]:
                 parecer = _maiuscula(re.sub(r"^Parecer\b.*?Dep\.\s*[^()]+\([^)]*\)[,:]?\s*", "", _limpa(p["textoParecer"])))
                 parecer_link = (prls.get(prop.get("id")) or {}).get("urlInteiroTeor") or ""
             iid = _id_unico(f"CD-{ev['id']}-{alvo.get('id')}", usados)
+            alvo_id = alvo.get("id")
             itens.append({**base, "id": iid, "tipo": "materia", "rotulo": rotulo,
                           "titulo": titulo, "ementa": _limpa(alvo.get("ementa")),
-                          "tituloLink": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={alvo.get('id')}",
+                          "tituloLink": f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={alvo_id}" if alvo_id else base["reuniaoLink"],
                           "autor": autoria(alvo.get("id")), "relator": relator,
                           "parecer": parecer, "parecerLink": parecer_link})
             if prop.get("siglaTipo") == "REQ" and _pede_audiencia(itens[-1]["ementa"]):
@@ -506,7 +507,7 @@ def coletar_senado_comissoes(ini: dt.date, fim: dt.date) -> list[dict]:
                 cod = doma.get("codigoMateria")
                 itens.append({**base, "id": f"SF-{reu.get('codigo')}-{it.get('codigo')}", "tipo": "materia",
                               "rotulo": rotulo, "titulo": _limpa(it.get("nome")),
-                              "tituloLink": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{cod}" if cod else "",
+                              "tituloLink": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{cod}" if cod else base["reuniaoLink"],
                               "ementa": _limpa(doma.get("ementa")), "autor": autoria, "relator": relator,
                               "parecer": _parecer_senado(it.get("relatorio")),
                               "parecerLink": parecer_link if it.get("relatorio") else ""})
@@ -544,7 +545,7 @@ def coletar_senado_plenario(ini: dt.date, fim: dt.date) -> list[dict]:
                 iid = _id_unico(f"SF-PLEN-{cod}-{cm or f'n{n}'}", usados)
                 itens.append({**base, "id": iid, "tipo": "materia", "rotulo": tipo_sessao,
                               "titulo": _limpa(m.get("DescricaoIdentificacaoMateria")),
-                              "tituloLink": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{cm}" if cm else "",
+                              "tituloLink": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{cm}" if cm else base["reuniaoLink"],
                               "ementa": _limpa(m.get("Ementa")), "autor": _limpa(m.get("NomeAutor")),
                               "parecer": _limpa(m.get("Parecer"))})
     return itens
@@ -632,8 +633,9 @@ def _rotulado(d: _Doc, rotulo: str, valor: str, url: str = "") -> str:
 
 def _item_xml(d: _Doc, it: dict) -> list[str]:
     t = it.get("tipo")
+    url = it.get("tituloLink") or it.get("reuniaoLink") or ""
     if t == "materia":
-        out = [d.bullet(d.link(f'{it["titulo"]}:', it.get("tituloLink"), bold=True)
+        out = [d.bullet(d.link(f'{it["titulo"]}:', url, bold=True)
                         + d.run(" " + (it.get("ementa") or "")), NUM_MATERIA)]
         if it.get("autor"):
             out.append(_rotulado(d, "Autoria", it["autor"]))
@@ -646,9 +648,10 @@ def _item_xml(d: _Doc, it: dict) -> list[str]:
             out += _lista_convidados(d, it["convidados"])
         return out
     if t == "audiencia":
-        out = [d.p(d.run(it.get("ementa") or it.get("titulo") or ""))]
+        txt = it.get("ementa") or it.get("titulo") or ""
+        out = [d.p(d.link(txt, url))]
     else:
-        txt = d.link(it["titulo"], it.get("tituloLink"), bold=True)
+        txt = d.link(it["titulo"], url, bold=True)
         if it.get("ementa") and it["ementa"] != it["titulo"]:
             txt += d.run(" - " + it["ementa"])
         out = [d.p(txt)]
