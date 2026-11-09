@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import html as _html
 import json
+import re
 import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -436,7 +437,10 @@ if SS.get("sint_acomp_n"):
 
 
 def _movs_de(c):
-    return (movs_por_cli or {}).get(c, []) + SS.get("sint_movs_xls", {}).get(c, [])
+    """Sem a apresentação de proposição que já está em Novas proposições (seria a mesma informação)."""
+    novas = {re.sub(r"\s+", " ", p["proposicao"]).upper() for p in _novas_de(c)}
+    todas = (movs_por_cli or {}).get(c, []) + SS.get("sint_movs_xls", {}).get(c, [])
+    return [m for m in todas if not (re.sub(r"\s+", " ", m["proposicao"]).upper() in novas and ss.so_apresentacao(m))]
 
 
 def _novas_de(c):
@@ -526,7 +530,7 @@ for c, tab in zip(abas, tabs):
                       f'<p class="sx-h">{_a(m.get("link", ""), m["proposicao"])}{teor}</p>'
                       f'<p class="sx-ementa">{esc(m.get("ementa", ""))}</p>'
                       f'<p class="sx-and"><span>Andamento</span>{esc(m.get("andamento", ""))}</p>'
-                      + (f'<p class="sx-meta">{quem}</p>' if quem else ""))
+                      + (f'<p class="sx-meta">{quem}</p>' if quem else ""), valor=not ss.mov_rotina(m))
             if url_m:
                 with st.expander("Acrescentar do Inteligov (XLS)"):
                     st.markdown(f'<p class="eg-explica">Se faltar alguma, abra a <a href="{url_m}" target="_blank">'
@@ -555,7 +559,7 @@ for c, tab in zip(abas, tabs):
             _item(f"sd_{c}_{j}",
                   f'<div class="sx-top">{chip(a.get("publicado"), "data")}{chip(a.get("orgao_topo") or a.get("orgao"), "org")}</div>'
                   f'<p class="sx-h">{_a(a["link"], a["ato"])}</p>'
-                  f'<p class="sx-ementa">{esc(a.get("resumo", ""))}</p>')
+                  f'<p class="sx-ementa">{esc(a.get("resumo", ""))}</p>', valor=not ss.dou_rotina(a))
 
 
 # ========= 3. WORD, PDF E EMAIL =========
@@ -580,8 +584,8 @@ if gerar:
                                "texto": SS.get(f"sb_{c}_{i}_x", b["texto"])})
             cl = [x for i, x in enumerate(clipping.get(c, [])) if SS.get(f"sc_{c}_{i}", True)]
             novas = [p for j, p in enumerate(_novas_de(c)) if SS.get(f"sp_{c}_{j}", True)]
-            atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", True)]
-            movs = [m for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", True)]
+            atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not ss.dou_rotina(a))]
+            movs = [m for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m))]
             modelo = (MODELO_IDEC if c == "IDEC" else MODELO).read_bytes()
             nome = ss.nome_arquivo(c, INI, FIM)
             arquivos[nome] = ss.gerar_docx(modelo, c, PERIODO, bl, cl, novas, movs, atos)
@@ -607,7 +611,7 @@ if arqs:
             nome = ss.nome_arquivo(c, INI, FIM)
             anexo = nome.replace(".docx", " - anexo.docx")
             n_on = sum(1 for i in range(len(bullets[c])) if SS.get(f"sb_{c}_{i}_on", True))
-            n_mov = sum(1 for j in range(len(_movs_de(c))) if SS.get(f"sm_{c}_{j}", True))
+            n_mov = sum(1 for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m)))
             with st.container(key=f"lin_{k}"):
                 c0, c1, c2, c3 = st.columns(larg, vertical_alignment="center")
                 c0.markdown(f'<p class="sx-cli">{esc(ss.CLIENTES[c]["titulo"])}<span>{plural(n_on, "bullet", "bullets")} · '

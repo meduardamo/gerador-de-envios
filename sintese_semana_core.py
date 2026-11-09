@@ -446,7 +446,7 @@ SELEÇÃO
 
 FORMATO DE CADA BULLET
 - "titulo": uma frase no presente que contextualiza o fato (ex.: "Senacon determina suspensão de novas revendas de ingressos por cinco plataformas."). Começa pelo fato, nunca por "a notícia destaca", "a matéria aborda" e equivalentes.
-- "texto": 1 a 3 frases seguintes com fatos, desdobramentos, posicionamentos ou medidas.
+- "texto": 1 a 3 frases seguintes com fatos, desdobramentos, posicionamentos ou medidas. O que já aconteceu vai no pretérito perfeito (aprovou, reuniu, afirmou); presente só para o que segue valendo (a norma estabelece, o prazo vai até).
 - Mencione, quando relevante, órgãos, instituições, parlamentares, autoridades, projetos de lei, decretos, portarias, programas e medidas. Use as siglas dos órgãos. Cite parlamentar como Nome (PARTIDO/UF).
 - "documentos": documentos citados na notícia e com link no próprio texto (lei, decreto, portaria, resolução, pesquisa, estudo, nota técnica, cartilha, relatório, consulta pública). Use só links que aparecem no texto da notícia, com o nome do documento como aparece no bullet. Não invente link nem crie link para pessoa ou instituição.
 
@@ -697,7 +697,7 @@ def _mov_camara(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
     d = dt.date.fromisoformat(ult["dataHora"][:10])
     return {"proposicao": f"{det['siglaTipo']} {det['numero']}/{det['ano']}", "ementa": det.get("ementa", ""),
             "autor": _autor_camara(id_), "relator": _relator_camara(ult.get("uriUltimoRelator", "")),
-            "data": d.strftime("%d/%m/%Y"), "orgao": ult.get("siglaOrgao", ""),
+            "data": f"{d.day}/{d.month}/{d.year}", "orgao": ult.get("siglaOrgao", ""),
             "andamento": (ult.get("despacho") or ult.get("descricaoTramitacao") or "").strip(),
             "link": det.get("urlInteiroTeor") or f"https://www.camara.leg.br/propostas-legislativas/{id_}",
             "teor": ult.get("url") or ""}
@@ -730,7 +730,7 @@ def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
     doc = (ult.get("documentosAssociados") or [{}])[0]
     return {"proposicao": det.get("identificacao", ""), "ementa": (det.get("conteudo") or {}).get("ementa", ""),
             "autor": autor, "relator": relator,
-            "data": d.strftime("%d/%m/%Y"), "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
+            "data": f"{d.day}/{d.month}/{d.year}", "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
             "andamento": re.sub(r"\s+", " ", ult.get("descricao", "")).strip(),
             "link": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{det.get('codigoMateria')}",
             "teor": doc.get("url") or ""}
@@ -885,6 +885,24 @@ def ler_dou_cliente(gc, planilha_id: str, cliente: str, ini: dt.date, fim: dt.da
         out.append({"data": d, "ato": g("Portaria"), "link": g("Link"), "resumo": g("Resumo"),
                     "alinhamento": g("Alinhamento"), "justificativa": g("Justificativa")})
     return out
+
+
+# Itens que entram desligados na página (quem revisa pode ligar de volta)
+_DOU_REPASSE = re.compile(r"^Autoriza (?:o|a|os|as) .{0,80}?receber recursos", re.I)
+
+
+def dou_rotina(ato: dict) -> bool:
+    """Aviso de prefeitura ou portaria de repasse a ente/entidade: fora por padrão."""
+    return (ato.get("orgao") or "").lower().startswith("prefeituras") or bool(_DOU_REPASSE.match(ato.get("resumo") or ""))
+
+
+def mov_rotina(m: dict) -> bool:
+    """Só recebimento do processo pelo órgão: fora por padrão."""
+    return bool(re.match(r"Recebimento pel[oa]", (m.get("andamento") or "").strip(), re.I))
+
+
+def so_apresentacao(m: dict) -> bool:
+    return bool(re.match(r"Apresentaç[aã]o d", (m.get("andamento") or "").strip(), re.I))
 
 
 def _campo_dou(pg: str, classe: str) -> str:
