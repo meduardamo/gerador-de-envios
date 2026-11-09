@@ -29,7 +29,8 @@ import requests
 # Cada equipe vê na página só os clientes da sua área. A pauta coletada é a mesma para todas.
 AREAS = {
     "Saúde": ["IEPS", "Vital", "Umane", "IDEC", "Infinis", "UNFPA", "Coletivo"],
-    "Educação": ["FMCSV", "ISG", "IU", "Lemann", "MegaEdu", "Fundação Itaú"],
+    "Educação": ["ISG", "IU", "Lemann", "MegaEdu", "Fundação Itaú"],
+    "Primeira Infância": ["FMCSV"],
     "Esporte": ["REMS"],
 }
 CLIENTES = [c for cs in AREAS.values() for c in cs]
@@ -38,6 +39,7 @@ CLIENTES = [c for cs in AREAS.values() for c in cs]
 COMISSOES_AREA = {
     "Saúde": {"CD": ["CSAUDE"], "SF": ["CAS"]},
     "Educação": {"CD": ["CE"], "SF": ["CE"]},
+    "Primeira Infância": {"CD": ["CPASF", "CE"], "SF": ["CE", "CAS"]},
     "Esporte": {"CD": ["CESPO"], "SF": ["CE"]},
 }
 
