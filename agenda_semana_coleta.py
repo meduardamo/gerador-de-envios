@@ -25,17 +25,13 @@ else:
         base += dt.timedelta(days=7 - base.weekday())
 seg = base - dt.timedelta(days=base.weekday())
 
-semana = ag.coletar_semana(seg, seg + dt.timedelta(days=4))
-semana["coletadoEm"] = agora.strftime("%d/%m %H:%M")
-for erro in semana["erros"]:
-    print(f"::warning::{erro}")
-
 saida = Path("agenda/semanas") / f"{seg.isoformat()}.json"
 anterior = json.loads(saida.read_text(encoding="utf-8")) if saida.exists() else None
 
 # Casa que deu erro (ex.: timeout da Câmara) mantém os itens da coleta anterior
-semana = ag.preservar_fontes_com_erro(semana, anterior)
-semana.update(ag.foto_segunda(semana, anterior, agora.date() <= seg))
+semana = ag.montar_coleta(seg, anterior, agora)
+for erro in semana["erros"]:
+    print(f"::warning::{erro}")
 saida.parent.mkdir(parents=True, exist_ok=True)
 saida.write_text(json.dumps(semana, ensure_ascii=False, indent=1), encoding="utf-8")
 print(f"{saida}: {len(semana['itens'])} itens ({semana['periodo']})")

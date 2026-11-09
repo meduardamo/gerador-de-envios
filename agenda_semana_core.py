@@ -746,6 +746,19 @@ def foto_segunda(semana: dict, anterior: dict | None, ate_segunda: bool) -> dict
     return {"idsSegunda": [i["id"] for i in semana["itens"]], "coletadoSegunda": semana.get("coletadoEm", "")}
 
 
+def montar_coleta(seg: dt.date, anterior: dict | None, agora: dt.datetime, bruta: dict | None = None) -> dict:
+    """Coleta a semana que começa em `seg` e junta com a anterior, como o workflow e a página gravam.
+
+    Fonte que falhou mantém os itens da coleta anterior; a foto de segunda soma as coletas
+    feitas até a segunda e depois fica fixa. `bruta` reaproveita um `coletar_semana` já feito
+    (a página junta de novo com a versão mais nova se outra gravação chegou antes)."""
+    semana = dict(bruta) if bruta is not None else coletar_semana(seg, seg + dt.timedelta(days=4))
+    semana["coletadoEm"] = agora.strftime("%d/%m %H:%M")
+    semana = preservar_fontes_com_erro(semana, anterior)
+    semana.update(foto_segunda(semana, anterior, agora.date() <= seg))
+    return semana
+
+
 def novos_desde_segunda(semana: dict) -> set[str]:
     """Itens que não estavam na coleta de segunda (reunião cancelada não conta)."""
     foto = semana.get("idsSegunda")

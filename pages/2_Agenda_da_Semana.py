@@ -14,12 +14,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google.oauth2.service_account import Credentials
 
+import agenda_repo as repo
 import agenda_semana_core as ag
 import importlib
 from estilo_paginas import MARINHO, VINHO, cabecalho, chip, esc, explica, resumo, secao, vazio
 
 # o Streamlit Cloud às vezes mantém o módulo velho depois de um push; recarrega a cada rodada
 ag = importlib.reload(ag)
+repo = importlib.reload(repo)
 
 
 from base_pagina import exigir_login, iniciar
@@ -96,6 +98,9 @@ PASTA_SEMANAS = Path("agenda/semanas")
 MODELO = Path("modelos/agenda_semana_modelo.docx")
 SELECAO_SHEET_ID = (st.secrets.get("AGENDA_SHEET_ID") or os.getenv("AGENDA_SHEET_ID", "")).strip()
 SELECAO_ABA = "Seleção"
+# token com Contents: Read and write no gerador-de-envios: a pauta buscada na página vai para o
+# repositório e a equipe toda vê; sem ele, a busca fica só na sessão de quem clicou
+GITHUB_TOKEN = (st.secrets.get("AGENDA_GITHUB_TOKEN") or os.getenv("AGENDA_GITHUB_TOKEN", "")).strip()
 
 
 # ========= SELEÇÃO SALVA (planilha "Eixo | Agenda da Semana") =========
@@ -239,12 +244,76 @@ def _selecao_na_tela(sid: str, area: str, itens: list[dict], base: dict) -> dict
     return out
 
 
+# Pauta salva: lida do GitHub (a cópia do app só se atualiza quando o Streamlit puxa o
+# repositório); se a API falhar ou não houver token, vale a cópia local.
+@st.cache_data(ttl=60, show_spinner=False)
+def _shas_github() -> dict[str, str]:
+    return repo.listar(GITHUB_TOKEN)
+
+
+@st.cache_data(max_entries=8, show_spinner=False)
+def _ler_github(sha: str) -> dict:
+    return repo.ler(GITHUB_TOKEN, sha)
+
+
+def _shas() -> dict[str, str] | None:
+    if not GITHUB_TOKEN:
+        return None
+    try:
+        return _shas_github()
+    except Exception:
+        return None
+
+
 def _semanas_salvas() -> list[str]:
-    return sorted((p.stem for p in PASTA_SEMANAS.glob("*.json")), reverse=True)
+    shas = _shas()
+    locais = {p.stem for p in PASTA_SEMANAS.glob("*.json")}
+    return sorted(locais | set(shas or {}), reverse=True)
 
 
 def _ler_semana(sid: str) -> dict:
+    shas = _shas()
+    if shas and sid in shas:
+        try:
+            return _ler_github(shas[sid])
+        except Exception:
+            pass
     return json.loads((PASTA_SEMANAS / f"{sid}.json").read_text(encoding="utf-8"))
+
+
+def _buscar_e_gravar(sid: str) -> tuple[dict, str]:
+    """Faz a mesma coleta do workflow das 7h e grava no repositório para a equipe toda.
+
+    Devolve (semana, aviso); aviso vazio = gravou. Se não der para gravar, a semana
+    coletada vale só nesta sessão e o aviso diz isso."""
+    ini = dt.date.fromisoformat(sid)
+    agora = dt.datetime.now(ZoneInfo("America/Recife"))
+    bruta = ag.coletar_semana(ini, ini + dt.timedelta(days=4))
+    if not GITHUB_TOKEN:
+        anterior = _ler_semana(sid) if sid in _semanas_salvas() else None
+        return (ag.montar_coleta(ini, anterior, agora, bruta),
+                "A pauta foi buscada, mas não ficou salva para a equipe (gravação no repositório não configurada).")
+    erro = ""
+    for _ in range(3):
+        try:
+            shas = repo.listar(GITHUB_TOKEN)
+            anterior = repo.ler(GITHUB_TOKEN, shas[sid]) if sid in shas else None
+            semana = ag.montar_coleta(ini, anterior, agora, bruta)
+            if not semana["itens"] and anterior and anterior.get("itens"):
+                return anterior, "A Câmara e o Senado não responderam. Ficou a pauta da coleta anterior; tente de novo em alguns minutos."
+            repo.gravar(GITHUB_TOKEN, sid, semana, shas.get(sid),
+                        f"Agenda da Semana: pauta buscada na página ({agora:%d/%m %H:%M})")
+            _shas_github.clear()
+            return semana, ""
+        except repo.Conflito:
+            continue
+        except Exception as e:
+            erro = str(e)[:160]
+            break
+    anterior = _ler_semana(sid) if sid in _semanas_salvas() else None
+    return (ag.montar_coleta(ini, anterior, agora, bruta),
+            "A pauta foi buscada, mas não deu para salvar para a equipe agora"
+            + (f" ({erro})" if erro else "") + ". Ela vale só nesta tela; tente Buscar pauta de novo daqui a pouco.")
 
 
 def _rotulo_semana(sid: str) -> str:
@@ -271,7 +340,7 @@ with st.sidebar:
                 'A seleção salva vale para toda a equipe.</p>', unsafe_allow_html=True)
     atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", width="stretch",
                           key="ag_atualizar",
-                          help="A pauta muda ao longo da semana. Busca de novo na Câmara e no Senado.")
+                          help="A pauta muda ao longo da semana. Busca de novo na Câmara e no Senado e salva para toda a equipe.")
     recarregar = st.button("Ver seleção da equipe", icon=":material/group:", width="stretch",
                            key="ag_recarregar",
                            help="Traz o que a equipe salvou desde que você abriu a página. "
@@ -304,18 +373,24 @@ with st.container(horizontal=True, vertical_alignment="bottom", key="ag_barra"):
     lugar_coleta = st.empty()  # preenchido depois que a semana é lida
 CLIS = ag.AREAS[area]
 
-# a busca na hora fica só na sessão; a do workflow de segunda fica salva no repositório
+# a busca na hora grava no repositório como a coleta das 7h; se não conseguir gravar,
+# fica só na sessão (ag_vivas) e a página avisa
 vivas = st.session_state.setdefault("ag_vivas", {})
 if atualizar:
-    ini = dt.date.fromisoformat(sid)
-    with st.spinner("Buscando a pauta na Câmara e no Senado…"):
-        viva = {**ag.coletar_semana(ini, ini + dt.timedelta(days=4)),
-                "coletadoEm": dt.datetime.now(ZoneInfo("America/Recife")).strftime("%d/%m %H:%M")}
-        hoje = dt.datetime.now(ZoneInfo("America/Recife")).date()
-        anterior = _ler_semana(sid) if sid in semanas else None
-        viva = ag.preservar_fontes_com_erro(viva, anterior)
-        vivas[sid] = {**viva, **ag.foto_segunda(viva, anterior, hoje <= ini)}
+    with st.spinner("Buscando a pauta na Câmara e no Senado (leva de 1 a 3 minutos)…"):
+        _semana, _aviso = _buscar_e_gravar(sid)
+    if _aviso:
+        vivas[sid] = _semana
+        st.session_state["ag_aviso_busca"] = ("warning", _aviso)
+    else:
+        vivas.pop(sid, None)
+        st.session_state["ag_aviso_busca"] = ("success", "Pauta buscada e salva para toda a equipe.")
     st.session_state.pop("ag_pacote", None)
+    st.rerun()
+
+_tipo_aviso, _txt_aviso = st.session_state.pop("ag_aviso_busca", (None, ""))
+if _txt_aviso:
+    (st.success if _tipo_aviso == "success" else st.warning)(_txt_aviso)
 
 if sid in vivas:
     semana = vivas[sid]
@@ -323,11 +398,19 @@ elif sid in semanas:
     semana = _ler_semana(sid)
 else:
     vazio(f"Ainda não há pauta salva para a semana de {_rotulo_semana(sid)}. "
-          "Clique em Buscar pauta de novo, na barra lateral, para trazer a pauta da Câmara e do Senado.")
+          "Clique em Buscar pauta de novo, na barra lateral: a pauta da Câmara e do Senado é buscada na hora "
+          "e fica salva para toda a equipe.")
     st.stop()
 
 for erro in semana.get("erros") or []:
     st.warning(f"Parte da pauta não veio. {erro} Para tentar de novo, use Buscar pauta de novo, na barra lateral.")
+
+# dia de coleta (seg, ter, qua) depois das 7h30 sem a coleta de hoje: a das 7h e a das 7h45 não chegaram
+_agora = dt.datetime.now(ZoneInfo("America/Recife"))
+if (sid == _corrente and sid not in vivas and _agora.weekday() <= 2 and _agora.time() >= dt.time(7, 30)
+        and not str(semana.get("coletadoEm", "")).startswith(_agora.strftime("%d/%m"))):
+    st.warning("A coleta automática de hoje ainda não chegou. Clique em Buscar pauta de novo, na barra "
+               "lateral: a pauta é buscada na hora e fica salva para toda a equipe.")
 
 itens = semana["itens"]
 if not itens:
