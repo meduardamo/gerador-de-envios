@@ -697,7 +697,7 @@ def _mov_camara(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
     d = dt.date.fromisoformat(ult["dataHora"][:10])
     return {"proposicao": f"{det['siglaTipo']} {det['numero']}/{det['ano']}", "ementa": det.get("ementa", ""),
             "autor": _autor_camara(id_), "relator": _relator_camara(ult.get("uriUltimoRelator", "")),
-            "data": f"{d.day}/{d.month}/{d.year}", "orgao": ult.get("siglaOrgao", ""),
+            "data": d.strftime("%d/%m/%Y"), "orgao": ult.get("siglaOrgao", ""),
             "andamento": (ult.get("despacho") or ult.get("descricaoTramitacao") or "").strip(),
             "link": det.get("urlInteiroTeor") or f"https://www.camara.leg.br/propostas-legislativas/{id_}",
             "teor": ult.get("url") or ""}
@@ -730,7 +730,7 @@ def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
     doc = (ult.get("documentosAssociados") or [{}])[0]
     return {"proposicao": det.get("identificacao", ""), "ementa": (det.get("conteudo") or {}).get("ementa", ""),
             "autor": autor, "relator": relator,
-            "data": f"{d.day}/{d.month}/{d.year}", "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
+            "data": d.strftime("%d/%m/%Y"), "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
             "andamento": re.sub(r"\s+", " ", ult.get("descricao", "")).strip(),
             "link": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{det.get('codigoMateria')}",
             "teor": doc.get("url") or ""}
