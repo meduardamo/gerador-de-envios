@@ -199,13 +199,13 @@ def info(texto: str) -> str:
 # Grupo de cada aba, na ordem do menu: aparece em cima do título.
 GRUPOS = {
     "Gerador de Envios": "Dia a dia",
-    "Gerador de Resumos": "Dia a dia",
     "Notícias": "Dia a dia",
+    "Gerador de Resumos": "Dia a dia",
     "Agenda da Semana": "Entrega semanal",
     "Síntese da Semana": "Entrega semanal · Saúde",
-    "Automações": "Consulta",
     "Gerador de Gráficos": "Ferramenta",
     "Alerta de Pesquisa": "Ferramenta",
+    "Automações": "Consulta",
 }
 
 
