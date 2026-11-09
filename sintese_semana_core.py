@@ -990,8 +990,8 @@ def _set_texto(p_el, partes: list[tuple[str, bool, str | None]], doc):
 
 
 def _partes_bullet(b: dict) -> list[tuple[str, bool, str | None]]:
-    """Título em negrito com o link da notícia; documentos com link no próprio nome."""
-    partes = [("• ", True, None), (b["titulo"].rstrip(".") + ".", True, b["url"]), (" ", False, None)]
+    """Título em negrito sem link, como no modelo da equipe; documentos com link no próprio nome."""
+    partes = [("• ", True, None), (b["titulo"].rstrip(".") + ".", True, None), (" ", False, None)]
     texto = b.get("texto", "")
     marcos = []
     for d in b.get("documentos") or []:
