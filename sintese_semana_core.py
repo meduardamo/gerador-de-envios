@@ -887,17 +887,27 @@ def ler_dou_cliente(gc, planilha_id: str, cliente: str, ini: dt.date, fim: dt.da
     return out
 
 
+def _campo_dou(pg: str, classe: str) -> str:
+    m = re.search(rf'class="{classe}"[^>]*>(.*?)</(?:p|span|div)>', pg, re.S)
+    return _html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", m.group(1)))).strip() if m else ""
+
+
 def completar_ato_dou(ato: dict) -> dict:
-    """Busca órgão e data de publicação na página do ato no in.gov.br."""
+    """Órgão, data, identificação e ementa pelos campos da página do ato no in.gov.br.
+    Sem ementa (aviso, despacho, consulta), fica o resumo da raspagem sem o título repetido."""
     try:
-        r = requests.get(ato["link"], headers=UA, timeout=20)
-        txt = re.sub(r"<[^>]+>", " ", r.text)
-        txt = _html.unescape(re.sub(r"\s+", " ", txt))
-        m_org = re.search(r"Órgão:\s*(.+?)\s+(?:Publicado em|Edição|Seção|Página|[A-ZÁÉÍÓÚÂÊÔÃÕÇ ]{12,})", txt)
-        m_pub = re.search(r"Publicado em:\s*(\d{2}/\d{2}/\d{4})", txt)
-        org = m_org.group(1).strip() if m_org else ""
-        return {**ato, "orgao": org, "orgao_topo": org.split("/")[0].strip().upper() if org else "OUTROS",
-                "publicado": m_pub.group(1) if m_pub else ato["data"].strftime("%d/%m/%Y")}
+        pg = requests.get(ato["link"], headers=UA, timeout=20).text
+        org = _campo_dou(pg, "orgao-dou-data")
+        pub = _campo_dou(pg, "publicado-dou-data")
+        ident = _campo_dou(pg, "identifica") or ato.get("ato", "")
+        resumo = _campo_dou(pg, "ementa")
+        if not resumo:
+            resumo = (ato.get("resumo") or "").strip()
+            if ident and resumo.lower().startswith(ident.lower()):
+                resumo = resumo[len(ident):].strip()
+        return {**ato, "ato": ident, "resumo": resumo, "orgao": org,
+                "orgao_topo": org.split("/")[0].strip().upper() if org else "OUTROS",
+                "publicado": pub if re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub) else ato["data"].strftime("%d/%m/%Y")}
     except Exception:  # noqa: BLE001
         return {**ato, "orgao": "", "orgao_topo": "OUTROS", "publicado": ato["data"].strftime("%d/%m/%Y")}
 
@@ -937,6 +947,7 @@ def _set_texto(p_el, partes: list[tuple[str, bool, str | None]], doc):
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
     for texto, negrito, link in partes:
+        texto = re.sub(r"[ \t]*[\r\n]+[ \t]*", " ", texto)  # \r da API do Senado desmonta a tabela no LibreOffice
         r = OxmlElement("w:r")
         rpr = copy.deepcopy(rpr0) if rpr0 is not None else OxmlElement("w:rPr")
         for tag in ("w:b", "w:bCs", "w:u", "w:color"):
