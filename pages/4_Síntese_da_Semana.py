@@ -681,17 +681,18 @@ if arqs:
   body {{ margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
   .btn-copy {{
     background: #192D4E; color: #FFFFFF; border: none; border-radius: 6px;
-    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; box-sizing: border-box; transition: background 0.2s;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 100%; box-sizing: border-box; transition: background 0.15s ease;
+    letter-spacing: 0.01em;
   }}
   .btn-copy:hover {{ background: #0E1A2E; }}
-  .btn-copy.sucesso {{ background: #2E7D32 !important; }}
+  .btn-copy.sucesso {{ background: #265C4B !important; color: #FFFFFF !important; }}
 </style>
 </head>
 <body>
 <button id="btn" class="btn-copy" onclick="copiar()">
-  <span>📋 Copiar email formatado</span>
+  <span>Copiar corpo do email</span>
 </button>
 <script>
 const htmlData = {json.dumps(corpo)};
@@ -726,18 +727,18 @@ function copiarFallback(html, text) {{
     document.execCommand("copy");
     mostrarSucesso();
   }} catch(err) {{
-    document.getElementById("btn").innerText = "❌ Selecione o texto abaixo";
+    document.getElementById("btn").innerText = "Erro ao copiar";
   }}
   document.removeEventListener("copy", listener);
 }}
 function mostrarSucesso() {{
   const btn = document.getElementById("btn");
   btn.className = "btn-copy sucesso";
-  btn.innerHTML = "<span>✓ Copiado com formatação!</span>";
+  btn.innerHTML = "<span>Copiado</span>";
   setTimeout(() => {{
     btn.className = "btn-copy";
-    btn.innerHTML = "<span>📋 Copiar email formatado</span>";
-  }}, 3000);
+    btn.innerHTML = "<span>Copiar corpo do email</span>";
+  }}, 2500);
 }}
 </script>
 </body>
@@ -747,7 +748,7 @@ function mostrarSucesso() {{
     if not tem_pdf:
         st.markdown('<p class="sx-nota">O PDF não está disponível neste servidor; baixe o Word e exporte pelo Word ou pelo Docs.</p>',
                     unsafe_allow_html=True)
-    st.markdown('<p class="sx-nota">Email: abra "Ver email" e clique em "Copiar email formatado" para colar no Wix com os links e negritos prontos.</p>',
+    st.markdown('<p class="sx-nota">Email: abra "Ver email" e clique em "Copiar corpo do email" para colar no Wix com os links e negritos prontos.</p>',
                 unsafe_allow_html=True)
 
 _etapas()
