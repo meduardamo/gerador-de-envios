@@ -758,8 +758,8 @@ def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
             "teor": doc.get("url") or ""}
 
 
-def _ids_camara_no_periodo(ini: dt.date, fim: dt.date) -> set[str] | None:
-    """IDs de toda proposição com tramitação na Câmara no período (None se a listagem falhar)."""
+def _ids_camara_no_periodo(ini: dt.date, fim: dt.date) -> tuple[set[str] | None, str]:
+    """IDs de toda proposição com tramitação na Câmara no período. Retorna (ids, erro)."""
     try:
         primeira = _get(f"{CAMARA}/proposicoes", dataInicio=ini.isoformat(), dataFim=fim.isoformat(),
                         itens=100, pagina=1) or {}
@@ -771,19 +771,21 @@ def _ids_camara_no_periodo(ini: dt.date, fim: dt.date) -> set[str] | None:
                                                dataFim=fim.isoformat(), itens=100, pagina=p)
             return [str(x["id"]) for x in (d or {}).get("dados") or []]
         with ThreadPoolExecutor(8) as ex:
-            return {i for lista in ex.map(pagina, range(1, n_pag + 1)) for i in lista}
-    except Exception:  # noqa: BLE001
-        return None
+            return {i for lista in ex.map(pagina, range(1, n_pag + 1)) for i in lista}, ""
+    except Exception as e:  # noqa: BLE001
+        msg = f"HTTP {e.response.status_code} ({e.response.reason})" if getattr(e, "response", None) is not None else str(e)[:100]
+        return None, msg
 
 
 SEM_RESPOSTA = "_sem_resposta"  # chave do resultado com as proposições que as APIs não responderam
+ERRO_CAMARA = "_erro_camara"    # motivo específico caso a API da Câmara tenha falhado por completo
 
 
 def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers: int = 16,
                          progresso=None) -> dict[str, list[dict]]:
     """Cliente -> movimentações da semana (uma linha por proposição, o último andamento)."""
     unicos = {(a["Casa"], a["ID na Casa"]) for a in acomp if a.get("ID na Casa")}
-    na_camara = _ids_camara_no_periodo(ini, fim)
+    na_camara, erro_camara = _ids_camara_no_periodo(ini, fim)
     camara_fora = set()
     if na_camara is not None:
         unicos = {(c, i) for c, i in unicos if not c.startswith("Câmara") or i in na_camara}
@@ -827,6 +829,8 @@ def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers:
             out.setdefault(a["Cliente"], []).append(m)
     for v in out.values():
         v.sort(key=lambda m: tuple(reversed([int(x) for x in m["data"].split("/")])))
+    if erro_camara:
+        out[ERRO_CAMARA] = erro_camara
     if sem_resposta:  # a página avisa; as chaves de cliente seguem intactas
         out[SEM_RESPOSTA] = [{"casa": c, "id": i} for c, i in sem_resposta]
     return out

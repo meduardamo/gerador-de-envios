@@ -427,7 +427,14 @@ if AGENDA_SHEET_ID:
             movs_por_cli = _movs_da_semana(INI, FIM, SS.get("sint_acomp_n", 0))
         except Exception as e:  # noqa: BLE001
             st.warning(f"Movimentações: {e}")
-    if (movs_por_cli or {}).get(ss.SEM_RESPOSTA):
+    if (movs_por_cli or {}).get(ss.ERRO_CAMARA):
+        err_c = movs_por_cli[ss.ERRO_CAMARA]
+        st.warning(
+            f"**Câmara dos Deputados indisponível ({err_c}):** a API pública da Câmara não respondeu "
+            "e suas movimentações não puderam ser verificadas nesta rodada. As do Senado foram carregadas normalmente. "
+            "Para incluir movimentações da Câmara, use a opção **Acrescentar do Inteligov (XLS)** na aba de cada cliente."
+        )
+    elif (movs_por_cli or {}).get(ss.SEM_RESPOSTA):
         n_sr = len(movs_por_cli[ss.SEM_RESPOSTA])
         st.warning(f"{plural(n_sr, 'proposição acompanhada não respondeu', 'proposições acompanhadas não responderam')} "
                    "na Câmara ou no Senado e pode faltar na tabela de movimentações. Confira no XLS do Inteligov.")
@@ -519,7 +526,10 @@ for c, tab in zip(abas, tabs):
             if movs_por_cli is None:
                 vazio("Não consegui consultar a Câmara e o Senado agora.")
             elif not movs_c:
-                vazio("Nenhuma proposição acompanhada andou na semana.")
+                if (movs_por_cli or {}).get(ss.ERRO_CAMARA):
+                    vazio(f"Nenhuma proposição do Senado andou na semana. (A API da Câmara estava indisponível: {movs_por_cli[ss.ERRO_CAMARA]}; use o XLS do Inteligov abaixo se precisar das movimentações da Câmara).")
+                else:
+                    vazio("Nenhuma proposição acompanhada andou na semana.")
             for j, m in enumerate(movs_c):
                 casa = "Senado" if "senado" in (m.get("link") or "") else ("Câmara" if "camara" in (m.get("link") or "") else "")
                 quem = " · ".join(x for x in [m.get("autor") and f"Autoria: {esc(m['autor'])}",
