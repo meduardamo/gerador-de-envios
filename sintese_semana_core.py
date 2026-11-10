@@ -415,10 +415,13 @@ def baixar_todas(noticias: list[dict], workers: int = 8) -> list[dict]:
 # ─── Clipping (título + lide da própria matéria, sem reescrever) ─────────────
 def secao_de_clipping(secao: str) -> str | None:
     """'clipping unfpa' -> 'UNFPA'."""
-    m = re.match(r"\s*clipping\s+(.+)", secao or "", re.I)
+    m = re.match(r"^\s*clipping\b[:\s–-]*(.*)$", secao or "", re.I)
     if not m:
         return None
-    return _APELIDOS.get(m.group(1).strip().lower())
+    resto = m.group(1).strip()
+    resto = re.sub(r"^(?:da|do|de)\s+", "", resto, flags=re.I)
+    resto = re.sub(r"[?.()*]", "", resto).strip().lower()
+    return _APELIDOS.get(resto)
 
 
 def clipping_por_cliente(noticias: list[dict]) -> dict[str, list[dict]]:
@@ -442,7 +445,7 @@ SELEÇÃO
 - Não use um tema amplo para puxar notícia de outro assunto.
 - Na dúvida, exclua. É preferível deixar de fora uma notícia marginal a incluir uma cujo enquadramento dependa de interpretação.
 - Não crie bullet apenas pela presença de uma palavra-chave.
-- A seção do documento interno de onde a notícia veio é só uma pista; quem decide é o conteúdo.
+- A seção do documento interno de onde a notícia veio é só uma pista; quem decide é o conteúdo (salvo exceção expressa de Conjuntura Política descrita abaixo).
 
 FORMATO DE CADA BULLET
 - "titulo": uma frase no presente que contextualiza o fato (ex.: "Senacon determina suspensão de novas revendas de ingressos por cinco plataformas."). Começa pelo fato, nunca por "a notícia destaca", "a matéria aborda" e equivalentes.
@@ -472,10 +475,23 @@ def montar_prompt(cliente: str, noticias: list[dict]) -> str:
     secoes = secoes_do_cliente(cliente)
     if cliente == "IDEC":
         regra_secao = ("Classifique cada bullet em UMA destas áreas do IDEC: " + "; ".join(secoes) + ".")
+        regra_conjuntura = (
+            "CONJUNTURA POLÍTICA (IDEC):\n"
+            "- Notícias gerais de conjuntura política (ex.: CÂMARA/SENADO/EXECUTIVO/JUDICIÁRIO) "
+            "NÃO devem ser incluídas para o IDEC, a menos que tratem diretamente de uma das áreas temáticas do IDEC listadas acima."
+        )
     else:
         regra_secao = ('Classifique cada bullet em "Executivo" (governo, ministérios, agências, órgãos de controle, '
                        'Judiciário, conselhos, organismos internacionais, eventos) ou "Legislativo" '
                        '(Câmara, Senado, comissões, projetos de lei, parlamentares).')
+        regra_conjuntura = (
+            "CONJUNTURA POLÍTICA (TODOS EXCETO IDEC):\n"
+            "- Notícias cuja 'Seção no documento interno' for de conjuntura política geral "
+            "(CÂMARA/SENADO/EXECUTIVO/JUDICIÁRIO ou similar) são de interesse geral e DEVEM ser incluídas para este cliente, "
+            "mesmo sem relação direta com os temas específicos de saúde acima.\n"
+            "- Classifique essas notícias em 'Executivo' ou 'Legislativo' conforme o poder envolvido, "
+            "e no campo 'tema' use 'Conjuntura Política'."
+        )
     blocos = []
     for i, n in enumerate(noticias, 1):
         blocos.append(f"### NOTÍCIA {i}\nURL: {n['url']}\nSeção no documento interno: {n.get('secao', '')}\n"
@@ -488,8 +504,10 @@ TEMAS DO CLIENTE (só estes contam):
 
 SEÇÃO: {regra_secao}
 
+{regra_conjuntura}
+
 Responda SOMENTE com JSON, sem comentários, no formato:
-{{"bullets": [{{"noticia": <número da notícia>, "secao": "<seção>", "tema": "<tema da lista acima>", "titulo": "...", "texto": "...", "documentos": [{{"nome": "...", "url": "..."}}]}}]}}
+{{"bullets": [{{"noticia": <número da notícia>, "secao": "<seção>", "tema": "<tema da lista acima ou 'Conjuntura Política'>", "titulo": "...", "texto": "...", "documentos": [{{"nome": "...", "url": "..."}}]}}]}}
 Se nenhuma notícia tiver relação direta, responda {{"bullets": []}}.
 
 NOTÍCIAS DA SEMANA:
