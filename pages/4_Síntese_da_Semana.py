@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 
 import gspread
 import streamlit as st
-import streamlit.components.v1 as components
 from google.oauth2.service_account import Credentials
 
 import sintese_semana_core as ss
@@ -670,85 +669,50 @@ if arqs:
                                     unsafe_allow_html=True)
                 corpo = (SS.get("sint_emails") or {}).get(c)
                 if corpo:
-                    with c3:
-                        with st.popover("Ver email", icon=":material/mail:"):
-                            conteudo = corpo.split("<body", 1)[-1].split(">", 1)[-1].rsplit("</body>", 1)[0]
-                        btn_iframe = f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  body {{ margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-  .btn-copy {{
-    background: #192D4E; color: #FFFFFF; border: none; border-radius: 6px;
-    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 100%; box-sizing: border-box; transition: background 0.15s ease;
-    letter-spacing: 0.01em;
-  }}
-  .btn-copy:hover {{ background: #0E1A2E; }}
-  .btn-copy.sucesso {{ background: #265C4B !important; color: #FFFFFF !important; }}
-</style>
-</head>
-<body>
-<button id="btn" class="btn-copy" onclick="copiar()">
-  <span>Copiar corpo do email</span>
-</button>
-<script>
-const htmlData = {json.dumps(corpo)};
-function copiar() {{
-  const btn = document.getElementById("btn");
-  const temp = document.createElement("div");
-  temp.innerHTML = htmlData;
-  const textData = temp.innerText || temp.textContent;
-
-  if (navigator.clipboard && window.ClipboardItem) {{
-    try {{
-      const bHtml = new Blob([htmlData], {{ type: "text/html" }});
-      const bText = new Blob([textData], {{ type: "text/plain" }});
-      navigator.clipboard.write([new ClipboardItem({{ "text/html": bHtml, "text/plain": bText }})]).then(() => {{
-        mostrarSucesso();
-      }}).catch(() => {{
-        copiarFallback(htmlData, textData);
-      }});
-      return;
-    }} catch(e) {{}}
-  }}
-  copiarFallback(htmlData, textData);
-}}
-function copiarFallback(html, text) {{
-  const listener = function(e) {{
-    e.clipboardData.setData("text/html", html);
-    e.clipboardData.setData("text/plain", text);
-    e.preventDefault();
-  }};
-  document.addEventListener("copy", listener);
-  try {{
-    document.execCommand("copy");
-    mostrarSucesso();
-  }} catch(err) {{
-    document.getElementById("btn").innerText = "Erro ao copiar";
-  }}
-  document.removeEventListener("copy", listener);
-}}
-function mostrarSucesso() {{
-  const btn = document.getElementById("btn");
-  btn.className = "btn-copy sucesso";
-  btn.innerHTML = "<span>Copiado</span>";
-  setTimeout(() => {{
-    btn.className = "btn-copy";
-    btn.innerHTML = "<span>Copiar corpo do email</span>";
-  }}, 2500);
-}}
-</script>
-</body>
-</html>"""
-                        components.html(btn_iframe, height=44)
-                        st.html(f'<div class="sx-email">{conteudo}</div>')
+                    with c3, st.popover("Ver email", icon=":material/mail:"):
+                        conteudo = corpo.split("<body", 1)[-1].split(">", 1)[-1].rsplit("</body>", 1)[0]
+                        cid = f"em_{k}_{re.sub(r'[^a-zA-Z0-9]', '_', c)}"
+                        btn_copy_html = f"""
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+                            <button id="btn_{cid}" onclick="
+                                const el = document.getElementById('cnt_{cid}');
+                                const html = el.innerHTML;
+                                const text = el.innerText;
+                                try {{
+                                    const blobHtml = new Blob([html], {{ type: 'text/html' }});
+                                    const blobText = new Blob([text], {{ type: 'text/plain' }});
+                                    const item = new ClipboardItem({{ 'text/html': blobHtml, 'text/plain': blobText }});
+                                    navigator.clipboard.write([item]).then(() => {{
+                                        const b = document.getElementById('btn_{cid}');
+                                        b.innerText = 'Copiado com formatação!';
+                                        b.style.background = '#265C4B';
+                                        setTimeout(() => {{
+                                            b.innerText = 'Copiar email formatado';
+                                            b.style.background = '#192D4E';
+                                        }}, 2500);
+                                    }}).catch(() => {{
+                                        window.getSelection().selectAllChildren(el);
+                                        document.execCommand('copy');
+                                        const b = document.getElementById('btn_{cid}');
+                                        b.innerText = 'Copiado!';
+                                    }});
+                                }} catch(e) {{
+                                    window.getSelection().selectAllChildren(el);
+                                    document.execCommand('copy');
+                                }}
+                            " style="
+                                background: #192D4E; color: #FFFFFF; border: none; border-radius: 4px;
+                                padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+                                transition: background 0.2s;
+                            ">Copiar email formatado</button>
+                        </div>
+                        <div id="cnt_{cid}" class="sx-email">{conteudo}</div>
+                        """
+                        st.html(btn_copy_html)
     if not tem_pdf:
         st.markdown('<p class="sx-nota">O PDF não está disponível neste servidor; baixe o Word e exporte pelo Word ou pelo Docs.</p>',
                     unsafe_allow_html=True)
-    st.markdown('<p class="sx-nota">Email: abra "Ver email" e clique em "Copiar corpo do email" para colar no Wix com os links e negritos prontos.</p>',
+    st.markdown('<p class="sx-nota">Email: abra "Ver email", clique em "Copiar email formatado" e cole no Wix; os links e negritos vão junto.</p>',
                 unsafe_allow_html=True)
 
 _etapas()
