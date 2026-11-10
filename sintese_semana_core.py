@@ -784,8 +784,14 @@ def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers:
     """Cliente -> movimentações da semana (uma linha por proposição, o último andamento)."""
     unicos = {(a["Casa"], a["ID na Casa"]) for a in acomp if a.get("ID na Casa")}
     na_camara = _ids_camara_no_periodo(ini, fim)
-    if na_camara is not None:  # sem a listagem, consulta todas como antes
+    camara_fora = set()
+    if na_camara is not None:
         unicos = {(c, i) for c, i in unicos if not c.startswith("Câmara") or i in na_camara}
+    else:
+        # Se a listagem da Câmara falhou (ex.: API da Câmara fora do ar com 503), evita fazer 1,4 mil
+        # chamadas individuais que travam a página por dezenas de minutos. Trata a Câmara como indisponível.
+        camara_fora = {(c, i) for c, i in unicos if c.startswith("Câmara")}
+        unicos = {(c, i) for c, i in unicos if not c.startswith("Câmara")}
     feitos = [0]
 
     falhou = object()
@@ -803,8 +809,11 @@ def movimentacoes_semana(acomp: list[dict], ini: dt.date, fim: dt.date, workers:
 
     with ThreadPoolExecutor(workers) as ex:
         res = dict(ex.map(um, unicos))
-    # a Câmara devolve 429 sob carga: quem falhou é consultado de novo, devagar
-    repetir = [k for k, v in res.items() if v is falhou]
+    if camara_fora:
+        for k in camara_fora:
+            res[k] = falhou
+    # quem falhou é consultado de novo, devagar (exceto se a Câmara já estiver fora do ar)
+    repetir = [k for k, v in res.items() if v is falhou and k not in camara_fora]
     if repetir:
         time.sleep(5)
         with ThreadPoolExecutor(4) as ex:
