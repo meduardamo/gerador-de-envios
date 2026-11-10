@@ -3468,6 +3468,26 @@
   {
    "casa": "SF",
    "dia": "2026-11-10",
+   "ordem": "09:00",
+   "hora": "9h",
+   "colegiado": "COMISSÃO DE SERVIÇOS DE INFRAESTRUTURA (CI)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/59/reuniao/13653",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-13653-112938",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "REQ 90/2026 - CI",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176263",
+   "ementa": "Requer a inclusão de um representante do Instituto Livre Mercado na audiência pública objeto do REQ 45/2026 - CI, com o objetivo de promover um debate técnico e institucional acerca da segurança energética nacional e os investimentos estratégicos em infraestrutura como garantidores do abastecimento e da soberania.",
+   "autor": "Jayme Campos (UNIÃO/MT)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-10",
    "ordem": "10:00",
    "hora": "10h",
    "colegiado": "PLENÁRIO",
@@ -9500,9 +9520,9 @@
   }
  ],
  "erros": [
-  "Câmara: 504 Server Error: Gateway Timeout for url: https://dadosabertos.camara.leg.br/api/v2/deputados/74765 (mantida a pauta da coleta de 10/11 07:00)"
+  "Câmara: 503 Server Error: Service Unavailable for url: https://dadosabertos.camara.leg.br/api/v2/eventos?dataInicio=2026-11-09&dataFim=2026-11-13&itens=100&ordem=ASC&ordenarPor=dataHoraInicio (mantida a pauta da coleta de 10/11 07:45)"
  ],
- "coletadoEm": "10/11 07:45",
+ "coletadoEm": "10/11 13:42",
  "idsSegunda": [
   "SF-14985-19306",
   "SF-PLEN-562781",
