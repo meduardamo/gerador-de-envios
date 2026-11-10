@@ -1152,6 +1152,10 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, bullets: list[dict],
                 add_par("ato", [(cab, True, a["link"])])
                 if (a.get("resumo") or "").strip():
                     add_par("desc", [(a["resumo"], False, None)])
+    if so_anexo and not (novas or movs or dou):
+        add_par("sub", [("MONITORAMENTO LEGISLATIVO E REGULATÓRIO", False, None)])
+        p_aviso = novo("data")
+        els.append(_set_texto(p_aviso, [("Não houve novas proposições apresentadas, movimentações tramitadas na Câmara ou no Senado, nem atos do Diário Oficial da União acompanhados para este cliente no período.", False, None)], doc))
     # mantém os parágrafos vazios antes do título (espaço do logo do cabeçalho)
     filhos = list(corpo)
     i_tit = filhos.index(P["titulo"]._p)
@@ -1193,25 +1197,26 @@ def _tirar_coluna_cliente(tbl):
 # ─── Corpo do email (HTML para colar no Wix) ─────────────────────────────────
 def html_email(cliente: str, periodo: str, bullets: list[dict], clipping: list[dict] | None = None) -> str:
     esc = _html.escape
-    partes = [f"<p><b>Síntese da Semana - {esc(CLIENTES[cliente]['titulo'])}</b><br>{esc(periodo)}</p>"]
+    partes = [f"<p style='font-size:14px;line-height:1.5;margin:0 0 14px 0;'><b>Síntese da Semana - {esc(CLIENTES[cliente]['titulo'])}</b><br>{esc(periodo)}</p>"]
     if clipping:
-        partes.append("<h3>Clipping da Semana</h3><ul>")
+        partes.append("<h3 style='font-size:15px;color:#192D4E;margin:16px 0 8px;font-family:Montserrat,Arial,sans-serif;'>Clipping da Semana</h3><ul style='margin:6px 0 14px 20px;padding:0;'>")
         for c in clipping:
-            partes.append(f'<li><a href="{esc(c["url"])}"><b>{esc(c["titulo"])}</b></a> - {esc(c["lide"])}</li>')
+            partes.append(f'<li style="margin-bottom:8px;line-height:1.5;"><a href="{esc(c["url"])}" style="color:#0056b3;text-decoration:underline;"><b>{esc(c["titulo"])}</b></a> - {esc(c["lide"])}</li>')
         partes.append("</ul>")
     for sec in secoes_do_cliente(cliente):
         doses = [b for b in bullets if b["secao"] == sec]
         if not doses:
             continue
-        partes.append(f"<h3>{esc(sec if cliente == 'IDEC' else 'Destaques ' + sec)}</h3><ul>")
+        rotulo = sec if cliente == "IDEC" else "Destaques " + sec
+        partes.append(f"<h3 style='font-size:15px;color:#192D4E;margin:16px 0 8px;font-family:Montserrat,Arial,sans-serif;'>{esc(rotulo)}</h3><ul style='margin:6px 0 14px 20px;padding:0;'>")
         for b in doses:
             corpo = "".join(
-                (f'<a href="{esc(link)}">{"<b>" if neg else ""}{esc(t)}{"</b>" if neg else ""}</a>' if link
+                (f'<a href="{esc(link)}" style="color:#0056b3;text-decoration:underline;">{"<b>" if neg else ""}{esc(t)}{"</b>" if neg else ""}</a>' if link
                  else f'{"<b>" if neg else ""}{esc(t)}{"</b>" if neg else ""}')
                 for t, neg, link in _partes_bullet(b)[1:])
-            partes.append(f"<li>{corpo}</li>")
+            partes.append(f'<li style="margin-bottom:8px;line-height:1.5;">{corpo}</li>')
         partes.append("</ul>")
-    return "<html><head><meta charset='utf-8'></head><body style='font-family:Montserrat,Arial,sans-serif;font-size:14px'>" \
+    return "<html><head><meta charset='utf-8'></head><body style='font-family:Montserrat,Arial,sans-serif;font-size:14px;line-height:1.5;color:#222222;'>" \
            + "\n".join(partes) + "</body></html>"
 
 

@@ -622,27 +622,84 @@ if arqs:
             anexo = nome.replace(".docx", " - anexo.docx")
             n_on = sum(1 for i in range(len(bullets[c])) if SS.get(f"sb_{c}_{i}_on", True))
             n_mov = sum(1 for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m)))
+            n_novas = sum(1 for j, p in enumerate(_novas_de(c)) if SS.get(f"sp_{c}_{j}", True))
+            n_dou = sum(1 for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not ss.dou_rotina(a)))
+            tem_anx = (n_novas + n_mov + n_dou) > 0
             with st.container(key=f"lin_{k}"):
                 c0, c1, c2, c3 = st.columns(larg, vertical_alignment="center")
-                c0.markdown(f'<p class="sx-cli">{esc(ss.CLIENTES[c]["titulo"])}<span>{plural(n_on, "bullet", "bullets")} · '
-                            f'{plural(n_mov, "movimentação", "movimentações")}</span></p>', unsafe_allow_html=True)
+                detalhes_cli = [plural(n_on, "bullet", "bullets")]
+                if n_novas:
+                    detalhes_cli.append(plural(n_novas, "nova proposição", "novas proposições"))
+                detalhes_cli.append(plural(n_mov, "movimentação", "movimentações"))
+                if n_dou:
+                    detalhes_cli.append(plural(n_dou, "ato", "atos") + " no DOU")
+                c0.markdown(f'<p class="sx-cli">{esc(ss.CLIENTES[c]["titulo"])}<span>{" · ".join(detalhes_cli)}</span></p>',
+                            unsafe_allow_html=True)
                 for col, base, rot in ((c1, nome, "sin"), (c2, anexo, "anx")):
-                    with col, st.container(horizontal=True, gap="small"):
-                        if base in arqs:
-                            st.download_button("Word", arqs[base], file_name=base, mime=DOCX, key=f"dl_{k}_{rot}_w",
-                                               icon=":material/description:")
-                        pdf = base.replace(".docx", ".pdf")
-                        if pdf in arqs:
-                            st.download_button("PDF", arqs[pdf], file_name=pdf, mime="application/pdf",
-                                               key=f"dl_{k}_{rot}_p", icon=":material/picture_as_pdf:")
+                    with col:
+                        with st.container(horizontal=True, gap="small"):
+                            if base in arqs:
+                                st.download_button("Word", arqs[base], file_name=base, mime=DOCX, key=f"dl_{k}_{rot}_w",
+                                                   icon=":material/description:")
+                            pdf = base.replace(".docx", ".pdf")
+                            if pdf in arqs:
+                                st.download_button("PDF", arqs[pdf], file_name=pdf, mime="application/pdf",
+                                                   key=f"dl_{k}_{rot}_p", icon=":material/picture_as_pdf:")
+                        if rot == "anx":
+                            if tem_anx:
+                                itens_anx = []
+                                if n_novas: itens_anx.append(f"{n_novas} novas")
+                                if n_mov: itens_anx.append(f"{n_mov} movs")
+                                if n_dou: itens_anx.append(f"{n_dou} DOU")
+                                st.caption(" · ".join(itens_anx))
+                            else:
+                                st.caption("Vazio nesta semana")
                 corpo = (SS.get("sint_emails") or {}).get(c)
                 if corpo:
                     with c3, st.popover("Ver email", icon=":material/mail:"):
-                        st.html(f'<div class="sx-email">{corpo.split("<body", 1)[-1].split(">", 1)[-1].rsplit("</body>", 1)[0]}</div>')
+                        conteudo = corpo.split("<body", 1)[-1].split(">", 1)[-1].rsplit("</body>", 1)[0]
+                        cid = f"em_{k}_{c}"
+                        btn_copy_html = f"""
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+                            <button id="btn_{cid}" onclick="
+                                const el = document.getElementById('cnt_{cid}');
+                                const html = el.innerHTML;
+                                const text = el.innerText;
+                                try {{
+                                    const blobHtml = new Blob([html], {{ type: 'text/html' }});
+                                    const blobText = new Blob([text], {{ type: 'text/plain' }});
+                                    const item = new ClipboardItem({{ 'text/html': blobHtml, 'text/plain': blobText }});
+                                    navigator.clipboard.write([item]).then(() => {{
+                                        const b = document.getElementById('btn_{cid}');
+                                        b.innerText = '✓ Copiado com formatação!';
+                                        b.style.background = '#2E7D32';
+                                        setTimeout(() => {{
+                                            b.innerText = '📋 Copiar email formatado';
+                                            b.style.background = '#192D4E';
+                                        }}, 2500);
+                                    }}).catch(() => {{
+                                        window.getSelection().selectAllChildren(el);
+                                        document.execCommand('copy');
+                                        const b = document.getElementById('btn_{cid}');
+                                        b.innerText = '✓ Selecionado e copiado!';
+                                    }});
+                                }} catch(e) {{
+                                    window.getSelection().selectAllChildren(el);
+                                    document.execCommand('copy');
+                                }}
+                            " style="
+                                background: #192D4E; color: #FFFFFF; border: none; border-radius: 4px;
+                                padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+                                transition: background 0.2s;
+                            ">📋 Copiar email formatado</button>
+                        </div>
+                        <div id="cnt_{cid}" class="sx-email">{conteudo}</div>
+                        """
+                        st.html(btn_copy_html)
     if not tem_pdf:
         st.markdown('<p class="sx-nota">O PDF não está disponível neste servidor; baixe o Word e exporte pelo Word ou pelo Docs.</p>',
                     unsafe_allow_html=True)
-    st.markdown('<p class="sx-nota">Email: abra "Ver email", selecione o texto e cole no Wix; os links vão junto.</p>',
+    st.markdown('<p class="sx-nota">Email: abra "Ver email", clique em "Copiar email formatado" e cole no Wix; os links e negritos vão junto.</p>',
                 unsafe_allow_html=True)
 
 _etapas()
