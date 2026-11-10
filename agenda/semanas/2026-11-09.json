@@ -9500,9 +9500,9 @@
   }
  ],
  "erros": [
-  "Câmara: 504 Server Error: Gateway Timeout for url: https://dadosabertos.camara.leg.br/api/v2/eventos?dataInicio=2026-11-09&dataFim=2026-11-13&itens=100&ordem=ASC&ordenarPor=dataHoraInicio (mantida a pauta da coleta de 09/11 16:23)"
+  "Câmara: 504 Server Error: Gateway Timeout for url: https://dadosabertos.camara.leg.br/api/v2/deputados/74765 (mantida a pauta da coleta de 10/11 07:00)"
  ],
- "coletadoEm": "10/11 07:00",
+ "coletadoEm": "10/11 07:45",
  "idsSegunda": [
   "SF-14985-19306",
   "SF-PLEN-562781",
