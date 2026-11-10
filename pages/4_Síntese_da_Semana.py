@@ -658,48 +658,18 @@ if arqs:
                 if corpo:
                     with c3, st.popover("Ver email", icon=":material/mail:"):
                         conteudo = corpo.split("<body", 1)[-1].split(">", 1)[-1].rsplit("</body>", 1)[0]
-                        cid = f"em_{k}_{c}"
-                        btn_copy_html = f"""
-                        <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-                            <button id="btn_{cid}" onclick="
-                                const el = document.getElementById('cnt_{cid}');
-                                const html = el.innerHTML;
-                                const text = el.innerText;
-                                try {{
-                                    const blobHtml = new Blob([html], {{ type: 'text/html' }});
-                                    const blobText = new Blob([text], {{ type: 'text/plain' }});
-                                    const item = new ClipboardItem({{ 'text/html': blobHtml, 'text/plain': blobText }});
-                                    navigator.clipboard.write([item]).then(() => {{
-                                        const b = document.getElementById('btn_{cid}');
-                                        b.innerText = '✓ Copiado com formatação!';
-                                        b.style.background = '#2E7D32';
-                                        setTimeout(() => {{
-                                            b.innerText = '📋 Copiar email formatado';
-                                            b.style.background = '#192D4E';
-                                        }}, 2500);
-                                    }}).catch(() => {{
-                                        window.getSelection().selectAllChildren(el);
-                                        document.execCommand('copy');
-                                        const b = document.getElementById('btn_{cid}');
-                                        b.innerText = '✓ Selecionado e copiado!';
-                                    }});
-                                }} catch(e) {{
-                                    window.getSelection().selectAllChildren(el);
-                                    document.execCommand('copy');
-                                }}
-                            " style="
-                                background: #192D4E; color: #FFFFFF; border: none; border-radius: 4px;
-                                padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
-                                transition: background 0.2s;
-                            ">📋 Copiar email formatado</button>
-                        </div>
-                        <div id="cnt_{cid}" class="sx-email">{conteudo}</div>
-                        """
-                        st.html(btn_copy_html)
+                        st.download_button("Baixar arquivo .html", corpo.encode("utf8"),
+                                           file_name=f"{ss.CLIENTES[c]['titulo']} - email.html",
+                                           mime="text/html", icon=":material/download:",
+                                           key=f"dl_html_{k}_{c}")
+                        st.markdown('<p style="font-size:12px;color:#555;margin:6px 0 12px;background:#F0F4F8;padding:8px 10px;border-radius:6px;">'
+                                    '<b>Como copiar:</b> selecione o texto abaixo com o mouse, aperte <b>Cmd + C</b> e cole no Wix (<b>Cmd + V</b>).'
+                                    '</p>', unsafe_allow_html=True)
+                        st.html(f'<div class="sx-email">{conteudo}</div>')
     if not tem_pdf:
         st.markdown('<p class="sx-nota">O PDF não está disponível neste servidor; baixe o Word e exporte pelo Word ou pelo Docs.</p>',
                     unsafe_allow_html=True)
-    st.markdown('<p class="sx-nota">Email: abra "Ver email", clique em "Copiar email formatado" e cole no Wix; os links e negritos vão junto.</p>',
+    st.markdown('<p class="sx-nota">Email: abra "Ver email", selecione o texto (ou baixe o .html) e cole no Wix; os links e negritos vão junto.</p>',
                 unsafe_allow_html=True)
 
 _etapas()
