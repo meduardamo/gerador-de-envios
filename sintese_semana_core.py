@@ -999,18 +999,43 @@ def _set_texto(p_el, partes: list[tuple[str, bool, str | None]], doc):
             p_el.remove(child)
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
+
+    # Remove recuos negativos herdados de exportações do Google Docs que empurram o texto
+    # para fora da margem no LibreOffice, fazendo títulos e bullets tocarem a borda da página.
+    pPr = p_el.find(f"{W}pPr")
+    if pPr is not None:
+        ind = pPr.find(f"{W}ind")
+        if ind is not None:
+            left_val = ind.get(qn("w:left"))
+            if left_val:
+                try:
+                    if float(left_val) < 0:
+                        pPr.remove(ind)
+                except ValueError:
+                    pass
+
+    # Faixas de seção têm fundo colorido (w:shd) e precisam ter texto branco FFFFFF
+    tem_shd = (pPr is not None and (pPr.find(f"{W}rPr/{W}shd") is not None or pPr.find(f"{W}shd") is not None))
+
     for texto, negrito, link in partes:
         texto = re.sub(r"[ \t]*[\r\n]+[ \t]*", " ", texto)  # \r da API do Senado desmonta a tabela no LibreOffice
         r = OxmlElement("w:r")
         rpr = copy.deepcopy(rpr0) if rpr0 is not None else OxmlElement("w:rPr")
-        for tag in ("w:b", "w:bCs", "w:u", "w:color"):
+        for tag in ("w:b", "w:bCs", "w:u"):
             for x in rpr.findall(qn(tag)):
                 rpr.remove(x)
         if negrito:
             b = OxmlElement("w:b"); b.set(qn("w:val"), "1"); rpr.insert(0, b)  # noqa: E702
         if link:
+            for x in rpr.findall(qn("w:color")):
+                rpr.remove(x)
             c = OxmlElement("w:color"); c.set(qn("w:val"), "1155CC"); rpr.append(c)  # noqa: E702
             u = OxmlElement("w:u"); u.set(qn("w:val"), "single"); rpr.append(u)  # noqa: E702
+        elif tem_shd:
+            # Faixa com fundo colorido (DESTAQUES): texto sempre branco FFFFFF
+            for x in rpr.findall(qn("w:color")):
+                rpr.remove(x)
+            c = OxmlElement("w:color"); c.set(qn("w:val"), "FFFFFF"); rpr.append(c)  # noqa: E702
         r.append(rpr)
         t = OxmlElement("w:t"); t.set(qn("xml:space"), "preserve"); t.text = texto  # noqa: E702
         r.append(t)
