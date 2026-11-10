@@ -674,41 +674,63 @@ if arqs:
                         cid = f"em_{k}_{re.sub(r'[^a-zA-Z0-9]', '_', c)}"
                         btn_copy_html = f"""
                         <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-                            <button id="btn_{cid}" onclick="
-                                const el = document.getElementById('cnt_{cid}');
-                                const html = el.innerHTML;
-                                const text = el.innerText;
-                                try {{
-                                    const blobHtml = new Blob([html], {{ type: 'text/html' }});
-                                    const blobText = new Blob([text], {{ type: 'text/plain' }});
-                                    const item = new ClipboardItem({{ 'text/html': blobHtml, 'text/plain': blobText }});
-                                    navigator.clipboard.write([item]).then(() => {{
-                                        const b = document.getElementById('btn_{cid}');
-                                        b.innerText = 'Copiado com formatação!';
-                                        b.style.background = '#265C4B';
-                                        setTimeout(() => {{
-                                            b.innerText = 'Copiar email formatado';
-                                            b.style.background = '#192D4E';
-                                        }}, 2500);
-                                    }}).catch(() => {{
-                                        window.getSelection().selectAllChildren(el);
-                                        document.execCommand('copy');
-                                        const b = document.getElementById('btn_{cid}');
-                                        b.innerText = 'Copiado!';
-                                    }});
-                                }} catch(e) {{
-                                    window.getSelection().selectAllChildren(el);
-                                    document.execCommand('copy');
-                                }}
-                            " style="
+                            <button id="btn_{cid}" type="button" style="
                                 background: #192D4E; color: #FFFFFF; border: none; border-radius: 4px;
                                 padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
                                 transition: background 0.2s;
                             ">Copiar email formatado</button>
                         </div>
                         <div id="cnt_{cid}" class="sx-email">{conteudo}</div>
+                        <script>
+                        (function() {{
+                            function setup() {{
+                                const btn = document.getElementById("btn_{cid}");
+                                const cnt = document.getElementById("cnt_{cid}");
+                                if (!btn || !cnt) {{ setTimeout(setup, 40); return; }}
+                                btn.onclick = function() {{
+                                    const htmlData = cnt.innerHTML;
+                                    const textData = cnt.innerText || cnt.textContent;
+                                    let ok = false;
+                                    try {{
+                                        const listener = function(e) {{
+                                            e.clipboardData.setData("text/html", htmlData);
+                                            e.clipboardData.setData("text/plain", textData);
+                                            e.preventDefault();
+                                        }};
+                                        document.addEventListener("copy", listener);
+                                        ok = document.execCommand("copy");
+                                        document.removeEventListener("copy", listener);
+                                    }} catch(e) {{}}
+                                    if (!ok && navigator.clipboard && window.ClipboardItem) {{
+                                        try {{
+                                            const bHtml = new Blob([htmlData], {{ type: "text/html" }});
+                                            const bText = new Blob([textData], {{ type: "text/plain" }});
+                                            navigator.clipboard.write([new ClipboardItem({{ "text/html": bHtml, "text/plain": bText }})]).then(() => {{
+                                                sucesso();
+                                            }});
+                                            return;
+                                        }} catch(e) {{}}
+                                    }}
+                                    if (ok) {{
+                                        sucesso();
+                                    }} else {{
+                                        btn.innerText = "Erro ao copiar";
+                                    }}
+                                    function sucesso() {{
+                                        btn.innerText = "Copiado!";
+                                        btn.style.background = "#265C4B";
+                                        setTimeout(function() {{
+                                            btn.innerText = "Copiar email formatado";
+                                            btn.style.background = "#192D4E";
+                                        }}, 2500);
+                                    }}
+                                }};
+                            }}
+                            setup();
+                        }})();
+                        </script>
                         """
-                        st.html(btn_copy_html)
+                        st.html(btn_copy_html, unsafe_allow_javascript=True)
     if not tem_pdf:
         st.markdown('<p class="sx-nota">O PDF não está disponível neste servidor; baixe o Word e exporte pelo Word ou pelo Docs.</p>',
                     unsafe_allow_html=True)
