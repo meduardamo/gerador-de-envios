@@ -227,6 +227,16 @@ def _segunda(d: dt.date) -> dt.date:
     return d - dt.timedelta(days=d.weekday())
 
 
+def _limpar_tudo():
+    for k in ("sint_arquivo", "sint_div", "sint_noticias", "sint_bullets", "sint_dou",
+              "sint_arquivos", "sint_emails", "sint_acomp_ok", "sint_acomp_n",
+              "sint_movs_xls", "sint_erros", "sint_semana"):
+        SS.pop(k, None)
+    for k in [k for k in list(SS.keys()) if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_", "xls_"))]:
+        SS.pop(k, None)
+    SS["sint_upload_ver"] = SS.get("sint_upload_ver", 0) + 1
+
+
 # ========= BARRA LATERAL (igual às outras páginas: logo, descrição, usuário e sair) =========
 with st.sidebar:
     st.markdown(
@@ -235,6 +245,11 @@ with st.sidebar:
         'Síntese semanal de <strong>saúde</strong>: lê a <strong>Divisão semanal</strong>, gera os bullets de cada '
         'cliente, consulta as <strong>movimentações</strong> na Câmara e no Senado e monta o Word, o PDF e o email.'
         '</p></div>', unsafe_allow_html=True)
+    st.markdown("---")
+    if st.button("Limpar tudo", width="stretch",
+                 help="Zera a Síntese da Semana (arquivo da Divisão, bullets gerados, movimentações e arquivos montados) para começar do zero"):
+        _limpar_tudo()
+        st.rerun()
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
@@ -296,7 +311,8 @@ CLIS = [c for c, v in ss.CLIENTES.items() if quinzenal or not v.get("quinzenal")
 # ========= 1. DIVISÃO SEMANAL =========
 secao("1. Divisão semanal", cor="#962E4D", info="No Docs: Arquivo > Fazer download > PDF ou Microsoft Word (.docx). Os dois servem: "
       "a página lê os links de notícia por tema e a tabela de novas proposições.")
-arq = st.file_uploader("Divisão semanal - Saúde", type=["docx", "pdf"], label_visibility="collapsed")
+arq = st.file_uploader("Divisão semanal - Saúde", type=["docx", "pdf"], label_visibility="collapsed",
+                       key=f"sint_div_arq_{SS.get('sint_upload_ver', 0)}")
 if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
     SS["sint_arquivo"] = (arq.name, arq.size)
     try:
