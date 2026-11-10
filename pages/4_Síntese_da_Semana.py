@@ -133,6 +133,10 @@ div[class*="st-key-lin_"]:last-child { border-bottom: 0; }
 .sx-th { font-size: 0.69rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #4E5A6E; }
 .sx-cli { font-size: 14px; font-weight: 700; color: #192D4E; margin: 0; line-height: 1.3; }
 .sx-cli span { display: block; font-size: 12px; font-weight: 500; color: #6A6A66; margin-top: 2px; }
+.sx-anx-sub { font-size: 11px; font-weight: 500; color: #6E7787; margin-top: 3px; line-height: 1.2; }
+.sx-sem-anx { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.sx-tag-vazio { background: #F1F3F5; color: #5C6779; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 4px; border: 1px solid #D8DCE0; text-transform: uppercase; letter-spacing: .02em; }
+.sx-txt-vazio { font-size: 11.5px; color: #8C95A3; }
 div[class*="st-key-lin_"] [data-testid="stDownloadButton"] button, div[class*="st-key-lin_"] [data-testid="stPopover"] button { min-height: 32px !important; padding: 3px 12px !important; }
 .st-key-sx_entregas [data-testid="stPopoverBody"], div[class*="st-key-lin_"] [data-testid="stPopoverBody"] { width: min(760px, 92vw) !important; }
 .sx-email { font-size: 14px; line-height: 1.6; }
@@ -613,7 +617,7 @@ arqs = SS.get("sint_arquivos")
 if arqs:
     tem_pdf = any(k.endswith(".pdf") for k in arqs)
     with st.container(key="sx_entregas"):
-        larg = [0.34, 0.24, 0.24, 0.18]
+        larg = [0.28, 0.22, 0.32, 0.18]
         with st.container(key="lin_cab"):
             for col, t in zip(st.columns(larg, vertical_alignment="center"), ["Cliente", "Síntese", "Anexo", "Email"]):
                 col.markdown(f'<div class="sx-th">{t}</div>', unsafe_allow_html=True)
@@ -627,33 +631,40 @@ if arqs:
             tem_anx = (n_novas + n_mov + n_dou) > 0
             with st.container(key=f"lin_{k}"):
                 c0, c1, c2, c3 = st.columns(larg, vertical_alignment="center")
-                detalhes_cli = [plural(n_on, "bullet", "bullets")]
-                if n_novas:
-                    detalhes_cli.append(plural(n_novas, "nova proposição", "novas proposições"))
-                detalhes_cli.append(plural(n_mov, "movimentação", "movimentações"))
-                if n_dou:
-                    detalhes_cli.append(plural(n_dou, "ato", "atos") + " no DOU")
-                c0.markdown(f'<p class="sx-cli">{esc(ss.CLIENTES[c]["titulo"])}<span>{" · ".join(detalhes_cli)}</span></p>',
+                sub_cli = [plural(n_on, "bullet", "bullets")]
+                if clipping.get(c):
+                    sub_cli.append(plural(len(clipping[c]), "clipping", "clippings"))
+                c0.markdown(f'<p class="sx-cli">{esc(ss.CLIENTES[c]["titulo"])}<span>{" · ".join(sub_cli)}</span></p>',
                             unsafe_allow_html=True)
-                for col, base, rot in ((c1, nome, "sin"), (c2, anexo, "anx")):
-                    with col:
+                with c1, st.container(horizontal=True, gap="small"):
+                    if nome in arqs:
+                        st.download_button("Word", arqs[nome], file_name=nome, mime=DOCX, key=f"dl_{k}_sin_w",
+                                           icon=":material/description:")
+                    pdf = nome.replace(".docx", ".pdf")
+                    if pdf in arqs:
+                        st.download_button("PDF", arqs[pdf], file_name=pdf, mime="application/pdf",
+                                           key=f"dl_{k}_sin_p", icon=":material/picture_as_pdf:")
+                with c2:
+                    if tem_anx:
                         with st.container(horizontal=True, gap="small"):
-                            if base in arqs:
-                                st.download_button("Word", arqs[base], file_name=base, mime=DOCX, key=f"dl_{k}_{rot}_w",
+                            if anexo in arqs:
+                                st.download_button("Word", arqs[anexo], file_name=anexo, mime=DOCX, key=f"dl_{k}_anx_w",
                                                    icon=":material/description:")
-                            pdf = base.replace(".docx", ".pdf")
+                            pdf = anexo.replace(".docx", ".pdf")
                             if pdf in arqs:
                                 st.download_button("PDF", arqs[pdf], file_name=pdf, mime="application/pdf",
-                                                   key=f"dl_{k}_{rot}_p", icon=":material/picture_as_pdf:")
-                        if rot == "anx":
-                            if tem_anx:
-                                itens_anx = []
-                                if n_novas: itens_anx.append(f"{n_novas} novas")
-                                if n_mov: itens_anx.append(f"{n_mov} movs")
-                                if n_dou: itens_anx.append(f"{n_dou} DOU")
-                                st.caption(" · ".join(itens_anx))
-                            else:
-                                st.caption("Vazio nesta semana")
+                                                   key=f"dl_{k}_anx_p", icon=":material/picture_as_pdf:")
+                        itens_anx = []
+                        if n_novas:
+                            itens_anx.append(plural(n_novas, "nova", "novas"))
+                        if n_mov:
+                            itens_anx.append(plural(n_mov, "mov", "movs"))
+                        if n_dou:
+                            itens_anx.append(plural(n_dou, "ato no DOU", "atos no DOU"))
+                        st.markdown(f'<div class="sx-anx-sub">{" · ".join(itens_anx)}</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div class="sx-sem-anx"><span class="sx-tag-vazio">Sem anexo</span><span class="sx-txt-vazio">Sem proposições ou atos</span></div>',
+                                    unsafe_allow_html=True)
                 corpo = (SS.get("sint_emails") or {}).get(c)
                 if corpo:
                     with c3, st.popover("Ver email", icon=":material/mail:"):
