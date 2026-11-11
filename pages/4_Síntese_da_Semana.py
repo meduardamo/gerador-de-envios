@@ -484,9 +484,11 @@ if "sint_dou" not in SS:
         with ThreadPoolExecutor(8) as ex:
             completos = dict(zip(todos_para_completar.keys(),
                                  ex.map(ss.completar_ato_dou, todos_para_completar.values())))
+        campos = ("ato", "resumo", "orgao", "orgao_topo", "publicado")
         for c in abas:
             combinados[c] = [
-                {**a, **completos[a["link"]]} if a.get("link") in completos else a
+                {**a, **{k: completos[a["link"]][k] for k in campos if k in completos[a["link"]]}}
+                if a.get("link") in completos else a
                 for a in combinados[c]
             ]
 
@@ -516,10 +518,16 @@ if AGENDA_SHEET_ID:
             "e suas movimentações não puderam ser verificadas nesta rodada. As do Senado foram carregadas normalmente. "
             "Para incluir movimentações da Câmara, use a opção **Acrescentar do Inteligov (XLS)** na aba de cada cliente."
         )
+        if st.button("Consultar a Câmara de novo", icon=":material/refresh:", key="sx_camara_de_novo"):
+            _movs_da_semana.clear()
+            st.rerun()
     elif (movs_por_cli or {}).get(ss.SEM_RESPOSTA):
         n_sr = len(movs_por_cli[ss.SEM_RESPOSTA])
         st.warning(f"{plural(n_sr, 'proposição acompanhada não respondeu', 'proposições acompanhadas não responderam')} "
                    "na Câmara ou no Senado e pode faltar na tabela de movimentações. Confira no XLS do Inteligov.")
+        if st.button("Consultar de novo", icon=":material/refresh:", key="sx_sem_resposta_de_novo"):
+            _movs_da_semana.clear()
+            st.rerun()
 if SS.get("sint_acomp_n"):
     st.markdown(f'<p class="eg-explica">{plural(SS["sint_acomp_n"], "proposição nova da Divisão entrou", "proposições novas da Divisão entraram")} '
                 'na lista de acompanhadas.</p>', unsafe_allow_html=True)
@@ -684,8 +692,9 @@ if gerar:
             modelo = (MODELO_IDEC if c == "IDEC" else MODELO).read_bytes()
             nome = ss.nome_arquivo(c, INI, FIM)
             arquivos[nome] = ss.gerar_docx(modelo, c, PERIODO, bl, cl, novas, movs, atos)
-            arquivos[nome.replace(".docx", " - anexo.docx")] = ss.gerar_docx(
-                modelo, c, PERIODO, [], None, novas, movs, atos, so_anexo=True)
+            if novas or movs or atos:
+                arquivos[nome.replace(".docx", " - anexo.docx")] = ss.gerar_docx(
+                    modelo, c, PERIODO, [], None, novas, movs, atos, so_anexo=True)
             emails[c] = ss.html_email(c, PERIODO, bl, cl)
             arquivos[nome.replace(".docx", " - email.html")] = emails[c].encode("utf8")
     if ss.pdf_disponivel():

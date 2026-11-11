@@ -227,10 +227,13 @@ _RE_ORGAO = re.compile(
 )
 
 
+def _so_marcador(t: str) -> bool:
+    """Linha só com marcador ou espaço de largura zero (o Docs exporta "●\u200b" numa linha própria)."""
+    return not re.sub(r"[\s●·•\u200b\ufeff]+", "", t or "")
+
+
 def parse_ato_dou_item(cabecalho: str, resumo: str = "", orgao_padrao: str = "", link: str = "") -> dict | None:
     """Interpreta linha ou bloco do DOU da Divisão semanal e extrai o ato se houver cliente."""
-    if "REGIS ANDERSON DUDENA" in cabecalho or "REGIS ANDERSON DUDENA" in resumo:
-        return None
     partes = [p.strip() for p in cabecalho.split("|")]
     ato_nome = partes[0]
     if not (re.search(r"\|\s*Publicado\s+em", cabecalho, re.I) or
@@ -341,7 +344,7 @@ def _ler_dou_docx(d, rels) -> list[dict]:
         if el.tag != W + "p":
             continue
         texto = "".join(t.text or "" for t in el.iter(W + "t")).strip()
-        if not texto:
+        if _so_marcador(texto):
             continue
         if re.match(r"^\s*(?:DOU|DI[ÁA]RIO OFICIAL|ATOS DO DOU)\b", texto, re.I):
             em_dou = True
@@ -432,16 +435,18 @@ def _ler_dou_pdf(doc) -> list[dict]:
     orgao_atual = ""
     ultimo_ato = None
 
-    for pg in doc:
+    bloco_resumo = None  # (página, bloco) de onde veio o resumo do último ato: linhas seguintes do bloco continuam a frase
+
+    for n_pg, pg in enumerate(doc):
         links = [l for l in pg.get_links() if l.get("uri")]
-        for b in pg.get_text("blocks"):
+        for n_b, b in enumerate(pg.get_text("blocks")):
             texto = b[4].strip()
             if not texto:
                 continue
 
             for linha in texto.splitlines():
                 linha = linha.strip()
-                if not linha:
+                if _so_marcador(linha):
                     continue
                 if re.match(r"^\s*(?:DOU|DI[ÁA]RIO OFICIAL|ATOS DO DOU)\b", linha, re.I):
                     em_dou = True
@@ -468,11 +473,15 @@ def _ler_dou_pdf(doc) -> list[dict]:
                 if item:
                     out.append(item)
                     ultimo_ato = item
+                    bloco_resumo = None
+                elif ultimo_ato and bloco_resumo == (n_pg, n_b):
+                    ultimo_ato["resumo"] = f'{ultimo_ato["resumo"]} {linha}'.strip()
                 elif ultimo_ato and not ultimo_ato.get("resumo"):
                     clis, limpo = extrair_clientes_dou(linha)
                     if clis and not ultimo_ato.get("clientes"):
                         ultimo_ato["clientes"] = clis
                     ultimo_ato["resumo"] = limpo
+                    bloco_resumo = (n_pg, n_b)
 
     return out
 
@@ -1242,9 +1251,16 @@ def completar_ato_dou(ato: dict) -> dict:
                 resumo = resumo[len(ident):].strip()
         return {**ato, "ato": ident, "resumo": resumo, "orgao": org,
                 "orgao_topo": org.split("/")[0].strip().upper() if org else "OUTROS",
-                "publicado": pub if re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub) else ato["data"].strftime("%d/%m/%Y")}
+                "publicado": pub if re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub) else _publicado(ato)}
     except Exception:  # noqa: BLE001
-        return {**ato, "orgao": "", "orgao_topo": "OUTROS", "publicado": ato["data"].strftime("%d/%m/%Y")}
+        org = ato.get("orgao") or ""
+        return {**ato, "orgao": org, "orgao_topo": ato.get("orgao_topo") or (org.split("/")[0].strip().upper() if org else "OUTROS"),
+                "publicado": _publicado(ato)}
+
+
+def _publicado(ato: dict) -> str:
+    """Data do ato em dd/mm/aaaa; ato da Divisão pode vir sem data."""
+    return ato["data"].strftime("%d/%m/%Y") if ato.get("data") else (ato.get("publicado") or "")
 
 
 # ─── Word ────────────────────────────────────────────────────────────────────
@@ -1285,7 +1301,7 @@ def _set_texto(p_el, partes: list[tuple[str, bool, str | None]], doc):
     # Remove recuos negativos herdados de exportações do Google Docs que empurram o texto
     # para fora da margem no LibreOffice, fazendo títulos e bullets tocarem a borda da página.
     pPr = p_el.find(f"{W}pPr")
-    if pPr is not None:
+    if pPr is not None and getattr(doc, "_tirar_recuo_negativo", True):
         ind = pPr.find(f"{W}ind")
         if ind is not None:
             left_val = ind.get(qn("w:left"))
@@ -1374,6 +1390,7 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, bullets: list[dict],
                so_anexo: bool = False) -> bytes:
     import docx
     doc = docx.Document(io.BytesIO(modelo))
+    doc._tirar_recuo_negativo = cliente != "IDEC"
     P = _prototipos(doc)
     novo = lambda nome: copy.deepcopy(P[nome]._p)  # noqa: E731
     corpo = doc.element.body
@@ -1434,10 +1451,6 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, bullets: list[dict],
                 add_par("ato", [(cab, True, a["link"])])
                 if (a.get("resumo") or "").strip():
                     add_par("desc", [(a["resumo"], False, None)])
-    if so_anexo and not (novas or movs or dou):
-        add_par("sub", [("MONITORAMENTO LEGISLATIVO E REGULATÓRIO", False, None)])
-        p_aviso = novo("data")
-        els.append(_set_texto(p_aviso, [("Não houve novas proposições apresentadas, movimentações tramitadas na Câmara ou no Senado, nem atos do Diário Oficial da União acompanhados para este cliente no período.", False, None)], doc))
     # mantém os parágrafos vazios antes do título (espaço do logo do cabeçalho)
     filhos = list(corpo)
     i_tit = filhos.index(P["titulo"]._p)

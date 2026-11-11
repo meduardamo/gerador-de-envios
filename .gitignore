@@ -209,3 +209,6 @@ __marimo__/
 # Credencial local do login, nunca vai para o repositório.
 config.yaml
 .streamlit/secrets.toml
+
+# macOS
+.DS_Store
