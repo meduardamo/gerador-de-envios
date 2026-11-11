@@ -227,6 +227,30 @@ _RE_ORGAO = re.compile(
 )
 
 
+def _so_clientes(t: str) -> list[tuple[str, bool]]:
+    """Linha que só tem cliente(s), como "Umane", "Infinis Unfpa", "IEPS, Vital?" ou "Infinis (alerta?)".
+    Devolve [] se houver qualquer palavra que não seja cliente (aí é texto do ato)."""
+    s = re.sub(r"\([^)]*\)", " ", t or "")
+    s = re.sub(r"^[●·•\u200b\s]+", "", s).strip(" .:-–|")
+    if not s or len(s) > 80:
+        return []
+    out = []
+    for parte in re.split(r"[,;/\n]| e ", s):
+        parte = parte.strip()
+        if not parte:
+            continue
+        cl = cliente_da_celula(parte)
+        if not cl:
+            pals = parte.split()
+            cl = [x for w in pals for x in cliente_da_celula(w)]
+            if len(cl) != len(pals):
+                return []
+        for x in cl:
+            if x[0] not in [c for c, _ in out]:
+                out.append(x)
+    return out
+
+
 def _so_marcador(t: str) -> bool:
     """Linha só com marcador ou espaço de largura zero (o Docs exporta "●\u200b" numa linha própria)."""
     return not re.sub(r"[\s●·•\u200b\ufeff]+", "", t or "")
@@ -236,6 +260,16 @@ def parse_ato_dou_item(cabecalho: str, resumo: str = "", orgao_padrao: str = "",
     """Interpreta linha ou bloco do DOU da Divisão semanal e extrai o ato se houver cliente."""
     partes = [p.strip() for p in cabecalho.split("|")]
     ato_nome = partes[0]
+    resumo_hifen = ""
+    # "PORTARIA Nº 1 - Infinis" ou "PORTARIA Nº 1 - Designa fulano..." (formato do email)
+    m_hif = re.match(r"(.+?)\s+[-–]\s+(.+)$", ato_nome)
+    if m_hif:
+        cli_hif = _so_clientes(m_hif.group(2))
+        if cli_hif:
+            ato_nome = m_hif.group(1).strip()
+            partes.append(m_hif.group(2))
+        elif re.match(r"^(?:PORTARIA|RESOLU|INSTRU|DESPACHO|DECRETO|ATO|CONSULTA|EDITAL|AC[ÓO]RD|DECIS|MEDIDA)", ato_nome, re.I):
+            ato_nome, resumo_hifen = m_hif.group(1).strip(), m_hif.group(2).strip()
     if not (re.search(r"\|\s*Publicado\s+em", cabecalho, re.I) or
             re.search(r"^(?:PORTARIA|RESOLUÇÃO|RESOLUCAO|INSTRUÇÃO|INSTRUCAO|DESPACHO|DECRETO|ATO|CONSULTA|EDITAL|ACÓRDÃO|ACORDAO|DECISÃO|DECISAO|MEDIDA)\b", ato_nome, re.I) or
             "in.gov.br" in link or "in.gov.br" in cabecalho):
@@ -250,10 +284,13 @@ def parse_ato_dou_item(cabecalho: str, resumo: str = "", orgao_padrao: str = "",
         orgao_txt = orgao_padrao
     orgao_topo = orgao_txt.split("/")[0].strip().upper() if orgao_txt else (orgao_padrao or "OUTROS")
     clis = []
-    if len(partes) >= 4:
-        clis = cliente_da_celula(partes[3])
-    if not clis and len(partes) >= 3:
-        clis = cliente_da_celula(partes[2])
+    for p in reversed(partes[1:]):
+        if re.match(r"Publicado", p, re.I):
+            continue
+        clis = cliente_da_celula(p)
+        if clis:
+            break
+    resumo = resumo or resumo_hifen
     resumo_limpo = resumo
     if not clis and resumo:
         clis, resumo_limpo = extrair_clientes_dou(resumo)
@@ -263,8 +300,9 @@ def parse_ato_dou_item(cabecalho: str, resumo: str = "", orgao_padrao: str = "",
         clis, ato_limpo = extrair_clientes_dou(ato_nome)
         if clis:
             ato_nome = ato_limpo
-    if not clis:
+    if not clis and not (m_pub or "in.gov.br" in link or "in.gov.br" in cabecalho):
         return None
+    # sem cliente na linha: fica pendente e pega o cliente da linha de baixo (ato sem cliente é descartado no fim)
     if not link:
         m_link = re.search(r"https?://\S+", cabecalho) or re.search(r"https?://\S+", resumo)
         if m_link:
@@ -373,13 +411,18 @@ def _ler_dou_docx(d, rels) -> list[dict]:
         if item:
             out.append(item)
             ultimo_ato = item
+            continue
+        so_cli = _so_clientes(texto)
+        if so_cli:
+            if ultimo_ato and not ultimo_ato.get("clientes"):
+                ultimo_ato["clientes"] = so_cli
         elif ultimo_ato and not ultimo_ato.get("resumo"):
             clis, limpo = extrair_clientes_dou(texto)
             if clis and not ultimo_ato.get("clientes"):
                 ultimo_ato["clientes"] = clis
-            ultimo_ato["resumo"] = limpo
+            ultimo_ato["resumo"] = re.sub(r"^[●·•\u200b\s]+", "", limpo)
 
-    return out
+    return [a for a in out if a["clientes"]]
 
 
 def _ler_dou_pdf(doc) -> list[dict]:
@@ -437,14 +480,31 @@ def _ler_dou_pdf(doc) -> list[dict]:
 
     bloco_resumo = None  # (página, bloco) de onde veio o resumo do último ato: linhas seguintes do bloco continuam a frase
 
+    re_inicio_ato = re.compile(r"^[●·•\u200b\s]*(?:PORTARIA|RESOLU|INSTRU|DESPACHO|DECRETO|ATO\b|CONSULTA|EDITAL|AC[ÓO]RD|DECIS|MEDIDA|EXTRATO|AVISO)", re.I)
+
+    def _linhas_do_bloco(b, margem_dir):
+        """Linhas do bloco com o retângulo de cada uma; linha que chegou à margem direita continua na seguinte."""
+        out_l = []
+        quebrou = False
+        for ln in b.get("lines", []):
+            txt = "".join(sp["text"] for sp in ln["spans"]).strip()
+            ret = fitz.Rect(ln["bbox"])
+            if not txt:
+                continue
+            if (quebrou and out_l and not _so_marcador(txt) and not re_inicio_ato.match(txt)
+                    and not _RE_ORGAO.match(txt) and not _so_clientes(txt)):
+                out_l[-1] = (f"{out_l[-1][0]} {txt}", out_l[-1][1] | ret)
+            else:
+                out_l.append((txt, ret))
+            quebrou = not _so_marcador(txt) and ret.x1 >= margem_dir - 40
+        return out_l
+
     for n_pg, pg in enumerate(doc):
         links = [l for l in pg.get_links() if l.get("uri")]
-        for n_b, b in enumerate(pg.get_text("blocks")):
-            texto = b[4].strip()
-            if not texto:
-                continue
-
-            for linha in texto.splitlines():
+        blocos = [b for b in pg.get_text("dict")["blocks"] if b.get("type") == 0]
+        margem_dir = max((ln["bbox"][2] for b in blocos for ln in b["lines"]), default=0)
+        for n_b, b in enumerate(blocos):
+            for linha, ret_linha in _linhas_do_bloco(b, margem_dir):
                 linha = linha.strip()
                 if _so_marcador(linha):
                     continue
@@ -461,7 +521,7 @@ def _ler_dou_pdf(doc) -> list[dict]:
 
                 link = ""
                 for l in links:
-                    if l.get("from") and fitz.Rect(b[:4]).intersects(l["from"]):
+                    if l.get("from") and ret_linha.intersects(l["from"]):
                         link = l["uri"]
                         break
                 if not link:
@@ -470,20 +530,24 @@ def _ler_dou_pdf(doc) -> list[dict]:
                         link = m_url.group(0).rstrip(".,;)>]")
 
                 item = parse_ato_dou_item(linha, orgao_padrao=orgao_atual, link=link)
+                so_cli = [] if item else _so_clientes(linha)
                 if item:
                     out.append(item)
                     ultimo_ato = item
                     bloco_resumo = None
+                elif so_cli:
+                    if ultimo_ato and not ultimo_ato.get("clientes"):
+                        ultimo_ato["clientes"] = so_cli
                 elif ultimo_ato and bloco_resumo == (n_pg, n_b):
                     ultimo_ato["resumo"] = f'{ultimo_ato["resumo"]} {linha}'.strip()
                 elif ultimo_ato and not ultimo_ato.get("resumo"):
                     clis, limpo = extrair_clientes_dou(linha)
                     if clis and not ultimo_ato.get("clientes"):
                         ultimo_ato["clientes"] = clis
-                    ultimo_ato["resumo"] = limpo
+                    ultimo_ato["resumo"] = re.sub(r"^[●·•\u200b\s]+", "", limpo)
                     bloco_resumo = (n_pg, n_b)
 
-    return out
+    return [a for a in out if a["clientes"]]
 
 
 def ler_divisao(dados: bytes, nome: str) -> dict:
