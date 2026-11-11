@@ -285,8 +285,9 @@ def _etapas():
     nb = sum(len(v) for v in bl.values())
     itens = [
         ("feita" if div_ else "atual", "Divisão semanal",
-         f'{plural(len(div_["noticias"]), "notícia", "notícias")} e '
-         f'{plural(len(div_["proposicoes"]), "proposição nova", "proposições novas")}' if div_
+         f'{plural(len(div_["noticias"]), "notícia", "notícias")}, '
+         f'{plural(len(div_["proposicoes"]), "proposição nova", "proposições novas")}'
+         + (f' e {plural(len(div_["dou"]), "ato no DOU", "atos no DOU")}' if div_.get("dou") else "") if div_
          else "Suba o PDF ou o Word baixado do Docs"),
         ("feita" if bl else ("atual" if div_ else "aberta"), "Bullets e revisão",
          f'{plural(nb, "bullet", "bullets")} em {plural(len(bl), "cliente", "clientes")}' if bl
@@ -330,8 +331,8 @@ if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
 div = SS.get("sint_div")
 if not div:
     _parar()
-if not div["noticias"] and not div["proposicoes"]:
-    st.warning("O arquivo não tem links de notícia nem a tabela de novas proposições. Confira se é a Divisão semanal - Saúde.")
+if not div["noticias"] and not div["proposicoes"] and not div.get("dou"):
+    st.warning("O arquivo não tem links de notícia, novas proposições nem atos do DOU. Confira se é a Divisão semanal - Saúde.")
     _parar()
 
 nots = div["noticias"]
@@ -339,6 +340,8 @@ falhas = [n for n in (SS.get("sint_noticias") or []) if n.get("erro")]
 partes = [f'<span><b>{len(nots)}</b>notícias</span>', '<span class="sep">|</span>',
           f'<span><b>{len({n["secao"] for n in nots})}</b>temas</span>', '<span class="sep">|</span>',
           f'<span><b>{len(div["proposicoes"])}</b>novas proposições</span>']
+if div.get("dou"):
+    partes += ['<span class="sep">|</span>', f'<span><b>{len(div["dou"])}</b>atos no DOU</span>']
 if falhas:
     partes += ['<span class="sep">|</span>', f'<span class="alerta"><b>{len(falhas)}</b>não lidas</span>']
 st.markdown('<div class="eg-resumo">' + "".join(partes) + "</div>", unsafe_allow_html=True)
@@ -407,27 +410,87 @@ abas = [c for c in bullets]
 if not abas:
     _parar()
 
-# DOU da raspagem (uma vez por semana e Divisão)
-if DOU_SHEET_ID and "sint_dou" not in SS:
-    with st.spinner("Lendo o DOU da raspagem..."):
-        try:
-            gc = _gc()
-            brutos, falhou = {}, []
-            for c in abas:
-                try:
-                    brutos[c] = ss.ler_dou_cliente(gc, DOU_SHEET_ID, c, INI, FIM)
-                except Exception as e:  # noqa: BLE001
-                    brutos[c] = []
-                    falhou.append(f"{ss.CLIENTES[c]['titulo']} ({type(e).__name__})")
-            if falhou:
-                st.warning("DOU não lido para: " + ", ".join(falhou))
-            todos = {a["link"]: a for v in brutos.values() for a in v}
-            with ThreadPoolExecutor(8) as ex:
-                completos = dict(zip(todos, ex.map(ss.completar_ato_dou, todos.values())))
-            SS["sint_dou"] = {c: [completos[a["link"]] for a in v] for c, v in brutos.items()}
-        except Exception as e:  # noqa: BLE001
-            SS["sint_dou"] = {}
-            st.warning(f"Não consegui ler o DOU da raspagem: {e}")
+# DOU híbrido: raspagem (planilha) + Divisão semanal (manual com indicação de cliente)
+if "sint_dou" not in SS:
+    brutos = {c: [] for c in abas}
+    if DOU_SHEET_ID:
+        with st.spinner("Lendo o DOU da raspagem..."):
+            try:
+                gc = _gc()
+                falhou = []
+                for c in abas:
+                    try:
+                        brutos[c] = ss.ler_dou_cliente(gc, DOU_SHEET_ID, c, INI, FIM)
+                    except Exception as e:  # noqa: BLE001
+                        falhou.append(f"{ss.CLIENTES[c]['titulo']} ({type(e).__name__})")
+                if falhou:
+                    st.warning("DOU da raspagem não lido para: " + ", ".join(falhou))
+            except Exception as e:  # noqa: BLE001
+                st.warning(f"Não consegui ler o DOU da raspagem: {e}")
+
+    dou_div = div.get("dou", [])
+    combinados = {}
+    todos_para_completar = {}
+
+    for c in abas:
+        vistos_links = set()
+        vistos_atos = set()
+        lista_c = []
+
+        # 1. Atos da raspagem
+        for a in brutos.get(c, []):
+            link_norm = (a.get("link") or "").strip().rstrip("/")
+            ato_norm = re.sub(r"\W+", " ", (a.get("ato") or "").lower()).strip()
+            if link_norm:
+                vistos_links.add(link_norm)
+            if ato_norm:
+                vistos_atos.add(ato_norm)
+            item = {**a, "origem": "raspagem"}
+            lista_c.append(item)
+            if item.get("link"):
+                todos_para_completar[item["link"]] = item
+
+        # 2. Atos da Divisão semanal
+        for a in dou_div:
+            duvida = False
+            pertence = False
+            for cli, d_flag in a.get("clientes", []):
+                if cli == c:
+                    pertence = True
+                    duvida = d_flag
+                    break
+            if not pertence:
+                continue
+
+            link_norm = (a.get("link") or "").strip().rstrip("/")
+            ato_norm = re.sub(r"\W+", " ", (a.get("ato") or "").lower()).strip()
+            if link_norm and link_norm in vistos_links:
+                continue
+            if ato_norm and ato_norm in vistos_atos:
+                continue
+            if link_norm:
+                vistos_links.add(link_norm)
+            if ato_norm:
+                vistos_atos.add(ato_norm)
+
+            item = {**a, "duvida": duvida, "origem": "divisao"}
+            lista_c.append(item)
+            if item.get("link"):
+                todos_para_completar[item["link"]] = item
+
+        combinados[c] = lista_c
+
+    if todos_para_completar:
+        with ThreadPoolExecutor(8) as ex:
+            completos = dict(zip(todos_para_completar.keys(),
+                                 ex.map(ss.completar_ato_dou, todos_para_completar.values())))
+        for c in abas:
+            combinados[c] = [
+                {**a, **completos[a["link"]]} if a.get("link") in completos else a
+                for a in combinados[c]
+            ]
+
+    SS["sint_dou"] = combinados
 dou_por_cli = SS.get("sint_dou", {})
 
 # proposições acompanhadas: as novas da Divisão entram na lista; depois, a tramitação da semana
@@ -579,16 +642,19 @@ for c, tab in zip(abas, tabs):
                             st.error(f"Não consegui ler o arquivo: {e}")
 
         secao("Novas publicações (DOU)", plural(len(atos), "ato", "atos") if atos else "", COR["dou"],
-              "Atos da raspagem do DOU marcados como alinhados ao cliente na semana.", menor=True)
-        if not DOU_SHEET_ID:
-            vazio("Planilha da raspagem do DOU não configurada.")
+              "Atos da raspagem do DOU e da Divisão semanal alinhados ao cliente na semana.", menor=True)
+        if not DOU_SHEET_ID and not any(div.get("dou", [])):
+            vazio("Nenhum ato do DOU encontrado (planilha da raspagem não configurada e nenhum ato com cliente na Divisão).")
         elif not atos:
             vazio("Nenhum ato marcado como alinhado na semana.")
         for j, a in enumerate(atos):
+            chip_duvida = chip("marcado com ? na Divisão", "duvida") if a.get("duvida") else ""
+            chip_origem = chip("Divisão semanal") if a.get("origem") == "divisao" else ""
             _item(f"sd_{c}_{j}",
-                  f'<div class="sx-top">{chip(a.get("publicado"), "data")}{chip(a.get("orgao_topo") or a.get("orgao"), "org")}</div>'
+                  f'<div class="sx-top">{chip_duvida}{chip_origem}{chip(a.get("publicado"), "data")}{chip(a.get("orgao_topo") or a.get("orgao"), "org")}</div>'
                   f'<p class="sx-h">{_a(a["link"], a["ato"])}</p>'
-                  f'<p class="sx-ementa">{esc(a.get("resumo", ""))}</p>', valor=not ss.dou_rotina(a))
+                  f'<p class="sx-ementa">{esc(a.get("resumo", ""))}</p>',
+                  valor=not (ss.dou_rotina(a) or a.get("duvida")))
 
 
 # ========= 3. WORD, PDF E EMAIL =========
@@ -613,7 +679,7 @@ if gerar:
                                "texto": SS.get(f"sb_{c}_{i}_x", b["texto"])})
             cl = [x for i, x in enumerate(clipping.get(c, [])) if SS.get(f"sc_{c}_{i}", True)]
             novas = [p for j, p in enumerate(_novas_de(c)) if SS.get(f"sp_{c}_{j}", True)]
-            atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not ss.dou_rotina(a))]
+            atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not (ss.dou_rotina(a) or a.get("duvida")))]
             movs = [m for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m))]
             modelo = (MODELO_IDEC if c == "IDEC" else MODELO).read_bytes()
             nome = ss.nome_arquivo(c, INI, FIM)
@@ -642,7 +708,7 @@ if arqs:
             n_on = sum(1 for i in range(len(bullets[c])) if SS.get(f"sb_{c}_{i}_on", True))
             n_mov = sum(1 for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m)))
             n_novas = sum(1 for j, p in enumerate(_novas_de(c)) if SS.get(f"sp_{c}_{j}", True))
-            n_dou = sum(1 for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not ss.dou_rotina(a)))
+            n_dou = sum(1 for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not (ss.dou_rotina(a) or a.get("duvida"))))
             tem_anx = (n_novas + n_mov + n_dou) > 0
             with st.container(key=f"lin_{k}"):
                 c0, c1, c2, c3 = st.columns(larg, vertical_alignment="top")

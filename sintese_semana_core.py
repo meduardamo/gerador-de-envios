@@ -197,8 +197,288 @@ def _secao_limpa(txt: str) -> str:
     return t
 
 
+def extrair_clientes_dou(txt: str) -> tuple[list[tuple[str, bool]], str]:
+    """Extrai clientes e dúvidas de texto e retorna (clientes, texto_sem_marcação)."""
+    m = re.search(r"(?:clientes?|para)\s*[:=]\s*([^\n\r]+)", txt, re.I)
+    if m:
+        clis = cliente_da_celula(m.group(1))
+        if clis:
+            limpo = re.sub(r"\s*(?:clientes?|para)\s*[:=]\s*[^\n\r]+", "", txt, flags=re.I).strip()
+            return clis, limpo
+    m_colch = re.search(r"\[([^\]]+)\]\s*$", txt)
+    if m_colch:
+        clis = cliente_da_celula(m_colch.group(1))
+        if clis:
+            limpo = txt[:m_colch.start()].strip()
+            return clis, limpo
+    m_par = re.search(r"\(([^)]+)\)\s*$", txt)
+    if m_par:
+        clis = cliente_da_celula(m_par.group(1))
+        if clis:
+            limpo = txt[:m_par.start()].strip()
+            return clis, limpo
+    clis = cliente_da_celula(txt)
+    return clis, txt
+
+
+_RE_ORGAO = re.compile(
+    r"^[●·•\u200b\s]*(MINIST[ÉE]RIO|CONSELHO|AG[ÊE]NCIA|PRESID[ÊE]NCIA|CONTROLADORIA|ADVOCACIA|SECRETARIA|SUPERINTEND[ÊE]NCIA|C[ÂA]MARA|SENADO|TRIBUNAL|DEFENSORIA|MINIST[ÉE]RIO P[ÚU]BLICO|ATOS DO PODER)\b",
+    re.I
+)
+
+
+def parse_ato_dou_item(cabecalho: str, resumo: str = "", orgao_padrao: str = "", link: str = "") -> dict | None:
+    """Interpreta linha ou bloco do DOU da Divisão semanal e extrai o ato se houver cliente."""
+    if "REGIS ANDERSON DUDENA" in cabecalho or "REGIS ANDERSON DUDENA" in resumo:
+        return None
+    partes = [p.strip() for p in cabecalho.split("|")]
+    ato_nome = partes[0]
+    if not (re.search(r"\|\s*Publicado\s+em", cabecalho, re.I) or
+            re.search(r"^(?:PORTARIA|RESOLUÇÃO|RESOLUCAO|INSTRUÇÃO|INSTRUCAO|DESPACHO|DECRETO|ATO|CONSULTA|EDITAL|ACÓRDÃO|ACORDAO|DECISÃO|DECISAO|MEDIDA)\b", ato_nome, re.I) or
+            "in.gov.br" in link or "in.gov.br" in cabecalho):
+        return None
+    m_pub = re.search(r"Publicado\s+em:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})", cabecalho, re.I)
+    pub_txt = m_pub.group(1) if m_pub else ""
+    data_obj = _data_flex(pub_txt) if pub_txt else None
+    orgao_txt = ""
+    if len(partes) >= 3 and not cliente_da_celula(partes[2]):
+        orgao_txt = partes[2]
+    elif orgao_padrao:
+        orgao_txt = orgao_padrao
+    orgao_topo = orgao_txt.split("/")[0].strip().upper() if orgao_txt else (orgao_padrao or "OUTROS")
+    clis = []
+    if len(partes) >= 4:
+        clis = cliente_da_celula(partes[3])
+    if not clis and len(partes) >= 3:
+        clis = cliente_da_celula(partes[2])
+    resumo_limpo = resumo
+    if not clis and resumo:
+        clis, resumo_limpo = extrair_clientes_dou(resumo)
+    elif resumo:
+        _, resumo_limpo = extrair_clientes_dou(resumo)
+    if not clis:
+        clis, ato_limpo = extrair_clientes_dou(ato_nome)
+        if clis:
+            ato_nome = ato_limpo
+    if not clis:
+        return None
+    if not link:
+        m_link = re.search(r"https?://\S+", cabecalho) or re.search(r"https?://\S+", resumo)
+        if m_link:
+            link = m_link.group(0).rstrip(".,;)>]")
+    return {
+        "ato": ato_nome,
+        "link": link,
+        "orgao": orgao_txt,
+        "orgao_topo": orgao_topo,
+        "publicado": pub_txt,
+        "data": data_obj,
+        "resumo": resumo_limpo,
+        "clientes": clis,
+        "origem": "divisao"
+    }
+
+
+def _ler_dou_docx(d, rels) -> list[dict]:
+    W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    out = []
+
+    # 1. Tabelas com DOU e CLIENTE
+    for t in d.tables:
+        if not t.rows:
+            continue
+        cab = [c.text.strip().upper() for c in t.rows[0].cells]
+        if any("PROPOSI" in c for c in cab):
+            continue
+        if any(k in " ".join(cab) for k in ("ATO", "PORTARIA", "PUBLICA", "DOU")) and any("CLIENTE" in c for c in cab):
+            idx = {
+                "ato": next((i for i, c in enumerate(cab) if any(k in c for k in ("ATO", "PORTARIA", "IDENTIF", "PUBLICA"))), None),
+                "data": next((i for i, c in enumerate(cab) if any(k in c for k in ("DATA", "PUBLICAD"))), None),
+                "orgao": next((i for i, c in enumerate(cab) if "ÓRG" in c or "ORG" in c), None),
+                "ementa": next((i for i, c in enumerate(cab) if any(k in c for k in ("EMENTA", "RESUMO", "DESCRI"))), None),
+                "cliente": next((i for i, c in enumerate(cab) if "CLIENTE" in c), None),
+            }
+            if idx["ato"] is None or idx["cliente"] is None:
+                continue
+            for row in t.rows[1:]:
+                cel = [c.text.strip() for c in row.cells]
+                pega = lambda k: cel[idx[k]] if idx[k] is not None and idx[k] < len(cel) else ""  # noqa: E731
+                ato_txt = pega("ato")
+                if not ato_txt:
+                    continue
+                link = ""
+                for h in row.cells[idx["ato"]]._tc.iter(W + "hyperlink"):
+                    rid = h.get(R + "id")
+                    if rid and rid in rels and rels[rid].is_external:
+                        link = rels[rid].target_ref
+                if not link:
+                    m_url = re.search(r"https?://\S+", ato_txt)
+                    if m_url:
+                        link = m_url.group(0).rstrip(".,;)>]")
+                clis = cliente_da_celula(pega("cliente"))
+                if not clis:
+                    continue
+                data_val = _data_flex(pega("data"))
+                pub_txt = pega("data")
+                if data_val and not re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub_txt):
+                    pub_txt = data_val.strftime("%d/%m/%Y")
+                org = pega("orgao")
+                org_topo = org.split("/")[0].strip().upper() if org else "OUTROS"
+                out.append({
+                    "ato": ato_txt, "link": link, "orgao": org, "orgao_topo": org_topo,
+                    "publicado": pub_txt, "data": data_val, "resumo": pega("ementa"),
+                    "clientes": clis, "origem": "divisao"
+                })
+
+    # 2. Parágrafos sob a seção DOU
+    body = d.element.body
+    em_dou = False
+    orgao_atual = ""
+    ultimo_ato = None
+
+    for el in body.iterchildren():
+        if el.tag != W + "p":
+            continue
+        texto = "".join(t.text or "" for t in el.iter(W + "t")).strip()
+        if not texto:
+            continue
+        if re.match(r"^\s*(?:DOU|DI[ÁA]RIO OFICIAL|ATOS DO DOU)\b", texto, re.I):
+            em_dou = True
+            continue
+        if not em_dou:
+            continue
+        if texto.lower().startswith("modelo"):
+            continue
+
+        link = ""
+        for h in el.iter(W + "hyperlink"):
+            rid = h.get(R + "id")
+            if rid and rid in rels and rels[rid].is_external:
+                link = rels[rid].target_ref
+                break
+        if not link:
+            m_url = re.search(r"https?://\S+", texto)
+            if m_url:
+                link = m_url.group(0).rstrip(".,;)>]")
+
+        if _RE_ORGAO.match(texto):
+            orgao_atual = re.sub(r"^●\s*", "", texto).strip().upper()
+            continue
+
+        item = parse_ato_dou_item(texto, orgao_padrao=orgao_atual, link=link)
+        if item:
+            out.append(item)
+            ultimo_ato = item
+        elif ultimo_ato and not ultimo_ato.get("resumo"):
+            clis, limpo = extrair_clientes_dou(texto)
+            if clis and not ultimo_ato.get("clientes"):
+                ultimo_ato["clientes"] = clis
+            ultimo_ato["resumo"] = limpo
+
+    return out
+
+
+def _ler_dou_pdf(doc) -> list[dict]:
+    import fitz
+    out = []
+
+    # 1. Tabelas no PDF
+    for pg in doc:
+        try:
+            tabs = pg.find_tables().tables
+        except Exception:
+            tabs = []
+        for t in tabs:
+            extracted = t.extract()
+            if not extracted:
+                continue
+            cab = [(x or "").strip().upper() for x in extracted[0]]
+            if any("PROPOSI" in c for c in cab):
+                continue
+            if any(k in " ".join(cab) for k in ("ATO", "PORTARIA", "PUBLICA", "DOU")) and any("CLIENTE" in c for c in cab):
+                idx = {
+                    "ato": next((i for i, c in enumerate(cab) if any(k in c for k in ("ATO", "PORTARIA", "IDENTIF", "PUBLICA"))), None),
+                    "data": next((i for i, c in enumerate(cab) if any(k in c for k in ("DATA", "PUBLICAD"))), None),
+                    "orgao": next((i for i, c in enumerate(cab) if "ÓRG" in c or "ORG" in c), None),
+                    "ementa": next((i for i, c in enumerate(cab) if any(k in c for k in ("EMENTA", "RESUMO", "DESCRI"))), None),
+                    "cliente": next((i for i, c in enumerate(cab) if "CLIENTE" in c), None),
+                }
+                if idx["ato"] is None or idx["cliente"] is None:
+                    continue
+                for row in extracted[1:]:
+                    cel = [(c or "").strip() for c in row]
+                    pega = lambda k: cel[idx[k]] if idx[k] is not None and idx[k] < len(cel) else ""  # noqa: E731
+                    ato_txt = pega("ato")
+                    if not ato_txt:
+                        continue
+                    clis = cliente_da_celula(pega("cliente"))
+                    if not clis:
+                        continue
+                    data_val = _data_flex(pega("data"))
+                    pub_txt = pega("data")
+                    if data_val and not re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub_txt):
+                        pub_txt = data_val.strftime("%d/%m/%Y")
+                    org = pega("orgao")
+                    org_topo = org.split("/")[0].strip().upper() if org else "OUTROS"
+                    out.append({
+                        "ato": ato_txt, "link": "", "orgao": org, "orgao_topo": org_topo,
+                        "publicado": pub_txt, "data": data_val, "resumo": pega("ementa"),
+                        "clientes": clis, "origem": "divisao"
+                    })
+
+    # 2. Text blocks no PDF sob a seção DOU
+    em_dou = False
+    orgao_atual = ""
+    ultimo_ato = None
+
+    for pg in doc:
+        links = [l for l in pg.get_links() if l.get("uri")]
+        for b in pg.get_text("blocks"):
+            texto = b[4].strip()
+            if not texto:
+                continue
+
+            for linha in texto.splitlines():
+                linha = linha.strip()
+                if not linha:
+                    continue
+                if re.match(r"^\s*(?:DOU|DI[ÁA]RIO OFICIAL|ATOS DO DOU)\b", linha, re.I):
+                    em_dou = True
+                    continue
+                if not em_dou:
+                    continue
+                if linha.lower().startswith("modelo"):
+                    continue
+                if _RE_ORGAO.match(linha):
+                    orgao_atual = re.sub(r"^[●·•\u200b\s]*", "", linha).strip().upper()
+                    continue
+
+                link = ""
+                for l in links:
+                    if l.get("from") and fitz.Rect(b[:4]).intersects(l["from"]):
+                        link = l["uri"]
+                        break
+                if not link:
+                    m_url = re.search(r"https?://\S+", linha)
+                    if m_url:
+                        link = m_url.group(0).rstrip(".,;)>]")
+
+                item = parse_ato_dou_item(linha, orgao_padrao=orgao_atual, link=link)
+                if item:
+                    out.append(item)
+                    ultimo_ato = item
+                elif ultimo_ato and not ultimo_ato.get("resumo"):
+                    clis, limpo = extrair_clientes_dou(linha)
+                    if clis and not ultimo_ato.get("clientes"):
+                        ultimo_ato["clientes"] = clis
+                    ultimo_ato["resumo"] = limpo
+
+    return out
+
+
 def ler_divisao(dados: bytes, nome: str) -> dict:
-    """Notícias com a seção (tema) de onde vieram e a tabela de novas proposições."""
+    """Notícias com a seção (tema) de onde vieram, tabela de novas proposições e atos do DOU."""
     if nome.lower().endswith(".docx"):
         return _ler_divisao_docx(dados)
     return _ler_divisao_pdf(dados)
@@ -255,7 +535,8 @@ def _ler_divisao_docx(dados: bytes) -> dict:
             props.append({"proposicao": f"{m_p.group(1)} {m_p.group(2)}/{m_p.group(3)}" if m_p else cel[idx["PROPOSI"]],
                           "ementa": pega("EMENTA"), "autor": pega("AUTOR"), "link": link,
                           "clientes": cliente_da_celula(pega("CLIENTE"))})
-    return {"noticias": _dedup(noticias), "proposicoes": props}
+    dou_atos = _ler_dou_docx(d, rels)
+    return {"noticias": _dedup(noticias), "proposicoes": props, "dou": dou_atos}
 
 
 def _ler_divisao_pdf(dados: bytes) -> dict:
@@ -288,7 +569,8 @@ def _ler_divisao_pdf(dados: bytes) -> dict:
             vistos.add(val)
             noticias.append({"secao": secao, "url": val})
     props = [{**r, "clientes": cliente_da_celula(r.pop("cliente_txt"))} for r in tabela_proposicoes_pdf(doc)]
-    return {"noticias": _dedup(noticias), "proposicoes": props}
+    dou_atos = _ler_dou_pdf(doc)
+    return {"noticias": _dedup(noticias), "proposicoes": props, "dou": dou_atos}
 
 
 _PROP = re.compile(r"^([A-Z]{2,6})\s*(\d+)\s*/\s*(\d{4})")
