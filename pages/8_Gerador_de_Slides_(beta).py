@@ -117,7 +117,7 @@ cabecalho("Gerador de Slides",
           "para abrir no PowerPoint ou importar no Canva e no Google Slides.",
           kicker="Ferramenta · BETA")
 st.warning("**Página em teste (BETA).** Ainda não use em material de cliente nem de divulgação: "
-           "o modelo e os textos estão sendo conferidos pela Comunicação.", icon=":material/science:")
+           "o modelo e os textos estão sendo conferidos pela Comunicação.")
 
 with st.sidebar:
     st.markdown("---")
