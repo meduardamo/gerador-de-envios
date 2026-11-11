@@ -258,7 +258,7 @@ with st.sidebar:
 cabecalho("Síntese da Semana", "Da Divisão semanal ao Word, ao anexo em PDF e ao corpo do email de cada cliente.")
 
 hoje = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
-padrao = _segunda(hoje) - dt.timedelta(days=7) if hoje.weekday() < 3 else _segunda(hoje)
+padrao = _segunda(hoje)
 with st.container(horizontal=True, key="sx_barra", vertical_alignment="bottom"):
     dia = st.date_input("Semana", value=padrao, format="DD/MM/YYYY", width=170,
                         help="Escolha qualquer dia: vale a semana de segunda a sexta.")
