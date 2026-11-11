@@ -46,6 +46,7 @@ NS = {"a": A}
 POL = 914400  # EMU por polegada
 VINHO = "95304D"  # o vinho do molde do Canva
 FOLGA = 0.9
+_ORIGINAL = {}  # caixa -> txBody do molde, refeito a cada gerar_pptx
 
 # índice do slide no molde
 LAYOUTS = {"capa": 0, "texto": 1, "lista": 2, "secao": 3, "cartoes": 4, "encerramento": 5}
@@ -158,9 +159,9 @@ def _paragrafos(texto: str):
     return pars
 
 
-def _estilos(sh):
+def _estilos(body):
     """rPr normal e rPr de destaque do primeiro parágrafo da caixa."""
-    runs = sh._element.txBody.findall(".//a:r", NS)
+    runs = body.findall(".//a:r", NS)
     base = runs[0].find("a:rPr", NS)
     dest = None
     for r in runs:
@@ -183,31 +184,35 @@ def _estilos(sh):
     return base, dest
 
 
-def _metricas(sh):
-    """(estilos para medir, entrelinha em pt) da caixa como está no molde."""
-    base, dest = _estilos(sh)
+def _metricas(body):
+    """(estilos para medir, entrelinha em pt) da caixa."""
+    base, dest = _estilos(body)
     def m(rp):
         return (_peso(rp), int(rp.get("sz", "1800")) / 100, int(rp.get("spc", "0")) / 100)
-    sp = sh._element.txBody.find(".//a:pPr/a:lnSpc/a:spcPts", NS)
+    sp = body.find(".//a:pPr/a:lnSpc/a:spcPts", NS)
     ln = int(sp.get("val")) / 100 if sp is not None else m(base)[1] * 1.2
     return {False: m(base), True: m(dest)}, ln
 
 
 def escrever(sh, texto: str, *, largura_pol: float | None = None, altura_max_pol: float | None = None,
-             uma_linha: bool = False, escala_min: float = 0.35, escala: float | None = None) -> float:
+             uma_linha: bool = False, escala_min: float = 0.35, escala: float | None = None,
+             escala_max: float = 1.0) -> float:
     """Troca o texto da caixa mantendo a formatação do molde e reduz a fonte até
     caber. Devolve a escala usada (1 = tamanho do molde). Com `escala`, usa essa
     sem medir (para igualar caixas irmãs)."""
     if largura_pol:
         sh.width = Emu(int(largura_pol * POL))
-    estilos, ln = _metricas(sh)
+    # formatação sempre a do molde: a segunda escrita na mesma caixa (para
+    # igualar irmãs) não pode partir do texto já reduzido ou aumentado
+    original = _ORIGINAL.setdefault(sh._element, copy.deepcopy(sh._element.txBody))
+    estilos, ln = _metricas(original)
     pars = _paragrafos(texto)
     # folga: PowerPoint, LibreOffice, Canva e Slides desenham a Montserrat um
     # pouco mais larga que a medida da PIL, e o espaçamento negativo nem sempre entra
     largura_pt = sh.width / POL * 72 * FOLGA
 
     if escala is None:
-        escala = 1.0
+        escala = escala_max
         while escala > escala_min:
             n = _linhas(pars, largura_pt, escala, estilos)
             ok = n is not None
@@ -221,9 +226,9 @@ def escrever(sh, texto: str, *, largura_pol: float | None = None, altura_max_pol
     n = _linhas(pars, largura_pt, escala, estilos) or len(pars)
 
     body = sh._element.txBody
-    p0 = body.find("a:p", NS)
-    ppr = p0.find("a:pPr", NS)
-    base, dest = _estilos(sh)
+    ppr = original.find("a:p", NS).find("a:pPr", NS)
+    base, dest = _estilos(original)
+
     for p in body.findall("a:p", NS):
         body.remove(p)
     for par in pars:
@@ -315,7 +320,7 @@ def _capa(s, c):
 
 
 def _linhas_usadas(sh) -> int:
-    estilos, ln = _metricas(sh)
+    estilos, ln = _metricas(sh._element.txBody)
     return max(1, round(sh.height / POL * 72 / ln))
 
 
@@ -415,10 +420,13 @@ def _cartoes(s, c):
     pares = [("TextBox 21", "TextBox 22", "Group 6"), ("TextBox 19", "TextBox 20", "Group 12")]
     esc_t, esc_x = [], []
     for i, (tt, tx, _) in enumerate(pares, 1):
-        esc_t.append(escrever(f[tt], c.get(f"cartao_{i}_titulo") or "", altura_max_pol=1.2))
+        esc_t.append(escrever(f[tt], c.get(f"cartao_{i}_titulo") or "", altura_max_pol=1.2, escala_max=1.3))
     for i, (tt, tx, _) in enumerate(pares, 1):
         topo = f[tt].top + f[tt].height + _pol(0.25)
-        esc_x.append(escrever(f[tx], c.get(f"cartao_{i}_texto") or "", altura_max_pol=10.2 - topo / POL))
+        # texto curto cresce até 1,25x (18 -> 22,5 pt) para não sobrar cartão
+        # vazio; o título do cartão vai até 1,3x e fica sempre maior
+        esc_x.append(escrever(f[tx], c.get(f"cartao_{i}_texto") or "",
+                              altura_max_pol=min(3.0, 10.2 - topo / POL), escala_max=1.25))
     for i, (tt, tx, grupo) in enumerate(pares, 1):
         escrever(f[tt], c.get(f"cartao_{i}_titulo") or "", escala=min(esc_t))
         f[tx].top = f[tt].top + f[tt].height + _pol(0.25)
@@ -452,6 +460,7 @@ PREENCHER = {"capa": _capa, "texto": _texto, "lista": _lista, "secao": _secao,
 
 def gerar_pptx(slides: list[dict]) -> bytes:
     """slides: [{"layout": "capa", "campos": {...}}] -> bytes do .pptx."""
+    _ORIGINAL.clear()
     prs = Presentation(str(MOLDE))
     moldes = list(prs.slides)
     feitos = 0
