@@ -1,6 +1,6 @@
 """
 Gerador de Slides (BETA): o conteúdo entra em texto ou arquivo e sai .pptx no
-modelo institucional da Eixo, para abrir no PowerPoint ou importar no Canva e
+modelo de apresentação da Eixo, para abrir no PowerPoint ou importar no Canva e
 no Google Slides.
 
 Em teste: a página avisa que não é para uso em material de cliente ainda.
@@ -30,7 +30,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from gerador_slides_core import CAMPOS, LAYOUTS, NOMES, estruturar, gerar_pptx
+from gerador_slides_core import CAMPOS, COM_IMAGEM, ITENS, LAYOUTS, NOMES, estruturar, gerar_pptx
 from polling_extracao_core import definir_api_key, extrair_texto_pdf_bytes
 from estilo_paginas import MARINHO, cabecalho, explica, secao, vazio
 
@@ -107,13 +107,16 @@ def _campos(item) -> dict:
     for chave, _, _ in CAMPOS[item["layout"]]:
         v = st.session_state.get(f"gs_{item['id']}_{chave}", "")
         out[chave] = [x.strip() for x in v.split("\n") if x.strip()] if chave == "itens" else v
+    imagem = st.session_state.get(f"gs_{item['id']}_imagem")
+    if item["layout"] in COM_IMAGEM and imagem is not None:
+        out["imagem"] = imagem.getvalue()
     return out
 
 
 # ── cabeçalho e lateral ─────────────────────────────────────────────────────
 
 cabecalho("Gerador de Slides",
-          "O conteúdo entra em texto ou arquivo e sai .pptx no modelo institucional da Eixo, "
+          "O conteúdo entra em texto ou arquivo e sai .pptx no modelo de apresentação da Eixo, "
           "para abrir no PowerPoint ou importar no Canva e no Google Slides.",
           kicker="Ferramenta · BETA")
 st.warning("**Página em teste (BETA).** Ainda não use em material de cliente nem de divulgação: "
@@ -186,8 +189,9 @@ for i, item in enumerate(slides):
     with st.expander(rotulo, expanded=False):
         for chave, nome, lim in CAMPOS[lay]:
             k = f"gs_{item['id']}_{chave}"
-            if chave in ("corpo", "itens", "subtitulo") or chave.endswith("_texto"):
-                ajuda = f"Um item por linha, até {lim} caracteres cada." if chave == "itens" else f"Até {lim} caracteres."
+            if chave in ("corpo", "itens", "texto") or chave.endswith("_texto"):
+                ajuda = (f"Um item por linha, de {ITENS[lay][0]} a {ITENS[lay][1]} itens, até {lim} caracteres cada."
+                         if chave == "itens" else f"Até {lim} caracteres.")
                 st.text_area(nome, key=k, height=140 if chave in ("corpo", "itens") else 90, help=ajuda)
             else:
                 st.text_input(nome, key=k, help=f"Até {lim} caracteres.")
@@ -195,6 +199,11 @@ for i, item in enumerate(slides):
             longo = [x for x in v.split("\n") if len(x) > lim] if chave == "itens" else ([v] if len(v) > lim else [])
             if longo:
                 st.caption(f"Passou do limite sugerido ({lim}); a fonte vai diminuir.")
+        if lay in COM_IMAGEM:
+            st.file_uploader("Imagem (opcional)", type=["png", "jpg", "jpeg", "webp"],
+                             key=f"gs_{item['id']}_imagem",
+                             help="Entra recortada na área da foto. Sem imagem, fica o espaço do modelo "
+                                  "para trocar no Canva.")
         m1, m2, m3, _ = st.columns([1, 1, 1, 3])
         m1.button("Subir", key=f"gs_up_{item['id']}", on_click=_mover, args=(i, -1),
                   disabled=i == 0, icon=":material/arrow_upward:", width="stretch")

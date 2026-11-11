@@ -1,21 +1,28 @@
 """
-Gerador de Slides (beta): conteúdo estruturado entra e sai .pptx no modelo
-institucional da Eixo, para abrir no PowerPoint ou importar no Canva e no
+Gerador de Slides (beta): conteúdo estruturado entra e sai .pptx no modelo de
+apresentação da Eixo, para abrir no PowerPoint ou importar no Canva e no
 Google Slides.
 
-O molde (modelos/slides_eixo.pptx) é a exportação do Institucional do Canva
-reduzida a seis layouts, sem fotos da equipe nem logos de clientes:
+O molde (modelos/slides_eixo.pptx) é a exportação do "Modelo PPT Institucional"
+do Canva da Comunicação (DAGiL4fmmj4), reduzida a dez layouts, sem a página de
+equipe nem a de pessoas com foto:
 
-    capa          duas linhas de título sobre o padrão da Eixo
-    texto         título e um bloco de texto
-    lista         chamada em três linhas e de 2 a 6 itens numerados
-    secao         divisória com foto
-    cartoes       título e dois cartões numerados
-    encerramento  "Dúvidas? Entre em contato." com os contatos da Eixo
+    capa            duas linhas de título sobre o padrão da Eixo
+    texto           título e bloco de texto
+    topicos         título em dois pesos, 2 a 5 tópicos e imagem à direita
+    lista           chamada em três linhas e 2 a 6 itens numerados
+    destaque        título em destaque, frase curta e imagem à direita
+    secao_vinho     divisória de seção em vinho
+    secao_marinho   divisória de seção em marinho
+    cartoes_3       título e três cartões numerados
+    cartoes_2       título e dois cartões numerados
+    encerramento    "Obrigado!" e o contato de quem apresenta
 
 Cada slide do resultado é cópia de um slide do molde com o texto trocado. A
 formatação vem do próprio molde (fonte, cor, espaçamento); quando o texto não
-cabe, a fonte diminui até caber, medida com a Montserrat de fontes/.
+cabe, a fonte diminui até caber, medida com a Montserrat de fontes/. Nos
+layouts com imagem, a imagem enviada entra recortada na área da foto; sem
+imagem, fica o espaço do modelo para trocar no Canva.
 
 No texto, **assim** vira destaque (negrito na cor da Eixo). Linha em branco
 separa parágrafos.
@@ -32,7 +39,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from lxml import etree
-from PIL import ImageFont
+from PIL import Image, ImageFont
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -49,14 +56,19 @@ FOLGA = 0.9
 _ORIGINAL = {}  # caixa -> txBody do molde, refeito a cada gerar_pptx
 
 # índice do slide no molde
-LAYOUTS = {"capa": 0, "texto": 1, "lista": 2, "secao": 3, "cartoes": 4, "encerramento": 5}
+LAYOUTS = {"capa": 0, "texto": 1, "topicos": 2, "lista": 3, "destaque": 4, "secao_vinho": 5,
+           "secao_marinho": 6, "cartoes_3": 7, "cartoes_2": 8, "encerramento": 9}
 
 NOMES = {
     "capa": "Capa",
     "texto": "Título e texto",
+    "topicos": "Tópicos com imagem",
     "lista": "Lista numerada",
-    "secao": "Divisória de seção",
-    "cartoes": "Dois cartões",
+    "destaque": "Destaque com imagem",
+    "secao_vinho": "Divisória vinho",
+    "secao_marinho": "Divisória marinho",
+    "cartoes_3": "Três cartões",
+    "cartoes_2": "Dois cartões",
     "encerramento": "Encerramento",
 }
 
@@ -64,17 +76,26 @@ NOMES = {
 CAMPOS = {
     "capa": [("linha_1", "Linha de cima", 24), ("linha_2", "Linha de baixo (destaque)", 30)],
     "texto": [("titulo", "Título", 50), ("corpo", "Texto", 650)],
+    "topicos": [("titulo_1", "Título, parte fina", 30), ("titulo_2", "Título, parte forte", 24),
+                ("itens", "Tópicos (2 a 5)", 70)],
     "lista": [("linha_1", "Chamada (linha de cima)", 30), ("destaque", "Palavra em destaque", 16),
               ("linha_3", "Complemento (linha de baixo)", 50), ("itens", "Itens (2 a 6)", 90)],
-    "secao": [("linha_1", "Linha de cima", 18), ("destaque", "Palavra em destaque", 14),
-              ("subtitulo", "Subtítulo", 90)],
-    "cartoes": [("titulo", "Título", 45), ("cartao_1_titulo", "Cartão 1: título", 40),
-                ("cartao_1_texto", "Cartão 1: texto", 280), ("cartao_2_titulo", "Cartão 2: título", 40),
-                ("cartao_2_texto", "Cartão 2: texto", 280)],
-    "encerramento": [("titulo", "Título", 40)],
+    "destaque": [("linha_1", "Linha de cima", 18), ("destaque", "Palavra em destaque", 14),
+                 ("texto", "Frase", 90)],
+    "secao_vinho": [("titulo", "Título", 40)],
+    "secao_marinho": [("titulo", "Título", 40)],
+    "cartoes_3": [("titulo", "Título", 45)] + [
+        (f"cartao_{i}_{k}", f"Cartão {i}: {r}", lim) for i in (1, 2, 3)
+        for k, r, lim in (("titulo", "título", 30), ("texto", "texto", 200))],
+    "cartoes_2": [("titulo", "Título", 45)] + [
+        (f"cartao_{i}_{k}", f"Cartão {i}: {r}", lim) for i in (1, 2)
+        for k, r, lim in (("titulo", "título", 40), ("texto", "texto", 280))],
+    "encerramento": [("titulo", "Título", 30), ("contato", "Contato de quem apresenta", 80)],
 }
 
-PADRAO_ENCERRAMENTO = "Dúvidas?\nEntre em contato."
+ITENS = {"topicos": (2, 5), "lista": (2, 6)}
+COM_IMAGEM = {"topicos", "destaque"}
+PADRAO_ENCERRAMENTO = "Obrigado!"
 
 
 # ── medida do texto ──────────────────────────────────────────────────────────
@@ -163,14 +184,16 @@ def _estilos(body):
     """rPr normal e rPr de destaque do primeiro parágrafo da caixa."""
     runs = body.findall(".//a:r", NS)
     base = runs[0].find("a:rPr", NS)
-    dest = None
-    for r in runs:
-        rp = r.find("a:rPr", NS)
-        cor = rp.find(".//a:srgbClr", NS)
-        if _peso(rp) != _peso(base) or (cor is not None and cor.get("val") == VINHO and
-                                        base.find(".//a:srgbClr", NS).get("val") != VINHO):
-            dest = rp
-            break
+    def cor(rp):
+        el = rp.find(".//a:srgbClr", NS)
+        return el.get("val") if el is not None else ""
+
+    # destaque do molde: primeiro o run em vinho num texto que não é vinho
+    # (o "Aqui" de "Título Aqui"), senão o primeiro run com outro peso
+    rprs = [r.find("a:rPr", NS) for r in runs if (r.findtext("a:t", namespaces=NS) or "").strip()]
+    dest = next((rp for rp in rprs if cor(rp) == VINHO and cor(base) != VINHO), None)
+    if dest is None:
+        dest = next((rp for rp in rprs if _peso(rp) != _peso(base)), None)
     if dest is None:
         dest = copy.deepcopy(base)
         dest.set("b", "true")
@@ -304,87 +327,11 @@ def _pol(v):
     return Emu(int(v * POL))
 
 
-def _capa(s, c):
-    f = _formas(s)
-    l1, l2 = (c.get("linha_1") or "").strip(), (c.get("linha_2") or "").strip()
-    base = f["TextBox 5"].top + f["TextBox 5"].height  # rodapé do título no molde
-    escrever(f["TextBox 5"], l2 or " ", largura_pol=15.0, uma_linha=True, escala_min=0.45)
-    if f["TextBox 5"].height > _pol(2.6) or _linhas_usadas(f["TextBox 5"]) > 1:
-        escrever(f["TextBox 5"], l2, largura_pol=15.0, altura_max_pol=4.2)
-    f["TextBox 5"].top = base - f["TextBox 5"].height
-    if l1:
-        escrever(f["TextBox 6"], l1, largura_pol=15.0, uma_linha=True, escala_min=0.45)
-        f["TextBox 6"].top = f["TextBox 5"].top - int(f["TextBox 6"].height * 0.76)
-    else:
-        _tirar(f["TextBox 6"])
 
 
 def _linhas_usadas(sh) -> int:
     estilos, ln = _metricas(sh._element.txBody)
     return max(1, round(sh.height / POL * 72 / ln))
-
-
-def _texto(s, c):
-    f = _formas(s)
-    tit, corpo = f["TextBox 6"], f["TextBox 5"]
-    escrever(tit, c.get("titulo") or "", largura_pol=16.5, altura_max_pol=2.6)
-    corpo.top = tit.top + tit.height + _pol(0.7)
-    disponivel = 10.2 - corpo.top / POL
-    escrever(corpo, c.get("corpo") or "", largura_pol=16.0, altura_max_pol=disponivel, escala_min=0.5)
-
-
-ESQ = [("Freeform 4", "TextBox 5", "TextBox 6"), ("Freeform 8", "TextBox 9", "TextBox 23"),
-       ("Freeform 11", "TextBox 12", "TextBox 10")]
-DIR = [("Freeform 14", "TextBox 15", "TextBox 18"), ("Freeform 16", "TextBox 17", "TextBox 13"),
-       ("Freeform 20", "TextBox 21", "TextBox 22")]
-
-
-def _lista(s, c):
-    f = _formas(s)
-    l1, dest, l3 = ((c.get(k) or "").strip() for k in ("linha_1", "destaque", "linha_3"))
-    itens = [str(i).strip() for i in (c.get("itens") or []) if str(i).strip()][:6]
-
-    if l1:
-        escrever(f["TextBox 7"], l1, largura_pol=17.0, uma_linha=True)
-    else:
-        _tirar(f["TextBox 7"])
-    escrever(f["TextBox 3"], dest or " ", largura_pol=16.5, uma_linha=True)
-    if l1:
-        # no molde a chamada encosta no destaque; com maiúscula ou acento no
-        # destaque ("PRAZOS", "DISTRIBUIÇÃO") as letras se batem
-        f["TextBox 3"].top += _pol(0.35)
-    if l3:
-        escrever(f["TextBox 24"], l3, largura_pol=16.0, uma_linha=True)
-        f["TextBox 24"].top = f["TextBox 3"].top + int(f["TextBox 3"].height * 0.70)
-    else:
-        _tirar(f["TextBox 24"])
-
-    n = len(itens)
-    if n <= 3:
-        posicoes = ESQ[:n]
-        sobra = ESQ[n:] + DIR
-        larguras = [15.0] * n
-    else:
-        k = math.ceil(n / 2)
-        posicoes = ESQ[:k] + DIR[:n - k]
-        sobra = ESQ[k:] + DIR[n - k:]
-        larguras = [6.3] * k + [7.6] * (n - k)
-    for trio in sobra:
-        _tirar(*(f[nome] for nome in trio))
-    # mesma escala para todos os itens, pela do item que mais precisa reduzir
-    escalas = [escrever(f[t], txt, largura_pol=w, altura_max_pol=1.6)
-               for (_, _, t), txt, w in zip(posicoes, itens, larguras)]
-    e = min(escalas) if escalas else 1.0
-    for i, ((circ, num, t), txt, w) in enumerate(zip(posicoes, itens, larguras), 1):
-        escrever(f[t], txt, largura_pol=w, escala=e)
-        escrever(f[num], str(i))
-        # caixa do texto centralizada no círculo e com âncora no meio: se o
-        # programa quebrar a linha diferente da medida, o texto continua alinhado
-        meio = f[circ].top + f[circ].height // 2
-        f[t].height = max(f[t].height, f[circ].height)
-        f[t].top = meio - f[t].height // 2
-        _ancora_meio(f[t])
-        f[num].top = meio - f[num].height // 2
 
 
 def _ancora_meio(sh):
@@ -395,51 +342,183 @@ def _ancora_meio(sh):
             bp.remove(el)
 
 
+def _txt(c, k):
+    return str(c.get(k) or "").strip()
+
+
+def _capa(s, c):
+    f = _formas(s)
+    l1, l2 = _txt(c, "linha_1"), _txt(c, "linha_2")
+    baixo, cima = f["TextBox 2"], f["TextBox 3"]
+    base = baixo.top + baixo.height  # rodapé do título no molde
+    escrever(baixo, l2 or " ", largura_pol=15.0, uma_linha=True, escala_min=0.45)
+    if _linhas_usadas(baixo) > 1:
+        escrever(baixo, l2, largura_pol=15.0, altura_max_pol=4.2)
+    baixo.top = base - baixo.height
+    if l1:
+        escrever(cima, l1, largura_pol=15.0, uma_linha=True, escala_min=0.45)
+        cima.top = baixo.top - int(cima.height * 0.76)
+    else:
+        _tirar(cima)
+
+
+def _texto(s, c):
+    f = _formas(s)
+    tit, corpo = f["TextBox 5"], f["TextBox 2"]
+    escrever(tit, _txt(c, "titulo"), largura_pol=16.5, altura_max_pol=2.6)
+    corpo.top = tit.top + tit.height + _pol(0.7)
+    escrever(corpo, _txt(c, "corpo"), largura_pol=17.0, altura_max_pol=10.2 - corpo.top / POL, escala_min=0.5)
+
+
+def _itens(c, layout):
+    lo, hi = ITENS[layout]
+    v = c.get("itens") or []
+    if isinstance(v, str):
+        v = v.split("\n")
+    return [str(i).strip() for i in v if str(i).strip()][:hi]
+
+
+def _alinhar_no_circulo(texto, circulo, numero=None):
+    """Caixa do texto centralizada no círculo e com âncora no meio: se o
+    programa quebrar a linha diferente da medida, o texto continua alinhado."""
+    meio = circulo.top + circulo.height // 2
+    texto.height = max(texto.height, circulo.height)
+    texto.top = meio - texto.height // 2
+    _ancora_meio(texto)
+    if numero is not None:
+        numero.top = meio - numero.height // 2
+
+
+def _imagem(s, grupo, dados: bytes | None, dica=None):
+    """Troca a foto do modelo pela imagem enviada, recortada para preencher a
+    área sem deformar. Sem imagem, fica a do modelo e a dica para trocar no Canva."""
+    if not dados:
+        return
+    im = Image.open(io.BytesIO(dados))
+    im = im.convert("RGB")
+    im.thumbnail((2000, 2000))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=88)
+    buf.seek(0)
+    _, rid = s.part.get_or_add_image_part(buf)
+    blip = grupo._element.find(".//a:blip", NS)
+    blip.set("{%s}embed" % R, rid)
+    forma = blip.getparent().getparent()  # spPr da forma com a foto
+    ext = forma.find("a:xfrm/a:ext", NS)
+    a_area = int(ext.get("cx")) / int(ext.get("cy"))
+    a_img = im.width / im.height
+    ret = blip.getparent().find("a:stretch/a:fillRect", NS)
+    for k in ("l", "t", "r", "b"):
+        ret.attrib.pop(k, None)
+    if a_img > a_area:  # mais larga: sobra dos lados
+        sobra = int((a_img / a_area - 1) / 2 * 100000)
+        ret.set("l", str(-sobra)); ret.set("r", str(-sobra))
+    else:
+        sobra = int((a_area / a_img - 1) / 2 * 100000)
+        ret.set("t", str(-sobra)); ret.set("b", str(-sobra))
+    if dica is not None:
+        _tirar(dica)
+
+
+TOPICOS = [("Freeform 2", "TextBox 12"), ("Freeform 3", "TextBox 13"), ("Freeform 4", "TextBox 14"),
+           ("Freeform 5", "TextBox 15"), ("Freeform 9", "TextBox 16")]
+
+
+def _topicos(s, c):
+    f = _formas(s)
+    t1, t2 = f["TextBox 10"], f["TextBox 11"]
+    escrever(t1, _txt(c, "titulo_1") or " ", largura_pol=10.2, uma_linha=True, escala_min=0.5)
+    escrever(t2, _txt(c, "titulo_2") or " ", largura_pol=10.2, uma_linha=True, escala_min=0.5)
+    t2.top = t1.top + int(t1.height * 0.78)
+    itens = _itens(c, "topicos")
+    for circ, t in TOPICOS[len(itens):]:
+        _tirar(f[circ], f[t])
+    usados = TOPICOS[:len(itens)]
+    escalas = [escrever(f[t], txt, largura_pol=8.9, altura_max_pol=1.3) for (_, t), txt in zip(usados, itens)]
+    e = min(escalas) if escalas else 1.0
+    for (circ, t), txt in zip(usados, itens):
+        escrever(f[t], txt, largura_pol=8.9, escala=e)
+        _alinhar_no_circulo(f[t], f[circ])
+    _imagem(s, f["Group 6"], c.get("imagem"), f["TextBox 17"])
+
+
+ESQ = [("Freeform 4", "TextBox 5", "TextBox 6"), ("Freeform 8", "TextBox 9", "TextBox 20"),
+       ("Freeform 10", "TextBox 11", "TextBox 21")]
+DIR = [("Freeform 12", "TextBox 13", "TextBox 22"), ("Freeform 14", "TextBox 15", "TextBox 23"),
+       ("Freeform 17", "TextBox 18", "TextBox 24")]
+
+
+def _lista(s, c):
+    f = _formas(s)
+    l1, dest, l3 = _txt(c, "linha_1"), _txt(c, "destaque"), _txt(c, "linha_3")
+    itens = _itens(c, "lista")
+    if l1:
+        escrever(f["TextBox 7"], l1, largura_pol=17.0, uma_linha=True)
+    else:
+        _tirar(f["TextBox 7"])
+    escrever(f["TextBox 3"], dest or " ", largura_pol=16.5, uma_linha=True)
+    if l1:
+        # no molde a chamada encosta no destaque; com maiúscula ou acento no
+        # destaque ("PRAZOS", "DISTRIBUIÇÃO") as letras se batem
+        f["TextBox 3"].top += _pol(0.35)
+    if l3:
+        escrever(f["TextBox 19"], l3, largura_pol=16.0, uma_linha=True)
+        f["TextBox 19"].top = f["TextBox 3"].top + int(f["TextBox 3"].height * 0.70)
+    else:
+        _tirar(f["TextBox 19"])
+
+    n = len(itens)
+    if n <= 3:
+        posicoes, sobra, larguras = ESQ[:n], ESQ[n:] + DIR, [15.0] * n
+    else:
+        k = math.ceil(n / 2)
+        posicoes, sobra = ESQ[:k] + DIR[:n - k], ESQ[k:] + DIR[n - k:]
+        larguras = [6.3] * k + [7.6] * (n - k)
+    for trio in sobra:
+        _tirar(*(f[nome] for nome in trio))
+    # mesma escala para todos os itens, pela do item que mais precisa reduzir
+    escalas = [escrever(f[t], txt, largura_pol=w, altura_max_pol=1.6)
+               for (_, _, t), txt, w in zip(posicoes, itens, larguras)]
+    e = min(escalas) if escalas else 1.0
+    for i, ((circ, num, t), txt, w) in enumerate(zip(posicoes, itens, larguras), 1):
+        escrever(f[t], txt, largura_pol=w, escala=e)
+        escrever(f[num], str(i))
+        _alinhar_no_circulo(f[t], f[circ], f[num])
+
+
+def _destaque(s, c):
+    f = _formas(s)
+    l1, dest, txt = _txt(c, "linha_1"), _txt(c, "destaque"), _txt(c, "texto")
+    t3, t4, t5 = f["TextBox 3"], f["TextBox 4"], f["TextBox 5"]
+    topo = t3.top
+    if l1:
+        escrever(t3, l1, largura_pol=10.0, uma_linha=True)
+        t4.top = t3.top + int(t3.height * 0.70)
+    else:
+        _tirar(t3)
+        t4.top = topo
+    escrever(t4, dest or " ", largura_pol=10.0, uma_linha=True)
+    if txt:
+        t5.top = t4.top + int(t4.height * 1.24)
+        escrever(t5, txt, largura_pol=10.0, altura_max_pol=10.4 - t5.top / POL)
+    else:
+        _tirar(t5)
+    _imagem(s, f["Group 6"], c.get("imagem"), f["TextBox 8"])
+
+
 def _secao(s, c):
     f = _formas(s)
-    l1, dest, sub = (c.get("linha_1") or "").strip(), (c.get("destaque") or "").strip(), (c.get("subtitulo") or "").strip()
-    t4, t5, t6 = f["TextBox 4"], f["TextBox 5"], f["TextBox 6"]
-    topo = t4.top
-    if l1:
-        escrever(t4, l1, uma_linha=True)
-        t5.top = t4.top + int(t4.height * 0.70)
-    else:
-        _tirar(t4)
-        t5.top = topo
-    escrever(t5, dest or " ", uma_linha=True)
-    if sub:
-        t6.top = t5.top + int(t5.height * 1.24)
-        escrever(t6, sub, altura_max_pol=10.4 - t6.top / POL)
-    else:
-        _tirar(t6)
-
-
-def _cartoes(s, c):
-    f = _formas(s)
-    escrever(f["TextBox 18"], c.get("titulo") or "", largura_pol=6.6, altura_max_pol=8.0)
-    pares = [("TextBox 21", "TextBox 22", "Group 6"), ("TextBox 19", "TextBox 20", "Group 12")]
-    esc_t, esc_x = [], []
-    for i, (tt, tx, _) in enumerate(pares, 1):
-        esc_t.append(escrever(f[tt], c.get(f"cartao_{i}_titulo") or "", altura_max_pol=1.2, escala_max=1.3))
-    for i, (tt, tx, _) in enumerate(pares, 1):
-        topo = f[tt].top + f[tt].height + _pol(0.25)
-        # texto curto cresce até 1,25x (18 -> 22,5 pt) para não sobrar cartão
-        # vazio; o título do cartão vai até 1,3x e fica sempre maior
-        esc_x.append(escrever(f[tx], c.get(f"cartao_{i}_texto") or "",
-                              altura_max_pol=min(3.0, 10.2 - topo / POL), escala_max=1.25))
-    for i, (tt, tx, grupo) in enumerate(pares, 1):
-        escrever(f[tt], c.get(f"cartao_{i}_titulo") or "", escala=min(esc_t))
-        f[tx].top = f[tt].top + f[tt].height + _pol(0.25)
-        escrever(f[tx], c.get(f"cartao_{i}_texto") or "", escala=min(esc_x))
-        _numero_no_circulo(f[grupo], f"0{i}")
+    escrever(f["TextBox 4"], _txt(c, "titulo") or " ", largura_pol=17.0, altura_max_pol=2.6)
 
 
 def _numero_no_circulo(grupo, texto):
     caixa = grupo._element.find(".//{http://schemas.openxmlformats.org/presentationml/2006/main}txBody")
     p = caixa.find("a:p", NS)
+    for r in p.findall("a:r", NS):
+        p.remove(r)
     r = etree.SubElement(p, _q("a:r"))
     rp = etree.SubElement(r, _q("a:rPr"), lang="pt-BR", sz="6000", b="1")
-    cor = etree.SubElement(etree.SubElement(rp, _q("a:solidFill")), _q("a:srgbClr"), val=VINHO)
+    etree.SubElement(etree.SubElement(rp, _q("a:solidFill")), _q("a:srgbClr"), val=VINHO)
     for tag in ("a:latin", "a:ea", "a:cs", "a:sym"):
         etree.SubElement(rp, _q(tag), typeface="Montserrat Bold")
     etree.SubElement(r, _q("a:t")).text = texto
@@ -448,18 +527,64 @@ def _numero_no_circulo(grupo, texto):
         sp.set("val", "7200")
 
 
+def _cartoes(s, c, titulo, largura_titulo, altura_titulo, pares):
+    """pares: (título do cartão, texto do cartão, grupo do círculo, caixa da
+    instrução do Canva sobre o círculo), da esquerda para a direita."""
+    f = _formas(s)
+    escrever(f[titulo], _txt(c, "titulo"), largura_pol=largura_titulo, altura_max_pol=altura_titulo)
+    esc_t, esc_x = [], []
+    for i, (tt, tx, _, _) in enumerate(pares, 1):
+        esc_t.append(escrever(f[tt], _txt(c, f"cartao_{i}_titulo"), altura_max_pol=1.2, escala_max=1.3))
+    for i, (tt, tx, _, _) in enumerate(pares, 1):
+        topo = f[tt].top + f[tt].height + _pol(0.25)
+        # texto curto cresce até 1,25x (18 -> 22,5 pt) para não sobrar cartão
+        # vazio; o título do cartão vai até 1,3x e fica sempre maior
+        esc_x.append(escrever(f[tx], _txt(c, f"cartao_{i}_texto"),
+                              altura_max_pol=min(3.0, 10.2 - topo / POL), escala_max=1.25))
+    for i, (tt, tx, grupo, dica) in enumerate(pares, 1):
+        escrever(f[tt], _txt(c, f"cartao_{i}_titulo"), escala=min(esc_t))
+        escrever(f[tx], _txt(c, f"cartao_{i}_texto"), escala=min(esc_x))
+        _numero_no_circulo(f[grupo], f"0{i}")
+        _tirar(f[dica])
+    # títulos na mesma altura e textos começando juntos, abaixo do título mais alto
+    topo = min(f[tt].top for tt, _, _, _ in pares)
+    fundo = max(topo + f[tt].height for tt, _, _, _ in pares)
+    for tt, tx, _, _ in pares:
+        f[tt].top = topo
+        f[tx].top = fundo + _pol(0.25)
+
+
+def _cartoes_3(s, c):
+    _cartoes(s, c, "TextBox 22", 17.0, 1.3, [
+        ("TextBox 27", "TextBox 28", "Group 19", "TextBox 29"),
+        ("TextBox 23", "TextBox 24", "Group 7", "TextBox 30"),
+        ("TextBox 25", "TextBox 26", "Group 13", "TextBox 31")])
+
+
+def _cartoes_2(s, c):
+    _cartoes(s, c, "TextBox 16", 6.6, 8.0, [
+        ("TextBox 19", "TextBox 20", "Group 6", "TextBox 22"),
+        ("TextBox 17", "TextBox 18", "Group 12", "TextBox 21")])
+
+
 def _encerramento(s, c):
     f = _formas(s)
-    escrever(f["TextBox 8"], (c.get("titulo") or "").strip() or PADRAO_ENCERRAMENTO,
-             altura_max_pol=3.4)
+    escrever(f["TextBox 5"], _txt(c, "titulo") or PADRAO_ENCERRAMENTO, largura_pol=12.0, altura_max_pol=2.8)
+    contato = _txt(c, "contato")
+    if contato:
+        escrever(f["TextBox 7"], contato, largura_pol=10.5, altura_max_pol=2.0)
+    else:
+        _tirar(f["TextBox 6"], f["TextBox 7"], f["Freeform 2"])
 
 
-PREENCHER = {"capa": _capa, "texto": _texto, "lista": _lista, "secao": _secao,
-             "cartoes": _cartoes, "encerramento": _encerramento}
+PREENCHER = {"capa": _capa, "texto": _texto, "topicos": _topicos, "lista": _lista, "destaque": _destaque,
+             "secao_vinho": _secao, "secao_marinho": _secao, "cartoes_3": _cartoes_3, "cartoes_2": _cartoes_2,
+             "encerramento": _encerramento}
 
 
 def gerar_pptx(slides: list[dict]) -> bytes:
-    """slides: [{"layout": "capa", "campos": {...}}] -> bytes do .pptx."""
+    """slides: [{"layout": "capa", "campos": {...}}] -> bytes do .pptx. Nos
+    layouts com imagem, campos["imagem"] traz os bytes da imagem (opcional)."""
     _ORIGINAL.clear()
     prs = Presentation(str(MOLDE))
     moldes = list(prs.slides)
@@ -487,30 +612,37 @@ def gerar_pptx(slides: list[dict]) -> bytes:
 def _descricao_layouts() -> str:
     linhas = []
     for k, campos in CAMPOS.items():
-        cs = ", ".join(f'"{ck}" (até {lim} caracteres)' if ck != "itens" else
-                       f'"itens" (lista de 2 a 6 frases, cada uma até {lim} caracteres)'
-                       for ck, _, lim in campos)
-        linhas.append(f"- {k} ({NOMES[k]}): {cs}")
+        partes = []
+        for ck, _, lim in campos:
+            if ck == "itens":
+                lo, hi = ITENS[k]
+                partes.append(f'"itens" (lista de {lo} a {hi} frases, cada uma até {lim} caracteres)')
+            else:
+                partes.append(f'"{ck}" (até {lim} caracteres)')
+        linhas.append(f"- {k} ({NOMES[k]}): " + ", ".join(partes))
     return "\n".join(linhas)
 
 
-PROMPT = """Você organiza um conteúdo em slides no modelo institucional da Eixo, uma consultoria política.
+PROMPT = """Você organiza um conteúdo em slides no modelo de apresentação da Eixo, uma consultoria política.
 
 Layouts disponíveis e seus campos:
 {layouts}
 
 Como usar cada layout:
-- capa: sempre o primeiro slide. linha_1 é curta e em tom de chamada (ex.: "material"), linha_2 é o tema em destaque (ex.: "institucional").
-- secao: abre um bloco do conteúdo. linha_1 curta em minúsculas (ex.: "nossos"), destaque é UMA palavra em maiúsculas (ex.: "CLIENTES"), subtitulo explica o bloco.
-- texto: um título e um parágrafo. Linha em branco separa parágrafos. Pode marcar até três trechos-chave com **negrito**.
-- lista: etapas, frentes ou pontos paralelos. linha_1 em maiúsculas (ex.: "NOSSO FOCO É"), destaque é UMA palavra (ex.: "potencializar"), linha_3 completa a frase (ex.: "a atuação dos nossos clientes"). Os itens são frases curtas e completas.
-- cartoes: duas coisas lado a lado (dois produtos, duas frentes, antes e depois). Cada cartão tem título e texto.
-- encerramento: último slide, só se o pedido ou o conteúdo indicar fechamento. O texto é fixo ("Dúvidas? Entre em contato." e os contatos da Eixo): devolva "campos": {}.
+- capa: sempre o primeiro slide. linha_1 é curta, em minúsculas e em tom de chamada (ex.: "relatório de"); linha_2 é o tema (ex.: "pedidos de LAI").
+- secao_vinho e secao_marinho: abrem um bloco do conteúdo. Título curto em MAIÚSCULAS. Alterne as duas cores quando houver mais de um bloco.
+- texto: título e um ou dois parágrafos. No título, a palavra-chave pode vir entre ** (ex.: "Prazos **legais**"). No texto, até três trechos-chave com **.
+- topicos: título em duas partes (titulo_1 fina, titulo_2 forte, ex.: "Somos guiados por" / "fortes valores") e de 2 a 5 tópicos curtos. Tem área de imagem à direita.
+- lista: etapas ou pontos paralelos numerados. linha_1 em maiúsculas (ex.: "DISTRIBUIÇÃO DOS"), destaque é UMA palavra (ex.: "prazos"), linha_3 completa a frase (ex.: "dos 28 pedidos sem resposta").
+- destaque: uma ideia central. linha_1 curta em minúsculas, destaque é UMA palavra em maiúsculas, texto é uma frase. Tem área de imagem à direita.
+- cartoes_3 e cartoes_2: três ou duas coisas lado a lado (frentes, produtos, grupos). Cada cartão tem título curto e texto.
+- encerramento: último slide, só se o pedido ou o conteúdo indicar fechamento. Devolva "campos": {{}}; quem monta preenche o contato.
 
 Regras:
 - Use só o que está no conteúdo. Não invente número, nome, data, cliente nem resultado.
 - Pode resumir e reescrever para caber no limite, sem mudar o sentido.
 - Respeite os limites de caracteres. Texto acima do limite fica com fonte pequena.
+- Varie os layouts; não repita o mesmo layout em mais de dois slides seguidos.
 - Português do Brasil, sem travessão longo e sem emoji.
 - Entre 3 e 15 slides, conforme o tamanho do conteúdo.
 
@@ -530,13 +662,13 @@ def normalizar(payload) -> list[dict]:
         for chave, _, _ in CAMPOS[s["layout"]]:
             v = brutos.get(chave)
             if chave == "itens":
-                v = [str(i).strip() for i in (v or []) if str(i).strip()][:6] if isinstance(v, list) else \
-                    [x.strip() for x in str(v or "").split("\n") if x.strip()][:6]
+                v = v if isinstance(v, list) else str(v or "").split("\n")
+                v = [str(i).replace("—", ",").strip() for i in v if str(i).strip()][:ITENS[s["layout"]][1]]
             else:
                 v = str(v or "").replace("—", ",").strip()
             campos[chave] = v
         if s["layout"] == "encerramento":
-            campos = {"titulo": ""}  # texto fixo do molde; só a pessoa muda, na página
+            campos = {"titulo": "", "contato": ""}  # quem monta preenche, na página
         slides.append({"layout": s["layout"], "campos": campos})
     return slides
 
