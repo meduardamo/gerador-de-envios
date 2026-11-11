@@ -344,6 +344,10 @@ def _lista(s, c):
     else:
         _tirar(f["TextBox 7"])
     escrever(f["TextBox 3"], dest or " ", largura_pol=16.5, uma_linha=True)
+    if l1:
+        # no molde a chamada encosta no destaque; com maiúscula ou acento no
+        # destaque ("PRAZOS", "DISTRIBUIÇÃO") as letras se batem
+        f["TextBox 3"].top += _pol(0.35)
     if l3:
         escrever(f["TextBox 24"], l3, largura_pol=16.0, uma_linha=True)
         f["TextBox 24"].top = f["TextBox 3"].top + int(f["TextBox 3"].height * 0.70)
@@ -492,7 +496,7 @@ Como usar cada layout:
 - texto: um título e um parágrafo. Linha em branco separa parágrafos. Pode marcar até três trechos-chave com **negrito**.
 - lista: etapas, frentes ou pontos paralelos. linha_1 em maiúsculas (ex.: "NOSSO FOCO É"), destaque é UMA palavra (ex.: "potencializar"), linha_3 completa a frase (ex.: "a atuação dos nossos clientes"). Os itens são frases curtas e completas.
 - cartoes: duas coisas lado a lado (dois produtos, duas frentes, antes e depois). Cada cartão tem título e texto.
-- encerramento: último slide, só se o pedido ou o conteúdo indicar fechamento. Sem campos obrigatórios.
+- encerramento: último slide, só se o pedido ou o conteúdo indicar fechamento. O texto é fixo ("Dúvidas? Entre em contato." e os contatos da Eixo): devolva "campos": {}.
 
 Regras:
 - Use só o que está no conteúdo. Não invente número, nome, data, cliente nem resultado.
@@ -522,6 +526,8 @@ def normalizar(payload) -> list[dict]:
             else:
                 v = str(v or "").replace("—", ",").strip()
             campos[chave] = v
+        if s["layout"] == "encerramento":
+            campos = {"titulo": ""}  # texto fixo do molde; só a pessoa muda, na página
         slides.append({"layout": s["layout"], "campos": campos})
     return slides
 
