@@ -202,7 +202,7 @@ GRUPOS = {
     "Notícias": "Dia a dia",
     "Gerador de Resumos": "Dia a dia",
     "Agenda da Semana": "Entrega semanal",
-    "Síntese da Semana": "Entrega semanal · Saúde",
+    "Síntese da Semana": "Entrega semanal",
     "Gerador de Gráficos": "Ferramenta",
     "Alerta de Pesquisa": "Ferramenta",
     "Automações": "Consulta",

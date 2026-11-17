@@ -13,10 +13,12 @@ import streamlit as st
 from google.oauth2.service_account import Credentials
 
 import sintese_semana_core as ss
+import sintese_educacao_pagina as edu
 import importlib
 
 # o Streamlit Cloud às vezes mantém o módulo velho depois de um push; recarrega a cada rodada
 ss = importlib.reload(ss)
+edu = importlib.reload(edu)
 
 
 from base_pagina import exigir_login, iniciar
@@ -159,6 +161,7 @@ MODELO_IDEC = Path("modelos/sintese_semana_modelo_idec.docx")
 FONTES = Path("fontes")
 GEMINI_API_KEY = (st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")).strip()
 GEMINI_MODEL = "gemini-3.6-flash"
+LINKS_EDU_PASTA = (st.secrets.get("LINKS_EDUCACAO_FOLDER_ID") or os.getenv("LINKS_EDUCACAO_FOLDER_ID", "")).strip()
 DOU_SHEET_ID = (st.secrets.get("DOU_CLIENTES_SHEET_ID") or os.getenv("DOU_CLIENTES_SHEET_ID", "")).strip()
 AGENDA_SHEET_ID = (st.secrets.get("AGENDA_SHEET_ID") or os.getenv("AGENDA_SHEET_ID", "")).strip()
 SS = st.session_state
@@ -235,6 +238,7 @@ def _limpar_tudo():
     for k in [k for k in list(SS.keys()) if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_", "xls_"))]:
         SS.pop(k, None)
     SS["sint_upload_ver"] = SS.get("sint_upload_ver", 0) + 1
+    edu.limpar()
 
 
 # ========= BARRA LATERAL (igual às outras páginas: logo, descrição, usuário e sair) =========
@@ -242,8 +246,9 @@ with st.sidebar:
     st.markdown(
         '<div style="border-left:3px solid #962E4D;padding:10px 12px;margin:10px 0 0 0;background:transparent;">'
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;color:#111;line-height:1.65;margin:0;">'
-        'Síntese semanal de <strong>saúde</strong>: lê a <strong>Divisão semanal</strong>, gera os bullets de cada '
-        'cliente, consulta as <strong>movimentações</strong> na Câmara e no Senado e monta o Word, o PDF e o email.'
+        'Síntese semanal. <strong>Saúde</strong>: lê a <strong>Divisão semanal</strong>, gera os bullets de cada '
+        'cliente, consulta as <strong>movimentações</strong> na Câmara e no Senado e monta o Word, o PDF e o email. '
+        '<strong>Educação</strong>: lê o doc de links da semana, resume cada link e monta ISG, IU e FMCSV.'
         '</p></div>', unsafe_allow_html=True)
     st.markdown("---")
     if st.button("Limpar tudo", width="stretch",
@@ -255,18 +260,24 @@ with st.sidebar:
     authenticator.logout("Sair", "sidebar")
 
 # ========= CABEÇALHO =========
-cabecalho("Síntese da Semana", "Da Divisão semanal ao Word, ao anexo em PDF e ao corpo do email de cada cliente.")
+cabecalho("Síntese da Semana", "Do documento da semana ao Word, ao PDF e ao corpo do email de cada cliente.")
 
 hoje = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 padrao = _segunda(hoje)
 with st.container(horizontal=True, key="sx_barra", vertical_alignment="bottom"):
+    AREA = st.segmented_control("Área", ["Saúde", "Educação"], default="Saúde", key="sint_area",
+                                help="Saúde: Divisão semanal. Educação: doc de links (ISG, IU e FMCSV).") or "Saúde"
     dia = st.date_input("Semana", value=padrao, format="DD/MM/YYYY", width=170,
                         help="Escolha qualquer dia: vale a semana de segunda a sexta.")
     INI = _segunda(dia)
     FIM = INI + dt.timedelta(days=4)
     PERIODO = ss.periodo_extenso(INI, FIM)
     st.markdown(f'<div class="sx-periodo">{esc(PERIODO)}</div>', unsafe_allow_html=True)
-    quinzenal = st.toggle("Incluir ASBAI e Desiderata (quinzenais)", value=False)
+    quinzenal = AREA == "Saúde" and st.toggle("Incluir ASBAI e Desiderata (quinzenais)", value=False)
+
+if AREA == "Educação":
+    edu.render(INI, FIM, GEMINI_API_KEY, GEMINI_MODEL, LINKS_EDU_PASTA)
+    st.stop()
 
 if SS.get("sint_semana") != INI:  # trocou a semana: DOU, movimentações e arquivos são outros
     SS["sint_semana"] = INI
