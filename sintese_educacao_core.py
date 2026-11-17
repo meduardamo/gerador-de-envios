@@ -102,7 +102,7 @@ def listar_pasta(pasta_id: str) -> list[dict]:
 
 
 def _datas_do_nome(nome: str, ano: int) -> tuple[dt.date, dt.date] | None:
-    m = re.search(r"(\d{1,2})[./](\d{1,2})\s*a\s*(\d{1,2})[./](\d{1,2})", nome)
+    m = re.search(r"(\d{1,2})[./](\d{1,2})\s*(?:a|até|-|–)\s*(\d{1,2})[./](\d{1,2})", nome)
     if not m:
         return None
     try:
@@ -123,8 +123,19 @@ def doc_da_semana(arquivos: list[dict], ini: dt.date) -> dict | None:
 
 
 def id_do_doc(link_ou_id: str) -> str:
-    m = re.search(r"/d/([\w-]{20,})", link_ou_id or "")
-    return m.group(1) if m else (link_ou_id or "").strip()
+    """ID de um Google Doc a partir do link (ou do próprio ID). Erro claro para pasta, arquivo do Drive etc."""
+    t = (link_ou_id or "").strip()
+    m = re.search(r"docs\.google\.com/document/(?:u/\d+/)?d/([\w-]{20,})", t)
+    if m:
+        return m.group(1)
+    if re.fullmatch(r"[\w-]{25,}", t):
+        return t
+    if "/folders/" in t:
+        raise ValueError("Esse é o link de uma pasta. Abra o doc da semana e cole o link dele.")
+    if "drive.google.com/file" in t or "/spreadsheets/" in t:
+        raise ValueError("Esse link não é de um Google Doc. Se o doc está em Word, abra como Google Docs "
+                         "(Arquivo > Salvar como Google Docs) e cole o link novo.")
+    raise ValueError("Não reconheci o link. Cole o endereço do doc, que começa com https://docs.google.com/document/d/")
 
 
 def baixar_doc(doc_id: str) -> str:
@@ -306,37 +317,92 @@ def _novo_item(b: dict, secao: str) -> dict:
             "documentos_equipe": []}
 
 
+ENCURTADORES = ("tinyurl.com", "share.google", "bit.ly", "goo.gl", "encurtador.com.br", "abre.ai", "t.co/")
+
+
+def _curto(url: str) -> bool:
+    return any(e in (url or "") for e in ENCURTADORES)
+
+
+def _destino_tinyurl(pagina: str) -> str | None:
+    """O TinyURL manda link de API antiga para uma página "preview/deprecated" em vez da matéria;
+    o destino vem nessa página, em window.externalPageData.jsonUrl ("original" = base64 do endereço)."""
+    import base64
+    import json
+    from urllib.parse import unquote
+    try:
+        m = re.search(r"window\.externalPageData\s*=\s*(\{.*?\});\s*</script>", pagina, re.S)
+        j = json.loads(json.loads(m.group(1))["jsonUrl"])
+        if j.get("original"):
+            return unquote(base64.b64decode(j["original"]).decode())
+        return f"{j['scheme']}://{j['host']}{j['path']}" + (f"?{j['query']}" if j.get("query") else "")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _abrir(url: str):
+    """GET seguindo encurtadores (TinyURL com página de aviso, share.google). Devolve (resposta, endereço final)."""
+    r = requests.get(url, headers=ss.UA, timeout=25, allow_redirects=True)
+    if "tinyurl.com/preview" in r.url:
+        destino = _destino_tinyurl(r.text)
+        if not destino:
+            raise ValueError("o TinyURL não mostrou o destino do link")
+        r = requests.get(destino, headers=ss.UA, timeout=25, allow_redirects=True)
+    r.raise_for_status()
+    r.encoding = r.apparent_encoding if not r.encoding or r.encoding.lower() == "iso-8859-1" else r.encoding
+    final = r.url
+    if "share.google" in final:
+        m = re.search(r'<link rel="canonical" href="([^"]+)"', r.text) or re.search(r'property="og:url" content="([^"]+)"', r.text)
+        if m:
+            final = _html.unescape(m.group(1))
+    return r, final
+
+
+def resolver(url: str) -> str:
+    """Endereço final de um link curto (para o título no Word não levar à página do encurtador)."""
+    if not _curto(url):
+        return url
+    try:
+        return _abrir(url)[1]
+    except Exception:  # noqa: BLE001
+        return url
+
+
 # ─── Download dos links ──────────────────────────────────────────────────────
 def baixar(url: str) -> dict:
-    """Como ss.baixar_noticia, mas guarda o endereço final (share.google redireciona para a matéria)."""
+    """Como ss.baixar_noticia, mas guarda o endereço final (encurtadores levam para a matéria)."""
     import trafilatura
     out = {"url_final": url, "titulo_pagina": "", "texto": "", "erro": ""}
     try:
-        r = requests.get(url, headers=ss.UA, timeout=25, allow_redirects=True)
-        r.raise_for_status()
-        r.encoding = r.apparent_encoding if not r.encoding or r.encoding.lower() == "iso-8859-1" else r.encoding
-        final = r.url
-        if "google.com/share.google" in final or "share.google" in final:
-            m = re.search(r'<link rel="canonical" href="([^"]+)"', r.text) or re.search(r'property="og:url" content="([^"]+)"', r.text)
-            if m:
-                final = _html.unescape(m.group(1))
+        r, final = _abrir(url)
         out["url_final"] = final
         meta = trafilatura.bare_extraction(r.text, url=final, with_metadata=True)
         meta = meta.as_dict() if hasattr(meta, "as_dict") else (meta or {})
         out["titulo_pagina"] = (meta.get("title") or "").strip()
         out["texto"] = (trafilatura.extract(r.text, url=final, output_format="markdown", include_links=True) or "")[:9000]
         if len(out["texto"]) < 200:
-            out["erro"] = "texto curto (página pode exigir login ou ser só índice)"
+            out["erro"] = "página com pouco texto (pode exigir login ou ser só índice)"
+    except requests.HTTPError as e:
+        cod = e.response.status_code if e.response is not None else ""
+        if e.response is not None and "tinyurl.com" not in e.response.url:
+            out["url_final"] = e.response.url  # o encurtador resolveu; o site é que falhou
+        out["erro"] = f"o site recusou a leitura automática (HTTP {cod})" if cod in (401, 403, 429) \
+            else f"o site deu erro (HTTP {cod}); tente de novo mais tarde"
+    except requests.Timeout:
+        out["erro"] = "o site demorou demais para responder"
     except Exception as e:  # noqa: BLE001
         out["erro"] = f"{type(e).__name__}: {e}"[:200]
     return out
 
 
 def baixar_todos(itens: list[dict], workers: int = 8) -> list[dict]:
-    """Só baixa o que a equipe ainda não resumiu."""
+    """Baixa o que a equipe ainda não resumiu; do que ela já escreveu, só resolve link curto."""
     falta = [i for i, it in enumerate(itens) if not it["paragrafos_equipe"] and it["url"]]
+    curtos = [i for i, it in enumerate(itens) if it["paragrafos_equipe"] and _curto(it["url"])]
     with ThreadPoolExecutor(workers) as ex:
         res = dict(zip(falta, ex.map(lambda i: baixar(itens[i]["url"]), falta)))
+        res.update({i: {"url_final": u, "texto": "", "erro": "", "titulo_pagina": ""}
+                    for i, u in zip(curtos, ex.map(lambda i: resolver(itens[i]["url"]), curtos))})
     return [{**it, **res.get(i, {"url_final": it["url"], "texto": "", "erro": "", "titulo_pagina": ""})}
             for i, it in enumerate(itens)]
 
@@ -420,7 +486,10 @@ def _chamar(client, modelo: str, prompt: str):
 
 
 def gerar(client, modelo: str, itens: list[dict], lote: int = 8) -> tuple[list[dict], list[str]]:
-    """Resume e classifica os itens em lotes paralelos. Devolve (itens prontos, erros)."""
+    """Resume e classifica os itens em lotes paralelos. Devolve (itens, erros dos lotes).
+
+    Nenhum item some: o que não deu para ler ou resumir volta com "falha" e sem parágrafos,
+    para quem revisa escrever o texto ou tentar de novo."""
     validos = [it for it in itens if it["paragrafos_equipe"] or it.get("texto")]
     lotes = [validos[i:i + lote] for i in range(0, len(validos), lote)]
     erros: list[str] = []
@@ -431,7 +500,8 @@ def gerar(client, modelo: str, itens: list[dict], lote: int = 8) -> tuple[list[d
         except Exception as e:  # noqa: BLE001
             return grupo, [], f"{type(e).__name__}: {e}"[:300]
 
-    prontos = []
+    prontos = [{**montar_item(it, {}), "falha": "não consegui ler o link" + (f" ({it['erro']})" if it.get("erro") else "")}
+               for it in itens if not (it["paragrafos_equipe"] or it.get("texto"))]
     with ThreadPoolExecutor(4) as ex:
         for grupo, resp, err in ex.map(_um, lotes):
             if err:
@@ -445,11 +515,11 @@ def gerar(client, modelo: str, itens: list[dict], lote: int = 8) -> tuple[list[d
             for i, it in enumerate(grupo, 1):
                 r = por_n.get(i)
                 if r is None:
-                    if it["paragrafos_equipe"]:  # texto da equipe vai mesmo sem a classificação
-                        r = {}
-                    else:
+                    if not it["paragrafos_equipe"]:
+                        prontos.append({**montar_item(it, {}), "falha": "o Gemini não resumiu este item"})
                         continue
-                prontos.append(montar_item(it, r))
+                    r = {}  # texto da equipe vai mesmo sem a classificação
+                prontos.append({**montar_item(it, r), "aviso": it.get("erro", "")})
     ordem = {s: i for i, s in enumerate(SECOES)}
     prontos.sort(key=lambda x: (ordem.get(x["secao"], 99), x["_pos"]))
     return prontos, erros
@@ -461,7 +531,7 @@ def montar_item(it: dict, r: dict) -> dict:
         titulo = it["titulo_equipe"] or ss._limpar(r.get("titulo") or "")
         pars = list(it["paragrafos_equipe"])
     else:
-        titulo = ss._limpar(r.get("titulo") or it["titulo_equipe"] or it.get("titulo_pagina", ""))
+        titulo = ss._limpar(r.get("titulo") or it["titulo_equipe"] or it.get("titulo_pagina", "") or "")
         pars = [ss._limpar(p) for p in (r.get("paragrafos") or []) if isinstance(p, str) and p.strip()]
     docs = [d for d in (r.get("documentos") if isinstance(r.get("documentos"), list) else [])
             if isinstance(d, dict) and d.get("url") and d.get("nome") and d["url"] in fonte]
@@ -476,7 +546,8 @@ def montar_item(it: dict, r: dict) -> dict:
     return {"secao": it["secao"], "url": it.get("url_final") or it["url"], "titulo": titulo.rstrip(". "),
             "paragrafos": pars, "primeira_infancia": ss._limpar(r.get("primeira_infancia") or ""),
             "clima": clima, "fmcsv": fmcsv, "marcas": marcas, "clientes": clientes, "documentos": docs,
-            "da_equipe": bool(it["paragrafos_equipe"]), "_pos": it.get("_pos", 0)}
+            "da_equipe": bool(it["paragrafos_equipe"]), "_pos": it.get("_pos", 0), "_id": it.get("_id", ""),
+            "falha": "", "aviso": ""}
 
 
 # ─── Word ────────────────────────────────────────────────────────────────────
