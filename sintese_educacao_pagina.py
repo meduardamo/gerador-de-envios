@@ -331,6 +331,9 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
     doc = SS.get("edu_doc")
     if not doc:
         _parar()
+    if any("_id" not in it for it in doc["itens"]):  # doc lido por versão anterior da página (sessão aberta)
+        _dar_ids(doc["itens"])
+        SS.pop("edu_cache", None)
     estado["doc"] = doc
     itens_doc, props = doc["itens"], doc["proposicoes"]
     if not itens_doc and not props:
