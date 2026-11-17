@@ -248,7 +248,8 @@ with st.sidebar:
         '<p style="font-family:Montserrat,sans-serif;font-size:12.5px;color:#111;line-height:1.65;margin:0;">'
         'Síntese semanal. <strong>Saúde</strong>: lê a <strong>Divisão semanal</strong>, gera os bullets de cada '
         'cliente, consulta as <strong>movimentações</strong> na Câmara e no Senado e monta o Word, o PDF e o email. '
-        '<strong>Educação</strong>: lê o doc de links da semana, resume cada link e monta ISG, IU e FMCSV.'
+        '<strong>Educação</strong> e <strong>Primeira Infância</strong>: leem o doc de links da semana, resumem cada '
+        'link e montam ISG e IU, e FMCSV.'
         '</p></div>', unsafe_allow_html=True)
     st.markdown("---")
     if st.button("Limpar tudo", width="stretch",
@@ -264,9 +265,15 @@ cabecalho("Síntese da Semana", "Do documento da semana ao Word, ao PDF e ao cor
 
 hoje = dt.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 padrao = _segunda(hoje)
+AREAS_SINT = ["Saúde", "Educação", "Primeira Infância"]  # as áreas da Agenda que têm síntese
+# ?area=educacao no endereço abre direto na área (cada equipe salva o seu link)
+_sem_acento = lambda t: t.lower().translate(str.maketrans("áéíóúãõç", "aeiouaoc"))  # noqa: E731
+_area_url = _sem_acento(str(st.query_params.get("area", "")))
+_area_ini = next((i for i, a in enumerate(AREAS_SINT) if _area_url and _sem_acento(a).startswith(_area_url[:3])), 0)
 with st.container(horizontal=True, key="sx_barra", vertical_alignment="bottom"):
-    AREA = st.segmented_control("Área", ["Saúde", "Educação"], default="Saúde", key="sint_area",
-                                help="Saúde: Divisão semanal. Educação: doc de links (ISG, IU e FMCSV).") or "Saúde"
+    AREA = st.selectbox("Área", AREAS_SINT, index=_area_ini, key="sint_area", width=200,
+                        help="Mostra só os clientes da área, como na Agenda da Semana. Educação e Primeira Infância "
+                             "usam o mesmo doc de links.")
     dia = st.date_input("Semana", value=padrao, format="DD/MM/YYYY", width=170,
                         help="Escolha qualquer dia: vale a semana de segunda a sexta.")
     INI = _segunda(dia)
@@ -275,8 +282,8 @@ with st.container(horizontal=True, key="sx_barra", vertical_alignment="bottom"):
     st.markdown(f'<div class="sx-periodo">{esc(PERIODO)}</div>', unsafe_allow_html=True)
     quinzenal = AREA == "Saúde" and st.toggle("Incluir ASBAI e Desiderata (quinzenais)", value=False)
 
-if AREA == "Educação":
-    edu.render(INI, FIM, GEMINI_API_KEY, GEMINI_MODEL, LINKS_EDU_PASTA)
+if AREA != "Saúde":
+    edu.render(INI, FIM, GEMINI_API_KEY, GEMINI_MODEL, LINKS_EDU_PASTA, AREA)
     st.stop()
 
 if SS.get("sint_semana") != INI:  # trocou a semana: DOU, movimentações e arquivos são outros

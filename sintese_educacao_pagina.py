@@ -1,6 +1,8 @@
-"""Parte de educação da página Síntese da Semana (ISG, IU e FMCSV).
+"""Áreas Educação (ISG e IU) e Primeira Infância (FMCSV) da página Síntese da Semana.
 
-Usa o CSS e a régua de etapas da página da saúde; a lógica fica em sintese_educacao_core.
+As duas leem o mesmo doc de links e usam os mesmos resumos (o Gemini roda uma vez por semana);
+cada área só mostra e entrega os clientes dela, como na Agenda da Semana.
+Usa o CSS da página da saúde; a lógica fica em sintese_educacao_core.
 """
 from __future__ import annotations
 
@@ -22,11 +24,11 @@ SS = st.session_state
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 MODELOS = Path("modelos")
 FONTES = Path("fontes")
-CLIS = list(se.CLIENTES)
+AREAS = {"Educação": ["ISG", "IU"], "Primeira Infância": ["FMCSV"]}  # mesma divisão da Agenda da Semana
 NOME_SECAO = {"CENÁRIO ELEITORAL": "Cenário eleitoral", "LEGISLATIVO": "Legislativo", "EXECUTIVO": "Executivo",
               "JUDICIÁRIO": "Judiciário", "NOTÍCIAS": "Notícias", "DIÁRIO OFICIAL DA UNIÃO": "Diário Oficial da União"}
 CHAVES = ("edu_doc", "edu_doc_ref", "edu_itens", "edu_erros", "edu_arquivos", "edu_emails", "edu_semana")
-PREFIXOS = ("ei_", "ep_", "ed_")
+PREFIXOS = ("ei_", "ep_", "ed_", "wei_", "wep_")
 
 
 def limpar():
@@ -53,7 +55,11 @@ def _pasta(pasta_id: str):
 
 
 def _clientes_do_item(i: int, it: dict) -> list[str]:
-    return SS.get(f"ei_{i}_cli", it["clientes"])
+    """Soma o que está marcado em cada área (a escolha numa área não mexe na outra)."""
+    out = []
+    for a, cs in AREAS.items():
+        out += SS.get(f"ei_{i}_cli_{a}", [c for c in it["clientes"] if c in cs])
+    return out
 
 
 def _itens_do_cliente(itens: list[dict], c: str) -> list[dict]:
@@ -67,8 +73,24 @@ def _itens_do_cliente(itens: list[dict], c: str) -> list[dict]:
     return out
 
 
+def _pills_area(chave: str, opcoes: list[str], padrao: list[str]) -> list[str]:
+    """Pílulas de cliente que lembram a escolha quando a área sai da tela: o Streamlit apaga o estado
+    de widget que não foi desenhado, então o valor fica guardado em SS[chave], fora do widget."""
+    def _guardar():
+        SS[chave] = SS[f"w{chave}"]
+    return st.pills("Clientes", opcoes, default=SS.get(chave, padrao), selection_mode="multi",
+                    key=f"w{chave}", label_visibility="collapsed", on_change=_guardar)
+
+
+def _clientes_da_prop(j: int, p: dict) -> list[str]:
+    out = []
+    for a, cs in AREAS.items():
+        out += SS.get(f"ep_{j}_{a}", [c for c in (p["clientes"] or list(se.CLIENTES)) if c in cs])
+    return out
+
+
 def _props_do_cliente(props: list[dict], c: str) -> list[dict]:
-    return [p for j, p in enumerate(props) if c in SS.get(f"ep_{j}", p["clientes"] or CLIS)]
+    return [p for j, p in enumerate(props) if c in _clientes_da_prop(j, p)]
 
 
 def _popover_email(corpo: str, cid: str):
@@ -109,7 +131,9 @@ def _popover_email(corpo: str, cid: str):
     </script>""", unsafe_allow_javascript=True)
 
 
-def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, pasta_id: str):
+def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, pasta_id: str, area: str = "Educação"):
+    CLIS = AREAS[area]
+    nomes = " e ".join(CLIS)
     if SS.get("edu_semana") != INI:  # trocou a semana: o doc é outro
         limpar()
         SS["edu_semana"] = INI
@@ -117,16 +141,18 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
     etapas_ph = st.empty()
 
     def _etapas():
-        doc, itens, arqs = SS.get("edu_doc"), SS.get("edu_itens"), SS.get("edu_arquivos")
+        doc, itens = SS.get("edu_doc"), SS.get("edu_itens")
+        arqs = any(se.nome_arquivo(c, INI, FIM) in (SS.get("edu_arquivos") or {}) for c in CLIS)
         etapas([
             ("feita" if doc else "atual", "Doc de links",
              f'{_plural(len(doc["itens"]), "item", "itens")}, {_plural(len(doc["proposicoes"]), "proposição", "proposições")}'
              if doc else "O doc da semana na pasta z_links educação"),
             ("feita" if itens else ("atual" if doc else "aberta"), "Resumos e clientes",
              _plural(len(itens), "item resumido", "itens resumidos") if itens
-             else "O Gemini resume cada link e separa ISG, IU e FMCSV"),
+             else f"O Gemini resume cada link e separa os clientes ({nomes})"),
             ("feita" if arqs else ("atual" if itens else "aberta"), "Word, PDF e email",
-             "ISG, IU e FMCSV prontos para baixar" if arqs else "Síntese completa e 1 notícia por eixo para o Wix"),
+             f"{nomes} {'prontos' if len(CLIS) > 1 else 'pronta'} para baixar" if arqs
+             else "Síntese completa e 1 notícia por eixo para o Wix"),
         ], etapas_ph)
 
     def _parar():
@@ -135,8 +161,9 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
 
     # ========= 1. DOC DE LINKS =========
     secao("1. Doc de links da semana", cor="#962E4D",
-          explicacao="O doc 'Links educação - dd.mm a dd.mm' da pasta z_links educação. A página acha o da semana "
-                     "escolhida; se não achar, cole o link do doc. Ele precisa estar aberto para quem tem o link.")
+          explicacao="O doc 'Links educação - dd.mm a dd.mm' da pasta z_links educação, o mesmo para Educação e "
+                     "Primeira Infância. A página acha o da semana escolhida; se não achar, cole o link do doc. "
+                     "Ele precisa estar aberto para quem tem o link.")
     achado = None
     if pasta_id:
         try:
@@ -182,9 +209,10 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
 
     # ========= 2. RESUMOS =========
     secao("2. Resumos e clientes", cor="#962E4D",
-          explicacao="Cada link é baixado e resumido pelo Gemini. O que a equipe já escreveu no doc fica como está. "
-                     "IU recebe tudo; ISG, tudo menos clima; FMCSV, primeira infância e pautas gerais da educação básica. "
-                     "'FMCSV:', 'ISG:' ou 'IU:' no começo do item no doc manda só para aquele cliente.")
+          explicacao="Cada link é baixado e resumido pelo Gemini, uma vez para as duas áreas. O que a equipe já "
+                     "escreveu no doc fica como está. IU recebe tudo; ISG, tudo menos clima; FMCSV, primeira infância e "
+                     "pautas gerais da educação básica. 'FMCSV:', 'ISG:' ou 'IU:' no começo do item no doc manda só "
+                     "para aquele cliente. A escolha de clientes numa área não muda a outra.")
     if st.button("Ler links e gerar resumos", type="primary" if not SS.get("edu_itens") else "secondary"):
         if not gemini_key:
             st.error("Faltou a GEMINI_API_KEY nos Secrets.")
@@ -216,13 +244,12 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
             with st.container(key=f"it_edu_{i}"):
                 col1, col2 = st.columns([0.74, 0.26], vertical_alignment="top")
                 with col2, st.container(key=f"ac_edu_{i}"):
-                    st.pills("Clientes", CLIS, default=it["clientes"], selection_mode="multi",
-                             key=f"ei_{i}_cli", label_visibility="collapsed")
+                    _pills_area(f"ei_{i}_cli_{area}", CLIS, [c for c in it["clientes"] if c in CLIS])
                     with st.popover("Editar", icon=":material/edit:"):
                         st.text_input("Título", value=it["titulo"], key=f"ei_{i}_tit")
                         st.text_area("Parágrafos (linha em branco separa)", value="\n\n".join(it["paragrafos"]),
                                      height=220, key=f"ei_{i}_txt")
-                on = bool(_clientes_do_item(i, it))
+                on = any(c in CLIS for c in _clientes_do_item(i, it))
                 tit = SS.get(f"ei_{i}_tit", it["titulo"])
                 pars = [p for p in SS.get(f"ei_{i}_txt", "\n\n".join(it["paragrafos"])).split("\n\n") if p.strip()]
                 chips = [chip("texto da equipe", "ok") if it["da_equipe"] else ""]
@@ -230,25 +257,24 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
                     chips.append(chip("marcado no doc: " + ", ".join(it["marcas"]), "org"))
                 elif it["clima"]:
                     chips.append(chip("clima", "alerta"))
-                if it.get("primeira_infancia"):
-                    chips.append(chip("trecho de primeira infância na FMCSV", "data"))
+                if it.get("primeira_infancia") and "FMCSV" in CLIS:
+                    chips.append(chip("trecho de primeira infância", "data"))
                 corpo = (f'<div class="sx-top">{"".join(chips)}</div>' if any(chips) else "") + \
                         f'<p class="sx-h"><a href="{esc(it["url"])}" target="_blank">{esc(tit)}</a></p>' + \
                         "".join(f'<p class="sx-txt" style="margin-top:6px !important">{esc(p)}</p>' for p in pars)
-                if it.get("primeira_infancia"):
-                    corpo += f'<p class="sx-meta">Só na FMCSV: {esc(it["primeira_infancia"])}</p>'
+                if it.get("primeira_infancia") and "FMCSV" in CLIS:
+                    corpo += f'<p class="sx-meta">Parágrafo extra na FMCSV: {esc(it["primeira_infancia"])}</p>'
                 with col1:
                     st.markdown(f'<div class="{"" if on else "sx-fora"}">{corpo}</div>', unsafe_allow_html=True)
 
     if props:
         secao("Novas proposições", contagem=str(len(props)), cor="#192D4E", menor=True,
-              explicacao="Da tabela NOVAS PROPOSIÇÕES do doc. Vão para os três clientes, a menos que a tabela diga o cliente.")
+              explicacao="Da tabela NOVAS PROPOSIÇÕES do doc. Vão para ISG, IU e FMCSV, a menos que a tabela diga o cliente.")
         for j, p in enumerate(props):
             with st.container(key=f"it_edup_{j}"):
                 col1, col2 = st.columns([0.74, 0.26], vertical_alignment="top")
                 with col2:
-                    st.pills("Clientes", CLIS, default=p["clientes"] or CLIS, selection_mode="multi",
-                             key=f"ep_{j}", label_visibility="collapsed")
+                    _pills_area(f"ep_{j}_{area}", CLIS, [c for c in (p["clientes"] or CLIS) if c in CLIS])
                 link = f'<a href="{esc(p["link"])}" target="_blank">{esc(p["proposicao"])}</a>' if p["link"] else esc(p["proposicao"])
                 col1.markdown(f'<p class="sx-h">{link}</p><p class="sx-ementa">{esc(p["ementa"])}</p>'
                               + (f'<p class="sx-meta">{esc(p["autor"])}</p>' if p["autor"] else ""),
@@ -259,8 +285,7 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
           explicacao="O PDF leva a síntese completa. O email do Wix leva 1 notícia de cada eixo (Legislativo, "
                      "Executivo e Notícias gerais); escolha qual abaixo.")
     destaques: dict[str, dict[str, dict]] = {}
-    abas = st.tabs(CLIS)
-    for c, aba in zip(CLIS, abas):
+    for c, aba in zip(CLIS, st.tabs(CLIS) if len(CLIS) > 1 else [st.container()]):
         meus = _itens_do_cliente(itens, c)
         destaques[c] = {}
         with aba:
@@ -279,7 +304,7 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
                     destaques[c][eixo] = opcoes[esc_i]
 
     if st.button("Montar Word, PDF e email", type="primary"):
-        arquivos, emails = {}, {}
+        arquivos, emails = dict(SS.get("edu_arquivos") or {}), dict(SS.get("edu_emails") or {})
         with st.spinner("Montando os arquivos..."):
             for c in CLIS:
                 modelo = (MODELOS / se.CLIENTES[c]["modelo"]).read_bytes()
@@ -289,12 +314,13 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
                 arquivos[nome.replace(".docx", " - email.html")] = emails[c].encode("utf8")
         if ss.pdf_disponivel():
             with st.spinner("Convertendo para PDF..."):
-                arquivos.update(ss.docx_para_pdf({k: v for k, v in arquivos.items() if k.endswith(".docx")}, str(FONTES)))
+                arquivos.update(ss.docx_para_pdf({se.nome_arquivo(c, INI, FIM): arquivos[se.nome_arquivo(c, INI, FIM)]
+                                                  for c in CLIS}, str(FONTES)))
         SS["edu_arquivos"], SS["edu_emails"] = arquivos, emails
         st.rerun()
 
-    arqs = SS.get("edu_arquivos")
-    if arqs:
+    arqs = SS.get("edu_arquivos") or {}
+    if any(se.nome_arquivo(c, INI, FIM) in arqs for c in CLIS):
         with st.container(key="sx_entregas"):
             larg = [0.34, 0.40, 0.26]
             with st.container(key="lin_cab"):
@@ -319,7 +345,7 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
                     if corpo:
                         with c2, st.popover("Ver email", icon=":material/mail:"):
                             _popover_email(corpo, f"edu_{k}")
-        if not any(k.endswith(".pdf") for k in arqs):
+        if not any(se.nome_arquivo(c, INI, FIM).replace(".docx", ".pdf") in arqs for c in CLIS):
             st.markdown('<p class="sx-nota">O PDF não está disponível neste servidor; baixe o Word e exporte pelo Word ou pelo Docs.</p>',
                         unsafe_allow_html=True)
         st.markdown('<p class="sx-nota">Email: abra "Ver email", clique em "Copiar email formatado" e cole no Wix; '
