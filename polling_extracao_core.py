@@ -78,21 +78,9 @@ def gerar_conteudo_gemini(model: str, contents, *, tentativas: int = 3, backoff_
 
     for tentativa in range(1, tentativas + 1):
         try:
-            try:
-                config = types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(thinking_budget=8000)
-                )
-                resp = client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=config,
-                )
-            except Exception:
-                # Algumas versões do SDK não aceitam ThinkingConfig; tenta sem.
-                resp = client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                )
+            # Sem ThinkingConfig: o google-genai 0.6.0 do requirements não tem thinking_budget
+            # (dava erro e caía sempre no caminho sem config). O 3.6 Flash pensa por padrão.
+            resp = client.models.generate_content(model=model, contents=contents)
 
             if getattr(resp, "text", None):
                 return resp

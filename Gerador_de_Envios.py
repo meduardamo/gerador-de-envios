@@ -417,13 +417,9 @@ def _ler_imagens_gemini(prompt: str, imagens_png: list[bytes]) -> str:
     parts = [prompt]
     for img in imagens_png:
         parts.append(types.Part.from_bytes(data=img, mime_type="image/png"))
-    resp = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=parts,
-        config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=8000)
-        ),
-    )
+    # Sem ThinkingConfig: o google-genai 0.6.0 do requirements não tem thinking_budget e a
+    # chamada caía em ValidationError antes de sair. O 3.6 Flash já pensa por padrão (medium).
+    resp = client.models.generate_content(model=GEMINI_MODEL, contents=parts)
     return gerar_resumo_seguro(resp)
 
 

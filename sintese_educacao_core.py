@@ -478,7 +478,7 @@ def _chamar(client, modelo: str, prompt: str):
         try:
             return client.models.generate_content(
                 model=modelo, contents=prompt,
-                config=types.GenerateContentConfig(temperature=0.2, response_mime_type="application/json"))
+                config=types.GenerateContentConfig(response_mime_type="application/json"))
         except Exception as e:  # noqa: BLE001
             if tentativa == 1 or not re.search(r"429|500|503|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE", str(e)):
                 raise
