@@ -683,7 +683,7 @@ def estruturar(conteudo: str, pedido: str = "") -> list[dict]:
     if pedido.strip():
         partes.append(f"Pedido de quem está montando: {pedido.strip()}")
     partes.append(f"Conteúdo:\n{conteudo.strip()}")
-    resp = gerar_conteudo_gemini(GEMINI_MODEL, partes)
+    resp = gerar_conteudo_gemini(GEMINI_MODEL, partes, json=True)
     slides = normalizar(extrair_json_de_texto_bruto(getattr(resp, "text", "") or ""))
     if not slides:
         raise RuntimeError("O Gemini não devolveu slides. Tente de novo ou encurte o conteúdo.")

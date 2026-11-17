@@ -124,7 +124,7 @@ def extrair_tabela(*, texto: str = "", imagens: list[tuple[bytes, str]] | None =
     if len(partes) == 1 + bool(pedido.strip()):
         raise ValueError("Envie um arquivo ou cole o texto da fonte.")
 
-    resp = gerar_conteudo_gemini(GEMINI_MODEL, partes)
+    resp = gerar_conteudo_gemini(GEMINI_MODEL, partes, json=True)
     tabela = normalizar_tabela(extrair_json_de_texto_bruto(getattr(resp, "text", "") or ""))
     if len(tabela["colunas"]) < 2 or not tabela["linhas"]:
         raise RuntimeError("Não achei tabela nessa fonte. Confira a página do PDF "

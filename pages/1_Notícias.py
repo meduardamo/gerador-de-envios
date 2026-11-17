@@ -582,7 +582,9 @@ if view.empty:
     st.stop()
 
 # ─── Alerta (Gemini) e envio no WhatsApp ───────────────────────────────────────
-GEMINI_MODEL = "gemini-3.6-flash"   # 2.5-flash dá 404 para a chave do projeto novo
+import gemini_config
+
+GEMINI_MODEL = gemini_config.MODELO
 
 REGRAS_POLITICOS_ALERTA = (
     "Formatação de políticos (obrigatório):\n"
@@ -660,7 +662,8 @@ def _gerar_alerta_texto(titulo, fonte, data_fmt, cand, part, uf, cargo, status, 
         f"{REGRAS_POLITICOS_ALERTA}\n"
         f"NOTÍCIA:\n{contexto}"
     )
-    resp = _gemini_client().models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    resp = _gemini_client().models.generate_content(model=GEMINI_MODEL, contents=prompt,
+                                                     config=gemini_config.config(gemini_config.TEXTO_CURTO))
     texto = (getattr(resp, "text", "") or "").strip()
     if not texto:
         raise RuntimeError("Não consegui gerar o texto do alerta. Tente novamente.")

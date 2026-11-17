@@ -28,15 +28,15 @@ from functools import lru_cache
 import fitz
 from google import genai
 from google.genai import types
+import gemini_config
 
 from polling_manual_core import (
     normalizar_instituto,
     normalizar_partido,
 )
 
-# Era 2.5-flash. A chave nova nasceu em projeto GCP novo depois da suspensão do
-# antigo, e para ela o 2.5-flash responde 404 "no longer available to new users".
-GEMINI_MODEL = "gemini-3.6-flash"
+# Modelo em gemini_config.py (um lugar só para o app inteiro).
+GEMINI_MODEL = gemini_config.MODELO
 
 UFS = [
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -68,7 +68,8 @@ def get_gemini_client():
     return _client_gemini(chave)
 
 
-def gerar_conteudo_gemini(model: str, contents, *, tentativas: int = 3, backoff_inicial: float = 1.5):
+def gerar_conteudo_gemini(model: str, contents, *, tentativas: int = 3, backoff_inicial: float = 1.5,
+                          json: bool = False, nivel: str = gemini_config.PADRAO):
     """Chama o Gemini com retry/backoff. Lança RuntimeError se todas as
     tentativas falharem ou se o conteúdo retornado vier vazio."""
     import time
@@ -78,9 +79,8 @@ def gerar_conteudo_gemini(model: str, contents, *, tentativas: int = 3, backoff_
 
     for tentativa in range(1, tentativas + 1):
         try:
-            # Sem ThinkingConfig: o google-genai 0.6.0 do requirements não tem thinking_budget
-            # (dava erro e caía sempre no caminho sem config). O 3.6 Flash pensa por padrão.
-            resp = client.models.generate_content(model=model, contents=contents)
+            resp = client.models.generate_content(model=model, contents=contents,
+                                                  config=gemini_config.config(nivel, json=json))
 
             if getattr(resp, "text", None):
                 return resp
@@ -661,7 +661,7 @@ TEXTO FONTE:
 {texto_fonte}
 """.strip()
 
-    resp = gerar_conteudo_gemini(GEMINI_MODEL, prompt)
+    resp = gerar_conteudo_gemini(GEMINI_MODEL, prompt, json=True)
     payload = extrair_json_de_texto_bruto(getattr(resp, "text", "") or "")
     payload = corrigir_metadados_explicitos_da_fonte(payload, texto_fonte)
     return normalizar_payload_polling(payload)

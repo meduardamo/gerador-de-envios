@@ -9,6 +9,7 @@ import json
 import streamlit as st
 from google import genai
 from google.genai import types
+import gemini_config
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -83,7 +84,7 @@ with st.sidebar:
 
 # ─── Configurações ───────────────────────────────────────────────────────────
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL   = "gemini-3.6-flash"   # 2.5-flash dá 404 para a chave do projeto novo
+GEMINI_MODEL   = gemini_config.MODELO
 SHEET_ID       = st.secrets.get("SHEET_ID") or os.getenv("SHEET_ID", "")
 
 AREAS = [
@@ -346,7 +347,8 @@ Instruções:
 TEXTO:
 {texto}""".strip()
 
-    resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    nivel = gemini_config.PADRAO if formato == "Pesquisa eleitoral" else gemini_config.TEXTO_CURTO
+    resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt, config=gemini_config.config(nivel))
     # Partido por extenso e título de urna abreviado valem em todo texto que a
     # casa publica. O prompt pede; isto garante, porque modelo esquece regra de
     # formatação no meio de texto longo.
@@ -417,9 +419,7 @@ def _ler_imagens_gemini(prompt: str, imagens_png: list[bytes]) -> str:
     parts = [prompt]
     for img in imagens_png:
         parts.append(types.Part.from_bytes(data=img, mime_type="image/png"))
-    # Sem ThinkingConfig: o google-genai 0.6.0 do requirements não tem thinking_budget e a
-    # chamada caía em ValidationError antes de sair. O 3.6 Flash já pensa por padrão (medium).
-    resp = client.models.generate_content(model=GEMINI_MODEL, contents=parts)
+    resp = client.models.generate_content(model=GEMINI_MODEL, contents=parts, config=gemini_config.config())
     return gerar_resumo_seguro(resp)
 
 

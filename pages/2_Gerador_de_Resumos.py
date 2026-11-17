@@ -6,6 +6,7 @@ import re
 import streamlit as st
 from google import genai
 from google.genai import types
+import gemini_config
 import fitz  # PyMuPDF
 
 
@@ -38,7 +39,7 @@ authenticator = exigir_login()
 # ── configurações ─────────────────────────────────────────────────────────────
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL   = "gemini-3.6-flash"   # 2.5-flash dá 404 para a chave do projeto novo
+GEMINI_MODEL   = gemini_config.MODELO
 
 LOGO_PATH = "logo_eixo_gov_magenta.png"
 
@@ -892,7 +893,7 @@ Não invente informações.
 Máximo: 180 palavras no total.
 """.strip()
 
-    resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt, config=gemini_config.config())
     # Partido por extenso e título de urna abreviado valem em tudo que a casa
     # publica, não só no Alerta de Pesquisa. O prompt pede; isto garante.
     return padronizar_politicos_no_texto((resp.text or "").strip())
@@ -932,9 +933,7 @@ def extrair_pdf_imagem(pdf_bytes: bytes, page_indices: list[int]) -> str:
         "números, datas e citações exatamente como aparecem."
     )
     parts = [prompt] + [types.Part.from_bytes(data=img, mime_type="image/png") for img in imgs]
-    # Sem ThinkingConfig: o google-genai 0.6.0 do requirements não tem thinking_budget e a
-    # chamada caía em ValidationError antes de sair. O 3.6 Flash já pensa por padrão (medium).
-    resp = client.models.generate_content(model=GEMINI_MODEL, contents=parts)
+    resp = client.models.generate_content(model=GEMINI_MODEL, contents=parts, config=gemini_config.config())
     return (resp.text or "").strip()
 
 def processar_pdf(pdf_bytes: bytes, modo: str, page_indices: list[int]) -> str:

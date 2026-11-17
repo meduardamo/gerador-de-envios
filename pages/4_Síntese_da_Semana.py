@@ -160,7 +160,9 @@ MODELO = Path("modelos/sintese_semana_modelo.docx")
 MODELO_IDEC = Path("modelos/sintese_semana_modelo_idec.docx")
 FONTES = Path("fontes")
 GEMINI_API_KEY = (st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")).strip()
-GEMINI_MODEL = "gemini-3.6-flash"
+import gemini_config
+
+GEMINI_MODEL = gemini_config.MODELO
 LINKS_EDU_PASTA = (st.secrets.get("LINKS_EDUCACAO_FOLDER_ID") or os.getenv("LINKS_EDUCACAO_FOLDER_ID", "")).strip()
 DOU_SHEET_ID = (st.secrets.get("DOU_CLIENTES_SHEET_ID") or os.getenv("DOU_CLIENTES_SHEET_ID", "")).strip()
 AGENDA_SHEET_ID = (st.secrets.get("AGENDA_SHEET_ID") or os.getenv("AGENDA_SHEET_ID", "")).strip()

@@ -473,12 +473,12 @@ def _json(texto: str | None) -> list:
 
 
 def _chamar(client, modelo: str, prompt: str):
-    from google.genai import types
+    import gemini_config
     for tentativa in range(2):  # 429/503 do Gemini costumam passar na segunda
         try:
             return client.models.generate_content(
                 model=modelo, contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json"))
+                config=gemini_config.config(json=True))
         except Exception as e:  # noqa: BLE001
             if tentativa == 1 or not re.search(r"429|500|503|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE", str(e)):
                 raise

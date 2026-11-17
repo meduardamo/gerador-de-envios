@@ -913,7 +913,7 @@ def _json_da_resposta(texto: str | None) -> list:
 
 
 def gerar_bullets(client, modelo: str, cliente: str, noticias: list[dict]) -> list[dict]:
-    from google.genai import types
+    import gemini_config
     validas = [n for n in noticias if n.get("texto") and not secao_de_clipping(n.get("secao", ""))]
     if not validas:
         return []
@@ -922,7 +922,7 @@ def gerar_bullets(client, modelo: str, cliente: str, noticias: list[dict]) -> li
         try:
             resp = client.models.generate_content(
                 model=modelo, contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json"))
+                config=gemini_config.config(json=True))
             break
         except Exception as e:  # noqa: BLE001
             if tentativa == 1 or not re.search(r"429|500|503|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE", str(e)):

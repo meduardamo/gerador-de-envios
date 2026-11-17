@@ -1,10 +1,10 @@
 streamlit==1.59.1
 # starlette 1.4.0 quebra o servidor do streamlit (GZipResponder sem thread_minimum_size)
 starlette<1.4
-google-genai==0.6.0
+google-genai==2.34.0
 
 gspread==6.1.2
-google-auth==2.35.0
+google-auth>=2.56,<3
 
 PyYAML==6.0.2
 streamlit-authenticator==0.4.2
@@ -14,6 +14,8 @@ PyMuPDF==1.24.14
 pillow==10.4.0
 
 numpy<2
+# pyarrow 26 (out/2026) exige numpy 2 e quebra o st.dataframe com o pino acima
+pyarrow<26
 pandas==2.2.3
 plotly
 # Gráfico da pesquisa (graficos_pesquisa_core). Versão conferida contra numpy<2,
