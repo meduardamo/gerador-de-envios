@@ -1077,7 +1077,16 @@ def _mov_camara(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
             "data": f"{d.day}/{d.month}/{d.year}", "orgao": ult.get("siglaOrgao", ""),
             "andamento": (ult.get("despacho") or ult.get("descricaoTramitacao") or "").strip(),
             "link": det.get("urlInteiroTeor") or f"https://www.camara.leg.br/propostas-legislativas/{id_}",
-            "teor": ult.get("url") or ""}
+            "teor": ult.get("url") or "",
+            # todas as da semana, da mais antiga para a mais nova (a síntese de educação escolhe a importante)
+            "historico": [{"data": _dmy(t["dataHora"]), "orgao": t.get("siglaOrgao", ""),
+                           "andamento": (t.get("despacho") or t.get("descricaoTramitacao") or "").strip()}
+                          for t in sorted(tram, key=lambda t: (t.get("dataHora", ""), t.get("sequencia", 0)))]}
+
+
+def _dmy(iso: str) -> str:
+    d = dt.date.fromisoformat(iso[:10])
+    return f"{d.day}/{d.month}/{d.year}"
 
 
 def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
@@ -1110,7 +1119,10 @@ def _mov_senado(id_: str, ini: dt.date, fim: dt.date) -> dict | None:
             "data": f"{d.day}/{d.month}/{d.year}", "orgao": (ult.get("colegiado") or {}).get("sigla", ""),
             "andamento": re.sub(r"\s+", " ", ult.get("descricao", "")).strip(),
             "link": f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{det.get('codigoMateria')}",
-            "teor": doc.get("url") or ""}
+            "teor": doc.get("url") or "",
+            "historico": [{"data": _dmy(i["data"]), "orgao": (i.get("colegiado") or {}).get("sigla", ""),
+                           "andamento": re.sub(r"\s+", " ", i.get("descricao", "")).strip()}
+                          for i in sorted(infs, key=lambda i: i["data"])]}
 
 
 def _ids_camara_no_periodo(ini: dt.date, fim: dt.date) -> tuple[set[str] | None, str]:

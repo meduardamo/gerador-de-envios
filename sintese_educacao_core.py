@@ -624,7 +624,8 @@ def paragrafos_do_cliente(item: dict, cliente: str) -> list[str]:
     return pars
 
 
-def gerar_docx(modelo: bytes, cliente: str, periodo: str, itens: list[dict], proposicoes: list[dict]) -> bytes:
+def gerar_docx(modelo: bytes, cliente: str, periodo: str, itens: list[dict], proposicoes: list[dict],
+               andamento: list[dict] | None = None) -> bytes:
     import docx
     doc = docx.Document(io.BytesIO(modelo))
     P = _prototipos(doc)
@@ -647,21 +648,13 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, itens: list[dict], pro
                 els.append(_runs(novo("par"), _partes_paragrafo(par, it["documentos"]), doc))
     if proposicoes:
         els.append(_runs(novo("sub"), [("NOVAS PROPOSIÇÕES", None)], doc))
-        tbl = novo("tabela")
-        trs = tbl.findall(f"{W}tr")
-        modelo_linha = trs[1]
-        for tr in trs[1:]:
-            tbl.remove(tr)
-        for p in proposicoes:
-            tr = copy.deepcopy(modelo_linha)
-            for tc, (txt, link) in zip(tr.findall(f"{W}tc"),
-                                       [(p["proposicao"], p.get("link") or None), (p["ementa"], None), (p["autor"], None)]):
-                pps = tc.findall(f"{W}p")
-                for extra in pps[1:]:
-                    tc.remove(extra)
-                _runs(pps[0], [(txt or "-", link)], doc)
-            tbl.append(tr)
-        els.append(tbl)
+        els.append(_tabela(P, novo, [[(p["proposicao"], p.get("link") or None), (p["ementa"], None), (p["autor"], None)]
+                                     for p in proposicoes], None, doc))
+    if andamento:
+        els.append(_runs(novo("sub"), [("ANDAMENTO DAS DEMAIS PROPOSIÇÕES DE INTERESSE", None)], doc))
+        els.append(_tabela(P, novo, [[(m["proposicao"], m.get("link") or None), (m["ementa"], None), (m["autor"], None),
+                                      (m["situacao"], None)] for m in andamento],
+                           ["PROPOSIÇÃO", "EMENTA", "AUTOR", "SITUAÇÃO"], doc))
     filhos = list(corpo)
     for child in filhos[filhos.index(tit) + 1:]:
         if child is not sect:
@@ -671,6 +664,116 @@ def gerar_docx(modelo: bytes, cliente: str, periodo: str, itens: list[dict], pro
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+# ─── Andamento das demais proposições (lista na aba "Acompanhadas Educação") ─
+# Mesma lógica da saúde (ss.movimentacoes_semana, APIs abertas da Câmara e do Senado), com a lista
+# de ISG, IU e FMCSV numa aba própria da planilha da Agenda, para a consulta da saúde não crescer.
+ABA_ACOMP = "Acompanhadas Educação"
+INTELIGOV = {"ISG": 3421, "IU": 3648, "FMCSV": 3416}  # cliente na Matriz de monitoramento
+
+# Regra da equipe de educação (Bruna, 17/11/2026): entra movimentação importante, como designação
+# de relatoria, apresentação do parecer, aprovação em comissão ou no plenário.
+_IMPORTANTE = re.compile(
+    r"designad[oa]\s+relator|designa[çc][ãa]o\s+d[oa]\s+relator|parecer|\bPRL|relat[óo]rio\s+do\s+relator|aprovad|\baprova\b|"
+    r"aprova[çc][ãa]o|rejeitad|sancionad|san[çc][ãa]o|promulga|transformad[oa]\s+n[ao]\s+(lei|norma)|"
+    r"remessa\s+ao\s+senado|encaminhando\s+o\s+projeto|remetid[oa]\s+[àa]\s+(c[âa]mara|san[çc][ãa]o)|vetad|\bveto\b",
+    re.I)
+# novidade de rotina: prazo, recebimento, despacho às comissões, apensação, proposição recém-apresentada
+_ROTINA = re.compile(r"^(recebid|recebimento|encaminhad[oa] [àa] publica|publica[çc][ãa]o|aguardando|prazo|abertura do prazo|"
+                     r"às comissões|apense|retirad[oa] de pauta|n[ãa]o foram apresentadas emendas)", re.I)
+
+
+def importante(m: dict) -> bool:
+    and_ = (m.get("andamento") or "").strip()
+    and_ = and_.split('"', 1)[0]  # o que vem entre aspas é a ementa citada, não o andamento
+    if _ROTINA.search(and_):
+        return False
+    # vale para a principal, que aparece por conta própria; expediente e retirada de pauta são rotina
+    if re.search(r"ao qual esta proposi[çc][ãa]o est[áa] apensad|parecer recebido para publica|retirada de pauta|"
+                 r"relator[a]? da reda[çc][ãa]o final", and_, re.I):
+        return False
+    if re.match(r"apresenta[çc][ãa]o\s+d[oa]\s+[A-Z]{2,6}\s+n\.", and_, re.I) and not re.search(r"PRL|parecer", and_, re.I):
+        return False  # proposição nova: vai em Novas proposições
+    return bool(_IMPORTANTE.search(and_))
+
+
+def andamentos(acomp: list[dict], ini: dt.date, fim: dt.date, progresso=None) -> dict:
+    """Cliente -> movimentações da semana, cada uma com "importante" (regra da equipe).
+
+    Se na semana houve uma movimentação importante e depois só rotina (ex.: aprovado na CFT e
+    recebido na CCJC), vale a importante: é ela que vai para a síntese."""
+    out = ss.movimentacoes_semana(acomp, ini, fim, progresso=progresso)
+    for c, ms in out.items():
+        if not isinstance(ms, list):
+            continue
+        for m in ms:
+            imps = [h for h in m.get("historico") or [] if importante(h)]
+            if imps and not importante(m):
+                m.update(imps[-1])
+            m["importante"] = bool(imps) or importante(m)
+    return out
+
+
+def acrescentar(ws, linhas: list[tuple[str, str, str, str]], atuais: list[dict], hoje: str, origem: str) -> int:
+    """Põe na aba (cliente, proposição, casa, id) que ainda não estão lá. Casa/ID vazios: procura nas APIs."""
+    tem = {(a["Cliente"], a["Proposição"].strip().upper()) for a in atuais}
+    novas = []
+    for cli, prop, casa, id_ in linhas:
+        if (cli, prop.strip().upper()) in tem:
+            continue
+        if not id_:
+            casa, id_ = ss.casa_e_id(prop)
+        tem.add((cli, prop.strip().upper()))
+        novas.append([cli, prop.strip(), casa, id_, origem, hoje])
+    if novas:
+        ws.append_rows(novas, value_input_option="RAW")
+    return len(novas)
+
+
+def _tabela(P, novo, linhas: list[list[tuple[str, str | None]]], cab: list[str] | None, doc):
+    """Tabela do modelo (3 colunas) com as linhas dadas; com `cab` de 4 nomes, ganha a 4ª coluna."""
+    tbl = novo("tabela")
+    trs = tbl.findall(f"{W}tr")
+    modelo_linha = trs[1]
+    for tr in trs[1:]:
+        tbl.remove(tr)
+    if cab and len(cab) == 4:
+        grid = tbl.find(f"{W}tblGrid")
+        for mud in grid.findall(f"{W}tblGridChange"):  # grade antiga de 3 colunas guardada pelo Docs
+            grid.remove(mud)
+        for ind in [*tbl.iter(f"{W}ind"), *modelo_linha.iter(f"{W}ind")]:  # recuo negativo do modelo: texto passa da borda
+            for lado in ("right", "end"):
+                if ind.get(f"{W}{lado}"):
+                    ind.set(f"{W}{lado}", "0")
+        cols = grid.findall(f"{W}gridCol")
+        total = sum(int(c.get(f"{W}w")) for c in cols)
+        grid.append(copy.deepcopy(cols[-1]))
+        larg = [int(total * f) for f in (0.19, 0.37, 0.18, 0.26)]
+        for c, w in zip(grid.findall(f"{W}gridCol"), larg):
+            c.set(f"{W}w", str(w))
+        for tr in (trs[0], modelo_linha):
+            tcs = tr.findall(f"{W}tc")
+            tcs[-1].addnext(copy.deepcopy(tcs[-1]))
+            for tc, w in zip(tr.findall(f"{W}tc"), larg):
+                tw = tc.find(f"{W}tcPr/{W}tcW")
+                if tw is not None:
+                    tw.set(f"{W}w", str(w))
+                    tw.set(f"{W}type", "dxa")
+        for tc, nome in zip(trs[0].findall(f"{W}tc"), cab):
+            pps = tc.findall(f"{W}p")
+            for extra in pps[1:]:
+                tc.remove(extra)
+            _runs(pps[0], [(nome, None)], doc)
+    for valores in linhas:
+        tr = copy.deepcopy(modelo_linha)
+        for tc, (txt, link) in zip(tr.findall(f"{W}tc"), valores):
+            pps = tc.findall(f"{W}p")
+            for extra in pps[1:]:
+                tc.remove(extra)
+            _runs(pps[0], [(txt or "-", link)], doc)
+        tbl.append(tr)
+    return tbl
 
 
 # ─── Email (Wix: 1 notícia por eixo + o PDF da síntese completa) ─────────────

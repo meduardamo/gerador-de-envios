@@ -33,8 +33,9 @@ AREAS = {"Educação": ["ISG", "IU"], "Primeira Infância": ["FMCSV"]}  # mesma 
 NOME_SECAO = {"CENÁRIO ELEITORAL": "Cenário eleitoral", "LEGISLATIVO": "Legislativo", "EXECUTIVO": "Executivo",
               "JUDICIÁRIO": "Judiciário", "NOTÍCIAS": "Notícias", "DIÁRIO OFICIAL DA UNIÃO": "Diário Oficial da União"}
 CHAVES = ("edu_doc", "edu_doc_ref", "edu_cache", "edu_erros", "edu_arquivos", "edu_emails", "edu_assin",
-          "edu_semana", "edu_link")
-PREFIXOS = ("ei_", "ep_", "ed_", "wei_", "wep_", "wed_")
+          "edu_semana", "edu_link", "edu_acomp_doc")
+PREFIXOS = ("ei_", "ep_", "ed_", "ea_", "wei_", "wep_", "wed_", "wea_")
+_ABRIR = {"f": None}  # abre a aba "Acompanhadas Educação"; vem da página (credencial do Google)
 
 
 def limpar():
@@ -148,12 +149,124 @@ def _itens_atuais(itens_doc: list[dict]) -> list[dict]:
     return out
 
 
-def _assinatura(c: str, itens: list[dict], props: list[dict], dest: dict) -> str:
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
+def _andamentos(ini: dt.date, fim: dt.date, versao: int):
+    return se.andamentos(ss.ler_acompanhadas(_ABRIR["f"]()), ini, fim)
+
+
+def _mid(m: dict) -> str:
+    return re.sub(r"\W", "", m["proposicao"])
+
+
+def _clientes_do_andamento(m: dict, area: str, quem: list[str]) -> list[str]:
+    return SS.get(f"ea_{_mid(m)}_{area}", list(quem) if m["importante"] else [])
+
+
+def _andamento_do_cliente(movs: dict, c: str) -> list[dict]:
+    area = next(a for a, cs in AREAS.items() if c in cs)
+    out = []
+    for m in movs.get(c) or [] if isinstance(movs.get(c), list) else []:
+        quem = [x for x in AREAS[area] if any(_mid(y) == _mid(m) for y in movs.get(x) or [])]
+        if c in _clientes_do_andamento(m, area, quem):
+            out.append({**m, "situacao": SS.get(f"ea_{_mid(m)}_sit", m["andamento"]).strip()})
+    return out
+
+
+def _assinatura(c: str, itens: list[dict], props: list[dict], dest: dict, movs: dict) -> str:
     """Muda quando muda algo que vai no Word ou no email do cliente (para avisar arquivo velho)."""
     return _hash([[(m["_id"], m["titulo"], m["paragrafos"], m["url"], m["primeira_infancia"] if c == "FMCSV" else "")
                    for m in _itens_do_cliente(itens, c)],
                   [p["proposicao"] for p in _props_do_cliente(props, c)],
-                  {e: d["_id"] for e, d in dest.items()}])
+                  {e: d["_id"] for e, d in dest.items()},
+                  [(m["proposicao"], m["situacao"]) for m in _andamento_do_cliente(movs, c)]])
+
+
+def _bloco_andamento(m: dict, area: str, quem: list[str]):
+    mid = _mid(m)
+    with st.container(key=f"it_edua_{mid}"):
+        col1, col2 = st.columns([0.74, 0.26], vertical_alignment="top")
+        with col2, st.container(key=f"ac_edua_{mid}"):
+            _campo(st.pills, f"ea_{mid}_{area}", list(quem) if m["importante"] else [], label="Clientes",
+                   options=quem, selection_mode="multi", label_visibility="collapsed")
+            with st.popover("Editar", icon=":material/edit:"):
+                _campo(st.text_area, f"ea_{mid}_sit", m["andamento"], height=120,
+                       label="Situação (o que vai na coluna Situação do Word)")
+        on = bool(_clientes_do_andamento(m, area, quem))
+        chips = [chip(m["data"], "data")] + ([chip(m["orgao"], "org")] if m["orgao"] else []) + \
+                ([chip("movimentação importante", "ok")] if m["importante"] else [])
+        sit = SS.get(f"ea_{mid}_sit", m["andamento"])
+        link = f'<a href="{esc(m["link"])}" target="_blank">{esc(m["proposicao"])}</a>' if m.get("link") else esc(m["proposicao"])
+        col1.markdown(f'<div class="{"" if on else "sx-fora"}"><div class="sx-top">{"".join(chips)}</div>'
+                      f'<p class="sx-h">{link}</p><p class="sx-txt">{esc(sit)}</p>'
+                      f'<p class="sx-ementa">{esc(m["ementa"])}</p>'
+                      + (f'<p class="sx-meta">{esc(m["autor"])}' + (f' · relatoria: {esc(m["relator"])}' if m.get("relator") else "")
+                         + "</p>" if m.get("autor") else "") + "</div>", unsafe_allow_html=True)
+
+
+def _secao_andamento(INI, FIM, area: str, CLIS: list[str], props: list[dict]) -> dict:
+    """Mostra o andamento da semana das proposições acompanhadas e devolve {cliente: [movs]}."""
+    secao("Andamento das demais proposições", cor="#192D4E", menor=True,
+          explicacao="Tramitação da semana, nas APIs da Câmara e do Senado, das proposições que cada cliente acompanha "
+                     "(lista da Matriz do Inteligov, mais as novas proposições do doc). Vem marcado o que a equipe "
+                     "manda: designação de relatoria, parecer, aprovação, remessa à outra Casa, sanção. Prazo, "
+                     "despacho e apensação ficam embaixo, desmarcados.")
+    if _ABRIR["f"] is None:
+        st.caption("Sem a planilha da Agenda (AGENDA_SHEET_ID) não dá para consultar o andamento.")
+        return {}
+    ref = SS.get("edu_doc_ref")
+    if props and SS.get("edu_acomp_doc") != ref:  # novas proposições do doc entram na lista, uma vez por doc
+        try:
+            ws = _ABRIR["f"]()
+            linhas = []
+            for p in props:
+                m_id = re.search(r"idProposicao=(\d+)", p.get("link") or "")
+                casa, id_ = ("Câmara dos Deputados", m_id.group(1)) if m_id else ("", "")
+                linhas += [(c, p["proposicao"], casa, id_) for c in (p["clientes"] or list(se.CLIENTES))]
+            if se.acrescentar(ws, linhas, ss.ler_acompanhadas(ws), dt.date.today().strftime("%d/%m/%Y"), "Doc de links"):
+                SS["edu_acomp_v"] = SS.get("edu_acomp_v", 0) + 1
+        except Exception as e:  # noqa: BLE001
+            st.warning(f"Não consegui pôr as novas proposições do doc na lista de acompanhadas: {e}")
+        SS["edu_acomp_doc"] = ref
+    try:
+        with st.spinner("Consultando a tramitação na Câmara e no Senado (na primeira vez da semana leva cerca de 1 minuto)..."):
+            movs = _andamentos(INI, FIM, SS.get("edu_acomp_v", 0))
+    except Exception as e:  # noqa: BLE001
+        st.warning(f"Não consegui consultar o andamento: {type(e).__name__}: {e}")
+        return {}
+    if movs.get(ss.ERRO_CAMARA):
+        st.warning(f"A API da Câmara não respondeu ({movs[ss.ERRO_CAMARA]}): só o Senado entrou. Tente de novo mais tarde.")
+    if movs.get(ss.SEM_RESPOSTA):
+        st.caption(f"{_plural(len(movs[ss.SEM_RESPOSTA]), 'proposição ficou', 'proposições ficaram')} sem resposta das APIs.")
+    unicos: dict[str, tuple[dict, list[str]]] = {}
+    for c in CLIS:
+        for m in movs.get(c) or []:
+            k = _mid(m)
+            unicos.setdefault(k, (m, []))[1].append(c)
+    imp = [v for v in unicos.values() if v[0]["importante"]]
+    rot = [v for v in unicos.values() if not v[0]["importante"]]
+    if not unicos:
+        st.caption(f"Nenhuma proposição acompanhada {_de(CLIS)} andou nesta semana.")
+    for m, quem in imp:
+        _bloco_andamento(m, area, quem)
+    if rot:
+        with st.expander(f"{_plural(len(rot), 'movimentação de rotina', 'movimentações de rotina')} (prazo, despacho, "
+                         f"apensação, recebimento): marque o que deve entrar"):
+            for m, quem in rot:
+                _bloco_andamento(m, area, quem)
+    with st.popover("Incluir proposição na lista", icon=":material/add:"):
+        st.caption("Para acompanhar uma proposição que não está na Matriz do Inteligov do cliente. Ela entra na lista "
+                   "e passa a aparecer aqui quando andar.")
+        nova = st.text_input("Proposição", placeholder="PL 3041/2023", key="edu_nova_prop")
+        cli_nova = st.pills("Clientes", CLIS, default=CLIS, selection_mode="multi", key="edu_nova_cli")
+        if st.button("Incluir", key="edu_nova_ok", disabled=not re.match(r"^\s*[A-Za-z]{2,6}\s*\d+/\d{4}", nova or "")):
+            prop = re.sub(r"^\s*([A-Za-z]+)\s*(\d+/\d{4}).*", lambda x: f"{x.group(1).upper()} {x.group(2)}", nova)
+            ws = _ABRIR["f"]()
+            n = se.acrescentar(ws, [(c, prop, "", "") for c in cli_nova], ss.ler_acompanhadas(ws),
+                               dt.date.today().strftime("%d/%m/%Y"), "Incluída na página")
+            SS["edu_acomp_v"] = SS.get("edu_acomp_v", 0) + 1
+            st.toast(f"{prop}: incluída para {', '.join(cli_nova)}." if n else f"{prop} já estava na lista.")
+            st.rerun()
+    return movs
 
 
 def _popover_email(corpo: str, cid: str):
@@ -244,8 +357,10 @@ def _item(it: dict, area: str, CLIS: list[str], repetidos: set, com_secao: bool 
             st.markdown(f'<div class="{"" if on or not pars else "sx-fora"}">{corpo}</div>', unsafe_allow_html=True)
 
 
-def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, pasta_id: str, area: str = "Educação"):
+def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, pasta_id: str, area: str = "Educação",
+           abrir_aba=None):
     CLIS = AREAS[area]
+    _ABRIR["f"] = abrir_aba
     nomes = " e ".join(CLIS)
     if SS.get("edu_semana") != INI:  # trocou a semana: o doc é outro (e o link colado também)
         limpar()
@@ -435,6 +550,8 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
                               + (f'<p class="sx-meta">{esc(p["autor"])}</p>' if p["autor"] else "") + "</div>",
                               unsafe_allow_html=True)
 
+    movs = _secao_andamento(INI, FIM, area, CLIS, props)
+
     # ========= 3. ENTREGA =========
     secao("3. Word, PDF e email", cor="#962E4D",
           explicacao="O PDF leva a síntese completa. O email do Wix leva 1 notícia de cada eixo (Legislativo, "
@@ -444,8 +561,9 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
         meus = _itens_do_cliente(itens, c)
         destaques[c] = {}
         with aba:
-            st.markdown(f'<p class="eg-explica">{_plural(len(meus), "item", "itens")} e '
-                        f'{_plural(len(_props_do_cliente(props, c)), "proposição", "proposições")} na síntese.</p>',
+            st.markdown(f'<p class="eg-explica">{_plural(len(meus), "item", "itens")}, '
+                        f'{_plural(len(_props_do_cliente(props, c)), "nova proposição", "novas proposições")} e '
+                        f'{_plural(len(_andamento_do_cliente(movs, c)), "andamento", "andamentos")} na síntese.</p>',
                         unsafe_allow_html=True)
             sem = _sem_texto(itens, c)
             if sem:
@@ -472,10 +590,11 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
                     destaques[c][eixo] = next(m for m in opcoes if m["_id"] == esc_id)
 
     assin = SS.setdefault("edu_assin", {})
-    atual = {c: _assinatura(c, itens, props, destaques[c]) for c in CLIS}
+    atual = {c: _assinatura(c, itens, props, destaques[c], movs) for c in CLIS}
     montados = [c for c in CLIS if c in assin]
     velhos = [c for c in montados if assin[c] != atual[c]]
-    vazios = [c for c in CLIS if not _itens_do_cliente(itens, c) and not _props_do_cliente(props, c)]
+    vazios = [c for c in CLIS if not _itens_do_cliente(itens, c) and not _props_do_cliente(props, c)
+              and not _andamento_do_cliente(movs, c)]
     estado["prontos"] = bool(montados) and not velhos and len(montados) == len([c for c in CLIS if c not in vazios])
     if st.button("Montar de novo" if velhos else "Montar Word, PDF e email", type="primary",
                  disabled=len(vazios) == len(CLIS)):
@@ -485,7 +604,8 @@ def render(INI: dt.date, FIM: dt.date, gemini_key: str, gemini_modelo: str, past
             for c in feitos:
                 modelo = (MODELOS / se.CLIENTES[c]["modelo"]).read_bytes()
                 nome = se.nome_arquivo(c, INI, FIM)
-                arquivos[nome] = se.gerar_docx(modelo, c, periodo, _itens_do_cliente(itens, c), _props_do_cliente(props, c))
+                arquivos[nome] = se.gerar_docx(modelo, c, periodo, _itens_do_cliente(itens, c), _props_do_cliente(props, c),
+                                               _andamento_do_cliente(movs, c))
                 emails[c] = se.html_email(c, periodo, destaques[c])
                 arquivos[nome.replace(".docx", " - email.html")] = emails[c].encode("utf8")
                 arquivos.pop(nome.replace(".docx", ".pdf"), None)

@@ -283,7 +283,8 @@ with st.container(horizontal=True, key="sx_barra", vertical_alignment="bottom"):
     quinzenal = AREA == "Saúde" and st.toggle("Incluir ASBAI e Desiderata (quinzenais)", value=False)
 
 if AREA != "Saúde":
-    edu.render(INI, FIM, GEMINI_API_KEY, GEMINI_MODEL, LINKS_EDU_PASTA, AREA)
+    edu.render(INI, FIM, GEMINI_API_KEY, GEMINI_MODEL, LINKS_EDU_PASTA, AREA,
+               abrir_aba=(lambda: _gc().open_by_key(AGENDA_SHEET_ID).worksheet(edu.se.ABA_ACOMP)) if AGENDA_SHEET_ID else None)
     st.stop()
 
 if SS.get("sint_semana") != INI:  # trocou a semana: DOU, movimentações e arquivos são outros
