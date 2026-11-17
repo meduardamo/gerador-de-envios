@@ -690,7 +690,7 @@ def importante(m: dict) -> bool:
     if _ROTINA.search(and_):
         return False
     # vale para a principal, que aparece por conta própria; expediente e retirada de pauta são rotina
-    if re.search(r"ao qual esta proposi[çc][ãa]o est[áa] apensad|parecer recebido para publica|retirada de pauta|"
+    if re.search(r"ao qual esta proposi[çc][ãa]o est[áa] apensad|em virtude da altera[çc][ãa]o do regime|parecer recebido para publica|retirada de pauta|"
                  r"relator[a]? da reda[çc][ãa]o final", and_, re.I):
         return False
     if re.match(r"apresenta[çc][ãa]o\s+d[oa]\s+[A-Z]{2,6}\s+n\.", and_, re.I) and not re.search(r"PRL|parecer", and_, re.I):
