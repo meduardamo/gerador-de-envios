@@ -738,6 +738,9 @@ def _tabela(P, novo, linhas: list[list[tuple[str, str | None]]], cab: list[str] 
     modelo_linha = trs[1]
     for tr in trs[1:]:
         tbl.remove(tr)
+    for jc in modelo_linha.iter(f"{W}jc"):  # justificado em coluna estreita abre buracos entre as palavras
+        if jc.get(f"{W}val") == "both":
+            jc.set(f"{W}val", "left")
     if cab and len(cab) == 4:
         grid = tbl.find(f"{W}tblGrid")
         for mud in grid.findall(f"{W}tblGridChange"):  # grade antiga de 3 colunas guardada pelo Docs
