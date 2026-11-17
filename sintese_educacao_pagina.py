@@ -158,8 +158,15 @@ def _mid(m: dict) -> str:
     return re.sub(r"\W", "", m["proposicao"])
 
 
+ANDAMENTO_MARCADO = ("ISG",)  # só o ISG recebe o bloco nas sínteses oficiais; IU e FMCSV vêm desmarcados
+
+
+def _padrao(m: dict, quem: list[str]) -> list[str]:
+    return [c for c in quem if c in ANDAMENTO_MARCADO] if m["importante"] else []
+
+
 def _clientes_do_andamento(m: dict, area: str, quem: list[str]) -> list[str]:
-    return SS.get(f"ea_{_mid(m)}_{area}", list(quem) if m["importante"] else [])
+    return SS.get(f"ea_{_mid(m)}_{area}", _padrao(m, quem))
 
 
 def _andamento_do_cliente(movs: dict, c: str) -> list[dict]:
@@ -186,7 +193,7 @@ def _bloco_andamento(m: dict, area: str, quem: list[str]):
     with st.container(key=f"it_edua_{mid}"):
         col1, col2 = st.columns([0.74, 0.26], vertical_alignment="top")
         with col2, st.container(key=f"ac_edua_{mid}"):
-            _campo(st.pills, f"ea_{mid}_{area}", list(quem) if m["importante"] else [], label="Clientes",
+            _campo(st.pills, f"ea_{mid}_{area}", _padrao(m, quem), label="Clientes",
                    options=quem, selection_mode="multi", label_visibility="collapsed")
             with st.popover("Editar", icon=":material/edit:"):
                 _campo(st.text_area, f"ea_{mid}_sit", m["andamento"], height=120,
@@ -207,9 +214,10 @@ def _secao_andamento(INI, FIM, area: str, CLIS: list[str], props: list[dict]) ->
     """Mostra o andamento da semana das proposições acompanhadas e devolve {cliente: [movs]}."""
     secao("Andamento das demais proposições", cor="#192D4E", menor=True,
           explicacao="Tramitação da semana, nas APIs da Câmara e do Senado, das proposições que cada cliente acompanha "
-                     "(lista da Matriz do Inteligov, mais as novas proposições do doc). Vem marcado o que a equipe "
-                     "manda: designação de relatoria, parecer, aprovação, remessa à outra Casa, sanção. Prazo, "
-                     "despacho e apensação ficam embaixo, desmarcados.")
+                     "(lista da Matriz do Inteligov, mais as novas proposições do doc). No ISG vem marcado o que a "
+                     "equipe manda: designação de relatoria, parecer, aprovação, remessa à outra Casa, sanção. IU e "
+                     "FMCSV não costumam receber este bloco e vêm desmarcados; marque o que deve entrar. Prazo, "
+                     "despacho e apensação ficam embaixo, desmarcados para todos.")
     if _ABRIR["f"] is None:
         st.caption("Sem a planilha da Agenda (AGENDA_SHEET_ID) não dá para consultar o andamento.")
         return {}
