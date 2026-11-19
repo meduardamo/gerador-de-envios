@@ -1297,12 +1297,18 @@ def orgao_topo(org: str) -> str:
 
 
 # Itens que entram desligados na página (quem revisa pode ligar de volta)
-_DOU_REPASSE = re.compile(r"^Autoriza (?:o|a|os|as) .{0,80}?receber recursos", re.I)
+_DOU_REPASSE = re.compile(
+    r"^(?:Autoriza (?:o|a|os|as) .{0,80}?receber recursos"
+    r"|Autoriza (?:o|a) (?:repasse|transferência) de recursos"
+    r"|Autoriza .{0,120}?incremento temporário)", re.I)
 
 
 def dou_rotina(ato: dict) -> bool:
-    """Aviso de prefeitura ou portaria de repasse a ente/entidade: fora por padrão."""
-    return (ato.get("orgao") or "").lower().startswith("prefeituras") or bool(_DOU_REPASSE.match(ato.get("resumo") or ""))
+    """Aviso de prefeitura ou portaria de repasse a ente/entidade: fora por padrão.
+    Olha o resumo da raspagem e o do Gemini (que reescreve o começo do texto)."""
+    if (ato.get("orgao") or "").lower().startswith("prefeituras"):
+        return True
+    return any(_DOU_REPASSE.match((ato.get(k) or "").strip()) for k in ("resumo_raspagem", "resumo"))
 
 
 def mov_rotina(m: dict) -> bool:

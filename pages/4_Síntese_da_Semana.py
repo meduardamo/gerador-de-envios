@@ -235,6 +235,7 @@ def _gravar(semana: dt.date, partes: dict, apagar: tuple = ()) -> bool:
     try:
         comp.salvar_partes(_abas_comp()[0], semana, partes, _quem(), apagar)
         _rodada.clear()
+        SS["_assinatura"] = None  # o vigia toma a rodada nova como base
         meta = SS.setdefault("sint_meta", {})
         for k in partes:
             meta[k] = (_quem(), comp.agora())
@@ -259,6 +260,7 @@ def _mudou(chave: str, semana: dt.date, versao: str | None):
         quando = comp.registrar(_abas_comp()[1], semana, versao, chave, SS[chave], _quem())
         SS.setdefault("_rev_aplicado", {})[chave] = quando
         _revisao.clear()
+        SS["_assinatura"] = None
     except Exception as e:  # noqa: BLE001
         SS["_rev_erro"] = f"{type(e).__name__}: {e}"
 
@@ -489,7 +491,10 @@ def _vigia():
         return
     assin = (v, len(rv), max((r["n"] for r in rv.values()), default=-1),
              tuple(sorted((k, r["em"]) for k, r in rem.items())))
-    if SS.get("_assinatura") is not None and assin != SS["_assinatura"]:
+    if SS.get("_assinatura") is None:  # depois de gravação própria: base nova, sem aviso
+        SS["_assinatura"] = assin
+        return
+    if assin != SS["_assinatura"]:
         ult = max(rv.values(), key=lambda r: r["n"], default=None)
         quem = comp.quem_curto(ult["por"]) if ult else ""
         with st.container(horizontal=True, vertical_alignment="center", key="sx_vigia"):
@@ -751,8 +756,9 @@ if "sint_dou" not in SS:
                 st.warning(f"{plural(falhou_res, 'ato ficou', 'atos ficaram')} com o resumo da raspagem "
                            "(o Gemini não respondeu). Dá para editar no próprio ato.")
             for link, (r, _) in resumos.items():
+                completos[link]["resumo_raspagem"] = completos[link].get("resumo", "")
                 completos[link]["resumo"] = r
-        campos = ("ato", "resumo", "orgao", "orgao_topo", "publicado")
+        campos = ("ato", "resumo", "resumo_raspagem", "orgao", "orgao_topo", "publicado")
         for c in abas:
             combinados[c] = [
                 {**a, **{k: completos[a["link"]][k] for k in campos if k in completos[a["link"]]}}
