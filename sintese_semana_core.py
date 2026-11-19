@@ -1284,9 +1284,16 @@ def ler_dou_cliente(gc, planilha_id: str, cliente: str, ini: dt.date, fim: dt.da
         if not (ini <= d <= fim) or g("Alinhamento") not in aceitar or g("Link") in vistos:
             continue
         vistos.add(g("Link"))
+        org = g("Órgão")  # coluna nova da raspagem (19/11/2026); linhas antigas vêm sem
         out.append({"data": d, "ato": g("Portaria"), "link": g("Link"), "resumo": g("Resumo"),
+                    "conteudo": g("Conteúdo"), "orgao": org, "orgao_topo": orgao_topo(org),
                     "alinhamento": g("Alinhamento"), "justificativa": g("Justificativa")})
     return out
+
+
+def orgao_topo(org: str) -> str:
+    """Primeiro nível da hierarquia do DOU, como no modelo ("MINISTÉRIO DA SAÚDE")."""
+    return org.split("/")[0].strip().upper() if (org or "").strip() else ""
 
 
 # Itens que entram desligados na página (quem revisa pode ligar de volta)
@@ -1312,26 +1319,88 @@ def _campo_dou(pg: str, classe: str) -> str:
     return _html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", m.group(1)))).strip() if m else ""
 
 
+def _texto_dou(pg: str) -> str:
+    """Texto do ato na página do in.gov.br (identificação, ementa e parágrafos)."""
+    m = re.search(r'<div class="texto-dou">(.*?)</div>\s*(?:<div class="(?:assina|cargo)|</div>)', pg, re.S)
+    bloco = m.group(1) if m else ""
+    ps = re.findall(r"<p[^>]*>(.*?)</p>", bloco, re.S)
+    txt = "\n\n".join(_html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", x))).strip() for x in ps)
+    return re.sub(r"\n{3,}", "\n\n", txt).strip()
+
+
 def completar_ato_dou(ato: dict) -> dict:
-    """Órgão, data, identificação e ementa pelos campos da página do ato no in.gov.br.
-    Sem ementa (aviso, despacho, consulta), fica o resumo da raspagem sem o título repetido."""
+    """Órgão, data, identificação, ementa e texto pela página do ato no in.gov.br.
+    O servidor do Streamlit às vezes não abre a página (vem sem os campos): aí fica o que
+    já veio da planilha da raspagem (Órgão e Conteúdo) ou da Divisão, nunca vazio por cima."""
     try:
         pg = requests.get(ato["link"], headers=UA, timeout=20).text
-        org = _campo_dou(pg, "orgao-dou-data")
-        pub = _campo_dou(pg, "publicado-dou-data")
-        ident = _campo_dou(pg, "identifica") or ato.get("ato", "")
-        resumo = _campo_dou(pg, "ementa")
-        if not resumo:
-            resumo = (ato.get("resumo") or "").strip()
-            if ident and resumo.lower().startswith(ident.lower()):
-                resumo = resumo[len(ident):].strip()
-        return {**ato, "ato": ident, "resumo": resumo, "orgao": org,
-                "orgao_topo": org.split("/")[0].strip().upper() if org else "OUTROS",
-                "publicado": pub if re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub) else _publicado(ato)}
     except Exception:  # noqa: BLE001
-        org = ato.get("orgao") or ""
-        return {**ato, "orgao": org, "orgao_topo": ato.get("orgao_topo") or (org.split("/")[0].strip().upper() if org else "OUTROS"),
-                "publicado": _publicado(ato)}
+        pg = ""
+    org = _campo_dou(pg, "orgao-dou-data") if pg else ""
+    pub = _campo_dou(pg, "publicado-dou-data") if pg else ""
+    ident = (_campo_dou(pg, "identifica") if pg else "") or ato.get("ato", "")
+    ementa = _campo_dou(pg, "ementa") if pg else ""
+    resumo = ementa or (ato.get("resumo") or "").strip()
+    if not ementa and ident and resumo.lower().startswith(ident.lower()):
+        resumo = resumo[len(ident):].strip()
+    org = org or ato.get("orgao") or ""
+    return {**ato, "ato": ident, "resumo": resumo, "orgao": org,
+            "orgao_topo": orgao_topo(org) or ato.get("orgao_topo") or "OUTROS",
+            "conteudo": ato.get("conteudo") or (_texto_dou(pg) if pg else ""),
+            "publicado": pub if re.fullmatch(r"\d{2}/\d{2}/\d{4}", pub) else _publicado(ato)}
+
+
+# Resumo do ato no padrão da equipe (prompt da Mayara, 19/11/2026): um bullet, duas ou três
+# frases curtas, só o que está no texto. O cabeçalho (ato | publicado | órgão) é montado no Word.
+PROMPT_DOU = """Você recebe um ato publicado no Diário Oficial da União (DOU). Escreva o resumo do ato para uma síntese semanal.
+
+Formato: um único parágrafo, curto e direto, de preferência duas ou três frases curtas, destacando o objetivo principal do ato e suas principais disposições.
+
+Orientações:
+- Priorize informações relevantes, como mudanças institucionais, designações, competências, prazos, obrigações, composição de grupos de trabalho e alterações normativas.
+- Use linguagem objetiva, técnica e institucional.
+- Não acrescente análises, avaliações de impacto, classificações ou informações que não estejam no texto.
+- Evite repetir o conteúdo integral do ato ou listar detalhes secundários.
+- Para atos de designação ou composição de grupos, informe a finalidade do colegiado e os principais integrantes, quando relevante.
+- Para atos normativos, destaque a principal mudança e eventuais prazos ou datas de vigência.
+- Para atos de nomeação, exoneração ou designação, informe a pessoa, o cargo e a unidade correspondente.
+- Não repita o nome, o número nem a data do ato no começo (eles já aparecem no título). Comece pelo verbo ou pelo assunto.
+- Frases completas, sem reticências e sem cortar no meio. Sem travessão.
+- Não inclua introduções, conclusões, títulos ou comentários.
+
+Responda só com JSON: {{"resumo": "..."}}
+
+ATO: {ato}
+ÓRGÃO: {orgao}
+TEXTO:
+{texto}
+"""
+
+
+def resumir_ato_dou(client, modelo: str, ato: dict) -> str:
+    """Resumo do ato pelo Gemini a partir do texto completo; sem texto, devolve o resumo que já havia."""
+    import gemini_config
+    texto = (ato.get("conteudo") or "").strip() or (ato.get("resumo") or "").strip()
+    if len(texto) < 40:
+        return ato.get("resumo") or ""
+    prompt = PROMPT_DOU.format(ato=ato.get("ato", ""), orgao=ato.get("orgao", ""), texto=texto[:15000])
+    for tentativa in range(2):
+        try:
+            resp = client.models.generate_content(model=modelo, contents=prompt,
+                                                  config=gemini_config.config(gemini_config.TEXTO_CURTO, json=True))
+            break
+        except Exception as e:  # noqa: BLE001
+            if tentativa == 1 or not re.search(r"429|500|503|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE", str(e)):
+                raise
+            time.sleep(10)
+    bruto = re.sub(r"^```(?:json)?|```$", "", (resp.text or "").strip()).strip()
+    try:
+        r = json.loads(bruto).get("resumo", "")
+    except (json.JSONDecodeError, AttributeError):
+        m = re.search(r'"resumo"\s*:\s*"(.*)"', bruto, re.S)
+        r = m.group(1) if m else ""
+    r = _limpar(str(r or "")).rstrip(" .…")
+    return (r + ".") if r else (ato.get("resumo") or "")
 
 
 def _publicado(ato: dict) -> str:
@@ -1654,3 +1723,13 @@ def pacote_zip(arquivos: dict[str, bytes]) -> bytes:
         for nome, dados in arquivos.items():
             z.writestr(nome, dados)
     return buf.getvalue()
+
+
+def sem_reticencias(t: str) -> str:
+    """Resumo da raspagem vem cortado com '...': fica até a última frase inteira."""
+    t = (t or "").strip()
+    if not re.search(r"(\.\.\.|…)$", t):
+        return t
+    corpo = re.sub(r"\s*(\.\.\.|…)$", "", t)
+    m = re.search(r"^(.*[.;:])\s", corpo + " ", re.S)
+    return m.group(1).strip() if m and len(m.group(1)) > 40 else corpo.rstrip(" ,;") + "."

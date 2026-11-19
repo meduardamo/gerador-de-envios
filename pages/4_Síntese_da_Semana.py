@@ -13,11 +13,14 @@ import streamlit as st
 from google.oauth2.service_account import Credentials
 
 import sintese_semana_core as ss
+import sintese_compartilhada as comp
 import sintese_educacao_pagina as edu
 import importlib
+from urllib.parse import unquote
 
 # o Streamlit Cloud às vezes mantém o módulo velho depois de um push; recarrega a cada rodada
 ss = importlib.reload(ss)
+comp = importlib.reload(comp)
 edu = importlib.reload(edu)
 
 
@@ -120,6 +123,8 @@ p.sx-and { font-size: 13px !important; line-height: 1.55 !important; color: #111
 .sx-and span { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #4E5A6E; margin-bottom: 2px; }
 p.sx-meta { font-size: 12px !important; color: #6A6A66 !important; margin: 7px 0 0 !important; line-height: 1.5 !important; }
 p.sx-meta a { color: #962E4D !important; }
+p.sx-quem { font-size: 11.5px !important; color: #8A6A2E !important; margin: 7px 0 0 !important; line-height: 1.4 !important; }
+.st-key-sx_vigia { background: #FFF8E8; border: 1px solid #EAD9B0; border-radius: 8px; padding: 6px 12px; margin: 6px 0; }
 
 /* expansores (notícias por seção, XLS do Inteligov) */
 [data-testid="stExpander"] details { border: 1px solid #DADAD4 !important; border-radius: 8px !important; background: #fff !important; }
@@ -197,6 +202,95 @@ def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
     return ss.movimentacoes_semana(ss.ler_acompanhadas(ws), ini, fim)
 
 
+# ─── Rodada compartilhada (planilha da Agenda, abas "Síntese rodada" e "Síntese revisão") ───
+COMP = bool(AGENDA_SHEET_ID)
+WIDGETS = ("sb_", "sc_", "sd_", "sp_", "sm_")
+
+
+@st.cache_resource
+def _abas_comp():
+    return comp.abas(_gc().open_by_key(AGENDA_SHEET_ID))
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def _rodada(semana: dt.date):
+    return comp.ler_rodada(_abas_comp()[0], semana)
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def _revisao(semana: dt.date, versao: str):
+    return comp.ler_revisao(_abas_comp()[1], semana, versao)
+
+
+def _quem() -> str:
+    login = st.session_state.get("name") or st.session_state.get("username") or ""
+    nome = (SS.get("sx_quem") or "").strip()
+    return f"{login} ({nome})" if nome else login
+
+
+def _gravar(semana: dt.date, partes: dict, apagar: tuple = ()) -> bool:
+    """Grava partes da rodada da semana para a equipe; falha vira aviso e a sessão segue."""
+    if not COMP:
+        return False
+    try:
+        comp.salvar_partes(_abas_comp()[0], semana, partes, _quem(), apagar)
+        _rodada.clear()
+        meta = SS.setdefault("sint_meta", {})
+        for k in partes:
+            meta[k] = (_quem(), comp.agora())
+        for k in apagar:
+            meta.pop(k, None)
+        return True
+    except Exception as e:  # noqa: BLE001
+        st.warning(f"Não consegui gravar a rodada para a equipe ({type(e).__name__}: {e}). "
+                   "O que está na tela continua valendo só para você.")
+        return False
+
+
+def _nova_versao() -> str:
+    return comp.agora() + " " + comp.chave_de(_quem(), str(dt.datetime.now().timestamp()))[:4]
+
+
+def _mudou(chave: str, semana: dt.date, versao: str | None):
+    """Chave ou texto mudou: vai para a aba de revisão e a equipe vê na próxima atualização."""
+    if not COMP or not versao or chave not in SS:
+        return
+    try:
+        quando = comp.registrar(_abas_comp()[1], semana, versao, chave, SS[chave], _quem())
+        SS.setdefault("_rev_aplicado", {})[chave] = quando
+        _revisao.clear()
+    except Exception as e:  # noqa: BLE001
+        SS["_rev_erro"] = f"{type(e).__name__}: {e}"
+
+
+def _sem_texto(noticias: list[dict]) -> list[dict]:
+    """Notícias sem o corpo (só serve para gerar bullets; a rodada guarda o resto)."""
+    return [{k: v for k, v in n.items() if k != "texto"} for n in noticias]
+
+
+def _sem_conteudo(dou: dict) -> dict:
+    return {c: [{k: v for k, v in a.items() if k != "conteudo"} for a in atos] for c, atos in dou.items()}
+
+
+def _adotar(remoto: dict):
+    """Troca o que está na sessão pela rodada gravada (de outra pessoa ou de outra aba)."""
+    for k in ("sint_div", "sint_noticias", "sint_bullets", "sint_erros", "sint_dou", "sint_arquivos",
+              "sint_emails", "sint_movs_xls", "_rev_aplicado", "sint_arquivo"):
+        SS.pop(k, None)
+    for k in [k for k in list(SS.keys()) if str(k).startswith(WIDGETS)]:
+        del SS[k]
+    v = (remoto.get("versao") or {}).get("valor")
+    SS["sint_versao"] = v
+    SS["sint_meta"] = {k: (r["por"], r["em"]) for k, r in remoto.items()}
+    if v:
+        mapa = {"divisao": "sint_div", "noticias": "sint_noticias", "bullets": "sint_bullets",
+                "erros": "sint_erros", "dou": "sint_dou", "movs_xls": "sint_movs_xls"}
+        for parte, chave in mapa.items():
+            if parte in remoto:
+                SS[chave] = remoto[parte]["valor"]
+    SS["sint_upload_ver"] = SS.get("sint_upload_ver", 0) + 1  # esvazia o campo de arquivo
+
+
 def secao(titulo: str, contagem: str = "", cor: str = "", info: str = "", menor: bool = False):
     _secao(titulo, contagem, cor, info, menor)
 
@@ -213,8 +307,30 @@ def plural(n: int, um: str, varios: str) -> str:
     return f"{n} {um if n == 1 else varios}"
 
 
+def _ultima_mudanca(grupo: str) -> str:
+    """'Lívia desligou · 19/11 10:32': a última linha da revisão entre as chaves do item."""
+    rev = SS.get("_rev") or {}
+    ult = max((r | {"k": k} for k, r in rev.items() if k == grupo or k.startswith(grupo + "_")),
+              key=lambda r: r["n"], default=None)
+    if not ult:
+        return ""
+    if isinstance(ult["valor"], bool):
+        acao = "ligou" if ult["valor"] else "desligou"
+    else:
+        acao = "editou"
+    return f"{comp.quem_curto(ult['por']) or 'Alguém'} {acao} · {comp.hora_curta(ult['em'])}"
+
+
+def _campo(tipo, rotulo: str, chave: str, valor: str, **kw):
+    """text_input/text_area que grava na revisão ao sair do campo."""
+    ini = {} if chave in SS else {"value": valor}
+    return tipo(rotulo, key=chave, on_change=_mudou, args=(chave, INI, SS.get("sint_versao")), **ini, **kw)
+
+
 def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
-    """Um bloco branco: conteúdo à esquerda; à direita, Editar (quando há) e a chave de incluir."""
+    """Um bloco branco: conteúdo à esquerda; à direita, Editar (quando há) e a chave de incluir.
+    A chave e o texto editado vão para a aba de revisão, e a equipe vê o mesmo estado."""
+    grupo = chave[:-3] if chave.endswith("_on") else chave
     with st.container(key=f"it_{chave}"):
         col1, col2 = st.columns([0.85, 0.15], vertical_alignment="top")
         with col2, st.container(horizontal=True, horizontal_alignment="right", vertical_alignment="center",
@@ -222,10 +338,15 @@ def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
             if editar:
                 with st.popover("Editar", icon=":material/edit:"):
                     editar()
-            on = st.toggle("Incluir", value=valor, key=chave, label_visibility="collapsed",
-                           help="Desligado, o item não vai para o Word nem para o email")
+            ini = {} if chave in SS else {"value": valor}
+            on = st.toggle("Incluir", key=chave, label_visibility="collapsed", on_change=_mudou,
+                           args=(chave, INI, SS.get("sint_versao")),
+                           help="Desligado, o item não vai para o Word nem para o email", **ini)
         with col1:
-            st.markdown(f'<div class="{"" if on else "sx-fora"}">{html_corpo}</div>', unsafe_allow_html=True)
+            marca = _ultima_mudanca(grupo)
+            st.markdown(f'<div class="{"" if on else "sx-fora"}">{html_corpo}'
+                        + (f'<p class="sx-quem">{esc(marca)}</p>' if marca else "") + "</div>",
+                        unsafe_allow_html=True)
 
 
 def _segunda(d: dt.date) -> dt.date:
@@ -235,7 +356,7 @@ def _segunda(d: dt.date) -> dt.date:
 def _limpar_tudo():
     for k in ("sint_arquivo", "sint_div", "sint_noticias", "sint_bullets", "sint_dou",
               "sint_arquivos", "sint_emails", "sint_acomp_ok", "sint_acomp_n",
-              "sint_movs_xls", "sint_erros", "sint_semana"):
+              "sint_movs_xls", "sint_erros", "sint_semana", "sint_versao", "sint_meta", "_rev_aplicado", "_rev"):
         SS.pop(k, None)
     for k in [k for k in list(SS.keys()) if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_", "xls_"))]:
         SS.pop(k, None)
@@ -254,10 +375,34 @@ with st.sidebar:
         'link e montam ISG e IU, e FMCSV.'
         '</p></div>', unsafe_allow_html=True)
     st.markdown("---")
-    if st.button("Limpar tudo", width="stretch",
-                 help="Zera a Síntese da Semana (arquivo da Divisão, bullets gerados, movimentações e arquivos montados) para começar do zero"):
-        _limpar_tudo()
-        st.rerun()
+    # o nome entra em "quem mexeu" de cada item; mesmo cookie da Agenda da Semana
+    if "sx_quem" not in SS:
+        try:
+            _cookie = st.context.cookies.get("ag_quem")
+        except Exception:  # noqa: BLE001
+            _cookie = None
+        if isinstance(_cookie, str) and _cookie:
+            SS["sx_quem"] = unquote(_cookie)
+    st.text_input("Seu nome", key="sx_quem", placeholder="Seu nome",
+                  help="Aparece para a equipe ao lado de cada item que você ligar, desligar ou editar.")
+    if (SS.get("sx_quem") or "").strip() and SS.get("_quem_gravado") != SS["sx_quem"].strip():
+        SS["_quem_gravado"] = SS["sx_quem"].strip()
+        st.html("<script>window.parent.document.cookie = " + json.dumps("ag_quem=")
+                + " + encodeURIComponent(" + json.dumps(SS["_quem_gravado"])
+                + ") + '; path=/; max-age=31536000; SameSite=Lax';</script>", unsafe_allow_javascript=True)
+    st.markdown("---")
+    with st.popover("Limpar tudo", width="stretch"):
+        st.markdown('<p class="eg-explica">Apaga a rodada da semana escolhida para toda a equipe: Divisão, '
+                    'bullets, DOU e o que cada um ligou, desligou ou editou.</p>', unsafe_allow_html=True)
+        if st.button("Apagar a semana", type="primary", width="stretch"):
+            if COMP and SS.get("sint_semana"):
+                try:
+                    comp.apagar_semana(_abas_comp()[0], SS["sint_semana"])
+                    _rodada.clear()
+                except Exception as e:  # noqa: BLE001
+                    st.warning(f"Não consegui apagar na planilha: {e}")
+            _limpar_tudo()
+            st.rerun()
     st.markdown("---")
     st.caption(f"Usuário: **{st.session_state.get('name', '')}** ({st.session_state.get('username', '')})")
     authenticator.logout("Sair", "sidebar")
@@ -295,8 +440,66 @@ if SS.get("sint_semana") != INI:  # trocou a semana: DOU, movimentações e arqu
         SS.pop(k, None)
     for k in [k for k in SS.keys() if str(k).startswith(("sd_", "sm_"))]:
         del SS[k]
+    if COMP:  # a semana nova pode já ter rodada gravada (ou nenhuma)
+        SS.pop("sint_versao", None)
+        SS["_forcar_adocao"] = True
+
+# a rodada da semana é uma só para a equipe: quem abre vê o que já foi feito
+if COMP:
+    try:
+        remoto = _rodada(INI)
+    except Exception as e:  # noqa: BLE001
+        remoto = None
+        st.warning(f"Não consegui ler a rodada da equipe na planilha ({type(e).__name__}). Seguindo só com esta sessão.")
+    if remoto is not None:
+        v_rem = (remoto.get("versao") or {}).get("valor")
+        if v_rem != SS.get("sint_versao") or SS.pop("_forcar_adocao", False):
+            _adotar(remoto)
+        rev = {}
+        if SS.get("sint_versao"):
+            try:
+                rev = _revisao(INI, SS["sint_versao"])
+            except Exception:  # noqa: BLE001
+                rev = {}
+            aplicado = SS.setdefault("_rev_aplicado", {})
+            for k, r in rev.items():
+                if aplicado.get(k) != r["em"]:
+                    SS[k] = r["valor"]
+                    aplicado[k] = r["em"]
+        SS["_rev"] = rev
+        SS["_assinatura"] = (SS.get("sint_versao"), len(rev), max((r["n"] for r in rev.values()), default=-1),
+                             tuple(sorted((k, r["em"]) for k, r in remoto.items())))
+if SS.get("_rev_erro"):
+    st.warning(f"Uma mudança não foi gravada para a equipe: {SS.pop('_rev_erro')}")
 
 etapas_ph = st.empty()
+
+
+@st.fragment(run_every=30)
+def _vigia():
+    """A cada 30 s confere se alguém da equipe mexeu na rodada; se mexeu, oferece atualizar
+    (não recarrega sozinho para não perder um texto sendo digitado)."""
+    if not COMP or not SS.get("sint_semana"):
+        return
+    try:
+        rem = _rodada(SS["sint_semana"])
+        v = (rem.get("versao") or {}).get("valor")
+        rv = _revisao(SS["sint_semana"], v) if v else {}
+    except Exception:  # noqa: BLE001
+        return
+    assin = (v, len(rv), max((r["n"] for r in rv.values()), default=-1),
+             tuple(sorted((k, r["em"]) for k, r in rem.items())))
+    if SS.get("_assinatura") is not None and assin != SS["_assinatura"]:
+        ult = max(rv.values(), key=lambda r: r["n"], default=None)
+        quem = comp.quem_curto(ult["por"]) if ult else ""
+        with st.container(horizontal=True, vertical_alignment="center", key="sx_vigia"):
+            st.markdown(f'<p class="eg-explica" style="margin:0 !important">A equipe mexeu nesta rodada'
+                        f'{" (por último: " + esc(quem) + ")" if quem else ""}.</p>', unsafe_allow_html=True)
+            if st.button("Atualizar", icon=":material/refresh:", key="sx_vigia_btn"):
+                st.rerun(scope="app")
+
+
+_vigia()
 
 
 def _etapas():
@@ -333,6 +536,18 @@ CLIS = [c for c, v in ss.CLIENTES.items() if quinzenal or not v.get("quinzenal")
 # ========= 1. DIVISÃO SEMANAL =========
 secao("1. Divisão semanal", cor="#962E4D", info="No Docs: Arquivo > Fazer download > PDF ou Microsoft Word (.docx). Os dois servem: "
       "a página lê os links de notícia por tema e a tabela de novas proposições.")
+META = SS.get("sint_meta") or {}
+
+
+def _por_em(parte: str) -> str:
+    por, em = META.get(parte, ("", ""))
+    return f"{comp.quem_curto(por) or 'alguém'} em {comp.hora_curta(em)}" if em else ""
+
+
+if SS.get("sint_div") and META.get("divisao"):
+    st.markdown(f'<p class="eg-explica">Divisão desta semana enviada por {esc(_por_em("divisao"))}. '
+                'Quem abrir a página vê a mesma rodada. Subir outro arquivo troca a Divisão para toda a equipe '
+                'e zera os bullets.</p>', unsafe_allow_html=True)
 arq = st.file_uploader("Divisão semanal - Saúde", type=["docx", "pdf"], label_visibility="collapsed",
                        key=f"sint_div_arq_{SS.get('sint_upload_ver', 0)}")
 if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
@@ -344,10 +559,15 @@ if arq is not None and SS.get("sint_arquivo") != (arq.name, arq.size):
         SS.pop("sint_arquivo", None)  # o aviso volta a cada clique enquanto o arquivo ruim estiver lá
         st.error("Não consegui abrir o arquivo. Baixe a Divisão de novo no Docs (Arquivo > Fazer download > PDF ou .docx) e envie outra vez.")
     for k in ("sint_noticias", "sint_bullets", "sint_dou", "sint_arquivos", "sint_emails", "sint_acomp_ok",
-              "sint_acomp_n", "sint_movs_xls"):
+              "sint_acomp_n", "sint_movs_xls", "sint_erros", "_rev_aplicado", "_rev"):
         SS.pop(k, None)
-    for k in [k for k in SS.keys() if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_"))]:
+    for k in [k for k in SS.keys() if str(k).startswith(WIDGETS)]:
         del SS[k]
+    if SS.get("sint_div"):
+        v = _nova_versao()
+        if _gravar(INI, {"versao": v, "divisao": SS["sint_div"]},
+                   apagar=("noticias", "bullets", "erros", "dou", "movs_xls")):
+            SS["sint_versao"] = v
 
 div = SS.get("sint_div")
 if not div:
@@ -384,7 +604,11 @@ st.markdown('<p class="eg-explica">Escolha os clientes desta rodada.</p>', unsaf
 escolhidos = st.pills("Clientes", CLIS, default=CLIS, selection_mode="multi", label_visibility="collapsed",
                       format_func=lambda c: ss.CLIENTES[c]["titulo"])
 
-if st.button("Ler notícias e gerar bullets", type="primary"):
+if SS.get("sint_bullets") and META.get("bullets"):
+    st.markdown(f'<p class="eg-explica">Bullets gerados por {esc(_por_em("bullets"))}. Gerar de novo troca os '
+                'bullets para toda a equipe e zera o que foi ligado, desligado ou editado.</p>', unsafe_allow_html=True)
+if st.button("Gerar bullets de novo" if SS.get("sint_bullets") else "Ler notícias e gerar bullets",
+             type="secondary" if SS.get("sint_bullets") else "primary"):
     if not GEMINI_API_KEY:
         st.error("Faltou a GEMINI_API_KEY nos Secrets.")
         _parar()
@@ -411,12 +635,17 @@ if st.button("Ler notícias e gerar bullets", type="primary"):
             if err:
                 erros[c] = err
     barra.empty()
+    SS["sint_noticias"] = _sem_texto(SS["sint_noticias"])
     SS["sint_bullets"], SS["sint_erros"] = bullets, erros
     for k in list(SS.keys()):
-        if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_")):
+        if str(k).startswith(WIDGETS):
             del SS[k]
-    SS.pop("sint_arquivos", None)
-    SS.pop("sint_emails", None)
+    for k in ("sint_arquivos", "sint_emails", "sint_dou", "_rev_aplicado", "_rev"):
+        SS.pop(k, None)
+    v = _nova_versao()  # bullets novos: as revisões da versão anterior não valem mais
+    if _gravar(INI, {"versao": v, "divisao": div, "noticias": SS["sint_noticias"], "bullets": bullets,
+                     "erros": erros}, apagar=("dou",)):
+        SS["sint_versao"] = v
     st.rerun()  # redesenha o resumo (não lidas) e a régua com o resultado
 
 noticias = SS.get("sint_noticias")
@@ -502,9 +731,27 @@ if "sint_dou" not in SS:
         combinados[c] = lista_c
 
     if todos_para_completar:
-        with ThreadPoolExecutor(8) as ex:
+        with st.spinner(f"Completando {plural(len(todos_para_completar), 'ato', 'atos')} do DOU..."), ThreadPoolExecutor(8) as ex:
             completos = dict(zip(todos_para_completar.keys(),
                                  ex.map(ss.completar_ato_dou, todos_para_completar.values())))
+        # resumo no padrão da equipe (prompt da Mayara): um por ato, a partir do texto completo
+        if GEMINI_API_KEY:
+            client_dou = genai.Client(api_key=GEMINI_API_KEY)
+
+            def _resumo(a):
+                try:
+                    return ss.resumir_ato_dou(client_dou, GEMINI_MODEL, a), None
+                except Exception as e:  # noqa: BLE001
+                    return ss.sem_reticencias(a.get("resumo") or ""), f"{type(e).__name__}"
+
+            with st.spinner(f"Resumindo {plural(len(completos), 'ato', 'atos')} do DOU..."), ThreadPoolExecutor(6) as ex:
+                resumos = dict(zip(completos.keys(), ex.map(_resumo, completos.values())))
+            falhou_res = sum(1 for _, e in resumos.values() if e)
+            if falhou_res:
+                st.warning(f"{plural(falhou_res, 'ato ficou', 'atos ficaram')} com o resumo da raspagem "
+                           "(o Gemini não respondeu). Dá para editar no próprio ato.")
+            for link, (r, _) in resumos.items():
+                completos[link]["resumo"] = r
         campos = ("ato", "resumo", "orgao", "orgao_topo", "publicado")
         for c in abas:
             combinados[c] = [
@@ -513,7 +760,9 @@ if "sint_dou" not in SS:
                 for a in combinados[c]
             ]
 
-    SS["sint_dou"] = combinados
+    SS["sint_dou"] = _sem_conteudo(combinados)
+    if SS.get("sint_versao"):
+        _gravar(INI, {"dou": SS["sint_dou"]})
 dou_por_cli = SS.get("sint_dou", {})
 
 # proposições acompanhadas: as novas da Divisão entram na lista; depois, a tramitação da semana
@@ -565,6 +814,33 @@ def _novas_de(c):
     return [p for p in div["proposicoes"] if c in [x for x, _ in p["clientes"]]]
 
 
+# Chaves pelo conteúdo do item, não pela posição: movimentações são consultadas na hora e a
+# ordem pode mudar entre uma pessoa e outra; a revisão gravada tem de cair no item certo.
+def _chaves(prefixo: str, c: str, itens: list[dict], ident) -> list[str]:
+    out, vistos = [], {}
+    for it in itens:
+        base = f"{prefixo}_{c}_{comp.chave_de(ident(it))}"
+        vistos[base] = vistos.get(base, 0) + 1
+        out.append(base if vistos[base] == 1 else f"{base}_{vistos[base]}")
+    return out
+
+
+def _k_novas(c, itens):
+    return _chaves("sp", c, itens, lambda p: re.sub(r"\s+", " ", p["proposicao"]).upper())
+
+
+def _k_movs(c, itens):
+    return _chaves("sm", c, itens, lambda m: re.sub(r"\s+", " ", m["proposicao"]).upper() + (m.get("link") or ""))
+
+
+def _k_dou(c, itens):
+    return _chaves("sd", c, itens, lambda a: (a.get("link") or a.get("ato") or "").strip().rstrip("/"))
+
+
+def _dou_padrao(a) -> bool:
+    return not (ss.dou_rotina(a) or a.get("duvida"))
+
+
 tabs = st.tabs([f"{ss.CLIENTES[c]['titulo']} · {len(bullets[c])}" for c in abas])
 for c, tab in zip(abas, tabs):
     with tab:
@@ -599,8 +875,8 @@ for c, tab in zip(abas, tabs):
                 docs = " · ".join(_a(d["url"], d["nome"]) for d in b.get("documentos", []))
 
                 def _editar(c=c, i=i, b=b):
-                    st.text_input("Título", value=b["titulo"], key=f"sb_{c}_{i}_t")
-                    st.text_area("Texto", value=b["texto"], key=f"sb_{c}_{i}_x", height=150)
+                    _campo(st.text_input, "Título", f"sb_{c}_{i}_t", b["titulo"])
+                    _campo(st.text_area, "Texto", f"sb_{c}_{i}_x", b["texto"], height=150)
 
                 _item(f"sb_{c}_{i}_on",
                       (f'<div class="sx-top">{chip(b.get("tema"))}</div>' if b.get("tema") else "")
@@ -616,9 +892,9 @@ for c, tab in zip(abas, tabs):
               "Cada uma entra na lista de acompanhadas do cliente.", menor=True)
         if not novas:
             vazio("Nenhuma proposição nova marcada para o cliente na Divisão.")
-        for j, p in enumerate(novas):
+        for kp, p in zip(_k_novas(c, novas), novas):
             duvida = any(x == c and d for x, d in p["clientes"])
-            _item(f"sp_{c}_{j}",
+            _item(kp,
                   (f'<div class="sx-top">{chip("marcada com ? na Divisão", "duvida")}</div>' if duvida else "")
                   + f'<p class="sx-h">{_a(p.get("link", ""), p["proposicao"])}</p>'
                   f'<p class="sx-ementa">{esc(p["ementa"])}</p>'
@@ -641,12 +917,12 @@ for c, tab in zip(abas, tabs):
                     vazio(f"Nenhuma proposição do Senado andou na semana. (A API da Câmara estava indisponível: {movs_por_cli[ss.ERRO_CAMARA]}; use o XLS do Inteligov abaixo se precisar das movimentações da Câmara).")
                 else:
                     vazio("Nenhuma proposição acompanhada andou na semana.")
-            for j, m in enumerate(movs_c):
+            for km, m in zip(_k_movs(c, movs_c), movs_c):
                 casa = "Senado" if "senado" in (m.get("link") or "") else ("Câmara" if "camara" in (m.get("link") or "") else "")
                 quem = " · ".join(x for x in [m.get("autor") and f"Autoria: {esc(m['autor'])}",
                                               m.get("relator") and f"Relatoria: {esc(m['relator'])}"] if x)
                 teor = f'<span class="teor">{_a(m["teor"], "inteiro teor ↗")}</span>' if m.get("teor") else ""
-                _item(f"sm_{c}_{j}",
+                _item(km,
                       f'<div class="sx-top">{chip(m.get("data"), "data")}{chip(m.get("orgao"), "org")}{chip(casa)}</div>'
                       f'<p class="sx-h">{_a(m.get("link", ""), m["proposicao"])}{teor}</p>'
                       f'<p class="sx-ementa">{esc(m.get("ementa", ""))}</p>'
@@ -666,6 +942,8 @@ for c, tab in zip(abas, tabs):
                                      if m["proposicao"].upper() not in ja]
                             SS.setdefault("sint_movs_xls", {})[c] = extra
                             SS[f"xls_lido_{c}"] = (xls.name, xls.size)
+                            if SS.get("sint_versao"):
+                                _gravar(INI, {"movs_xls": SS["sint_movs_xls"]})
                             st.rerun()
                         except Exception as e:  # noqa: BLE001
                             st.error(f"Não consegui ler o arquivo: {e}")
@@ -676,14 +954,20 @@ for c, tab in zip(abas, tabs):
             vazio("Nenhum ato do DOU encontrado (planilha da raspagem não configurada e nenhum ato com cliente na Divisão).")
         elif not atos:
             vazio("Nenhum ato marcado como alinhado na semana.")
-        for j, a in enumerate(atos):
+        for kd, a in zip(_k_dou(c, atos), atos):
             chip_duvida = chip("marcado com ? na Divisão", "duvida") if a.get("duvida") else ""
             chip_origem = chip("Divisão semanal") if a.get("origem") == "divisao" else ""
-            _item(f"sd_{c}_{j}",
+            resumo = SS.get(f"{kd}_x", a.get("resumo", ""))
+
+            def _editar_dou(kd=kd, a=a):
+                _campo(st.text_area, "Resumo", f"{kd}_x", a.get("resumo", ""), height=150)
+
+            _item(kd,
                   f'<div class="sx-top">{chip_duvida}{chip_origem}{chip(a.get("publicado"), "data")}{chip(a.get("orgao_topo") or a.get("orgao"), "org")}</div>'
                   f'<p class="sx-h">{_a(a["link"], a["ato"])}</p>'
-                  f'<p class="sx-ementa">{esc(a.get("resumo", ""))}</p>',
-                  valor=not (ss.dou_rotina(a) or a.get("duvida")))
+                  f'<p class="sx-ementa">{esc(resumo)}</p>'
+                  + (f'<p class="sx-meta">{esc(a["orgao"])}</p>' if a.get("orgao") else ""),
+                  valor=_dou_padrao(a), editar=_editar_dou)
 
 
 # ========= 3. WORD, PDF E EMAIL =========
@@ -707,9 +991,12 @@ if gerar:
                     bl.append({**b, "titulo": SS.get(f"sb_{c}_{i}_t", b["titulo"]),
                                "texto": SS.get(f"sb_{c}_{i}_x", b["texto"])})
             cl = [x for i, x in enumerate(clipping.get(c, [])) if SS.get(f"sc_{c}_{i}", True)]
-            novas = [p for j, p in enumerate(_novas_de(c)) if SS.get(f"sp_{c}_{j}", True)]
-            atos = [a for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not (ss.dou_rotina(a) or a.get("duvida")))]
-            movs = [m for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m))]
+            _nv, _dc, _mv = _novas_de(c), dou_por_cli.get(c, []), _movs_de(c)
+            novas = [p for k_, p in zip(_k_novas(c, _nv), _nv)
+                     if SS.get(k_, not any(x == c and d for x, d in p["clientes"]))]
+            atos = [{**a, "resumo": SS.get(f"{k_}_x", a.get("resumo", ""))}
+                    for k_, a in zip(_k_dou(c, _dc), _dc) if SS.get(k_, _dou_padrao(a))]
+            movs = [m for k_, m in zip(_k_movs(c, _mv), _mv) if SS.get(k_, not ss.mov_rotina(m))]
             modelo = (MODELO_IDEC if c == "IDEC" else MODELO).read_bytes()
             nome = ss.nome_arquivo(c, INI, FIM)
             arquivos[nome] = ss.gerar_docx(modelo, c, PERIODO, bl, cl, novas, movs, atos)
@@ -736,9 +1023,11 @@ if arqs:
             nome = ss.nome_arquivo(c, INI, FIM)
             anexo = nome.replace(".docx", " - anexo.docx")
             n_on = sum(1 for i in range(len(bullets[c])) if SS.get(f"sb_{c}_{i}_on", True))
-            n_mov = sum(1 for j, m in enumerate(_movs_de(c)) if SS.get(f"sm_{c}_{j}", not ss.mov_rotina(m)))
-            n_novas = sum(1 for j, p in enumerate(_novas_de(c)) if SS.get(f"sp_{c}_{j}", True))
-            n_dou = sum(1 for j, a in enumerate(dou_por_cli.get(c, [])) if SS.get(f"sd_{c}_{j}", not (ss.dou_rotina(a) or a.get("duvida"))))
+            _nv, _dc, _mv = _novas_de(c), dou_por_cli.get(c, []), _movs_de(c)
+            n_mov = sum(1 for k_, m in zip(_k_movs(c, _mv), _mv) if SS.get(k_, not ss.mov_rotina(m)))
+            n_novas = sum(1 for k_, p in zip(_k_novas(c, _nv), _nv)
+                          if SS.get(k_, not any(x == c and d for x, d in p["clientes"])))
+            n_dou = sum(1 for k_, a in zip(_k_dou(c, _dc), _dc) if SS.get(k_, _dou_padrao(a)))
             tem_anx = (n_novas + n_mov + n_dou) > 0
             with st.container(key=f"lin_{k}"):
                 c0, c1, c2, c3 = st.columns(larg, vertical_alignment="top")
