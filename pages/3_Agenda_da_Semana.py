@@ -336,7 +336,7 @@ semanas = _semanas_salvas()
 
 with st.sidebar:
     # st.caption na sidebar ganha fio em cima (CSS comum, feito para a linha do usuário); aqui é texto solto
-    st.markdown('<p class="ag-sb">Pauta coletada segunda, terça e quarta às 7h. '
+    st.markdown('<p class="ag-sb">Pauta coletada segunda, terça e quarta às 7h e às 9h. '
                 'A seleção salva vale para toda a equipe.</p>', unsafe_allow_html=True)
     atualizar = st.button("Buscar pauta de novo", icon=":material/refresh:", width="stretch",
                           key="ag_atualizar",

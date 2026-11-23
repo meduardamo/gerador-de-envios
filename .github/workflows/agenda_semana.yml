@@ -1,13 +1,15 @@
 name: Agenda da Semana
 
 on:
-  # disparo principal: cron-job.org às 7h de segunda, terça e quarta (o cron do GitHub atrasa
-  # até 4h); o schedule fica de reserva. As de terça e quarta mantêm a foto de segunda, e a
+  # disparo principal: cron-job.org às 7h, 7h45 (reserva) e 9h de segunda, terça e quarta (o cron
+  # do GitHub atrasa até 4h); o schedule fica de reserva. A das 9h pega o que a Câmara e o Senado
+  # publicaram de manhã. As de terça e quarta mantêm a foto de segunda, e a
   # página marca como novo o que entrou depois dela.
   repository_dispatch:
     types: [agenda-semana]
   schedule:
     - cron: "0 9 * * 1,2,3"   # segunda, terça e quarta, 6h em Brasília
+    - cron: "0 12 * * 1,2,3"  # segunda, terça e quarta, 9h em Brasília
   workflow_dispatch:
     inputs:
       semana:
