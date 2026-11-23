@@ -171,8 +171,8 @@ def _aba_historico():
     try:
         return planilha.worksheet(HISTORICO_ABA)
     except gspread.WorksheetNotFound:
-        ws = planilha.add_worksheet(HISTORICO_ABA, rows=1000, cols=len(HISTORICO_CAB))
-        ws.append_row(HISTORICO_CAB, value_input_option="RAW")
+        ws = planilha.add_worksheet(HISTORICO_ABA, rows=1, cols=len(HISTORICO_CAB))
+        ws.update([HISTORICO_CAB], "A1", value_input_option="RAW")
         return ws
 
 
@@ -213,7 +213,12 @@ def _salvar_selecao(sid: str, semana: dict, base: dict, atual: dict, quem: str) 
         ws.append_rows(novas, value_input_option="RAW")
     if historico:
         try:
-            _aba_historico().append_rows(historico, value_input_option="RAW")
+            # o mais novo fica no topo, logo abaixo do cabeçalho, e herda o formato da linha de baixo
+            wh = _aba_historico()
+            if wh.row_count > 1:
+                wh.insert_rows(historico, row=2, value_input_option="RAW")
+            else:
+                wh.append_rows(historico, value_input_option="RAW")
         except Exception:
             pass  # o histórico não pode impedir a seleção de ser salva
     return {k: [c for c in ag.CLIENTES if c in v] for k, v in salvo.items() if v}, desmarcados
