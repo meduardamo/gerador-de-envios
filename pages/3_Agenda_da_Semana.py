@@ -625,9 +625,18 @@ if len(visiveis) < len(universo):
     explica(f"{len(visiveis)} de {_plural(len(universo), 'item novo' if so_novos else 'item', 'itens novos' if so_novos else 'itens')} na tela."
             + (f" A busca acha mais {achados_fora} em outras comissões." if achados_fora else "")
             + " O Word sai com tudo o que está marcado.")
+# Item que não estava na tela na rodada anterior recebe o valor de novo NESTA rodada. Valor gravado
+# numa rodada em que a caixa não foi desenhada fica só no servidor: o navegador mostra a caixa vazia
+# e, ao salvar, o formulário manda o vazio, desmarcando o que a equipe tinha salvo (caso de 23/11).
+# Caixa que já estava na tela não é tocada, para não apagar o que a pessoa marcou e ainda não salvou.
+_vis_antes = st.session_state.get(f"ag_vis_{sid}_{area}", set())
 for it in visiveis:
-    if _chave(sid, area, it["id"]) not in st.session_state:
-        st.session_state[_chave(sid, area, it["id"])] = _da_area(base.get(it["id"]), area)
+    k = _chave(sid, area, it["id"])
+    if k not in st.session_state:
+        st.session_state[k] = _da_area(base.get(it["id"]), area)
+    elif it["id"] not in _vis_antes:
+        st.session_state[k] = list(st.session_state[k] or [])
+st.session_state[f"ag_vis_{sid}_{area}"] = {i["id"] for i in visiveis}
 dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
 
 # O nome fica num cookie do navegador e volta preenchido na próxima visita.
