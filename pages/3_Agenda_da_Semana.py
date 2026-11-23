@@ -85,6 +85,7 @@ p.ag-conv { font-size: 12px !important; color: #6A6A66 !important; margin: 4px 0
 .ag-fora .ag-tit a, .ag-fora .ag-tit { text-decoration: line-through !important; }
 p.ag-nota { font-size: 12px !important; color: #962E4D !important; font-weight: 600; margin: 4px 0 0 !important; text-align: right; }
 .ag-fio { border-bottom: 1px solid #ECEBE6; margin: 6px 0 4px; }
+p.ag-aviso { font-size: 13px !important; font-weight: 600; color: #962E4D !important; margin: -6px 0 8px !important; line-height: 1.5 !important; }
 </style>""", unsafe_allow_html=True)
 
 
@@ -630,9 +631,8 @@ if len(visiveis) < len(universo):
                        and all(t in _texto_item(i) for t in termos)) if termos else 0
     explica(f"{len(visiveis)} de {_plural(len(universo), 'item novo' if so_novos else 'item', 'itens novos' if so_novos else 'itens')} na tela."
             + (f" A busca acha mais {achados_fora} em outras comissões." if achados_fora else "")
-            + " O Word sai com tudo o que está marcado. " + SALVE_ANTES)
-else:
-    explica(SALVE_ANTES)
+            + " O Word sai com tudo o que está marcado.")
+st.markdown(f'<p class="ag-aviso">{esc(SALVE_ANTES)}</p>', unsafe_allow_html=True)
 # Item que não estava na tela na rodada anterior recebe o valor de novo NESTA rodada. Valor gravado
 # numa rodada em que a caixa não foi desenhada fica só no servidor: o navegador mostra a caixa vazia
 # e, ao salvar, o formulário manda o vazio, desmarcando o que a equipe tinha salvo (caso de 23/11).
