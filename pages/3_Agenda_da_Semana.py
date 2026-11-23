@@ -90,6 +90,9 @@ p.ag-nota { font-size: 12px !important; color: #962E4D !important; font-weight: 
 
 # ========= LOGIN =========
 authenticator = exigir_login()
+# caixas desenhadas na rodada anterior (ver o laço de `visiveis`); sai já no começo para que uma
+# rodada que pare antes da lista não deixe a marca velha
+_vis_antes = st.session_state.pop("ag_vis_ultima", set())
 
 
 # ========= DADOS =========
@@ -629,14 +632,14 @@ if len(visiveis) < len(universo):
 # numa rodada em que a caixa não foi desenhada fica só no servidor: o navegador mostra a caixa vazia
 # e, ao salvar, o formulário manda o vazio, desmarcando o que a equipe tinha salvo (caso de 23/11).
 # Caixa que já estava na tela não é tocada, para não apagar o que a pessoa marcou e ainda não salvou.
-_vis_antes = st.session_state.get(f"ag_vis_{sid}_{area}", set())
+# A conta é por caixa e vale só para a rodada anterior: cobre também trocar de área ou de semana e voltar.
 for it in visiveis:
     k = _chave(sid, area, it["id"])
     if k not in st.session_state:
         st.session_state[k] = _da_area(base.get(it["id"]), area)
-    elif it["id"] not in _vis_antes:
+    elif k not in _vis_antes:
         st.session_state[k] = list(st.session_state[k] or [])
-st.session_state[f"ag_vis_{sid}_{area}"] = {i["id"] for i in visiveis}
+st.session_state["ag_vis_ultima"] = {_chave(sid, area, i["id"]) for i in visiveis}
 dias_vis = [d for d in dias_com if any(i["dia"] == d for i in visiveis)]
 
 # O nome fica num cookie do navegador e volta preenchido na próxima visita.

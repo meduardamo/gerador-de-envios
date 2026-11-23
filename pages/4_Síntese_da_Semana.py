@@ -464,8 +464,11 @@ if COMP:
             except Exception:  # noqa: BLE001
                 rev = {}
             aplicado = SS.setdefault("_rev_aplicado", {})
+            # chave que sumiu da sessão também recebe a revisão de novo: o Streamlit apaga o valor de
+            # widget que não foi desenhado numa rodada (troca para Educação e volta, por exemplo), e sem
+            # isso o item voltava ao padrão na tela e no Word mesmo desligado ou editado pela equipe
             for k, r in rev.items():
-                if aplicado.get(k) != r["em"]:
+                if aplicado.get(k) != r["em"] or k not in SS:
                     SS[k] = r["valor"]
                     aplicado[k] = r["em"]
         SS["_rev"] = rev
