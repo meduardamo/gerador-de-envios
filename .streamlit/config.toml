@@ -8,3 +8,8 @@ font = "sans serif"
 
 [client]
 toolbarMode = "viewer"
+
+[server]
+# quem perde a conexão (notebook fechado, internet que cai) volta à mesma sessão em até 2 horas,
+# com o login e as marcações ainda não salvas; o padrão do Streamlit é 2 minutos
+disconnectedSessionTTL = 7200
