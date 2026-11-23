@@ -992,10 +992,11 @@ def _palavras(t: str) -> set:
 
 def _candidatos(proposicao: str) -> list[tuple[str, str, str]]:
     """(casa, id, ementa) de cada casa onde existe essa sigla/número/ano."""
-    m = re.match(r"(\w+)\s+(\d+)/(\d{4})", proposicao.strip())
+    m = re.match(r"(\w+)\s+([\d.]+)/(\d{4})", proposicao.strip())  # aceita "RIC 2.990/2026"
     if not m:
         return []
     sig, num, ano = m.groups()
+    num = num.replace(".", "")
     out = []
     for d in (_get(f"{CAMARA}/proposicoes", siglaTipo=sig, numero=num, ano=ano) or {}).get("dados") or []:
         ementa = d.get("ementa", "")
