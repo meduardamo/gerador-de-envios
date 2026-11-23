@@ -621,13 +621,18 @@ termos = _sem_acento(busca).split()
 universo = [i for i in itens if not so_novos or i["id"] in novos]
 visiveis = [i for i in universo if (not filtro or _comissao(i) in filtro)
             and all(t in _texto_item(i) for t in termos)]
+# marcação ainda não salva de item que sai da tela (busca, filtro, chave de novos, área) se perde:
+# o formulário só manda ao servidor o que está desenhado na hora de salvar
+SALVE_ANTES = "Salve antes de mudar a busca, o filtro ou a área, senão as marcações não salvas se perdem."
 if len(visiveis) < len(universo):
     # a busca também acha o que está fora das comissões escolhidas; avisa para não parecer que não existe
     achados_fora = sum(1 for i in universo if filtro and _comissao(i) not in filtro
                        and all(t in _texto_item(i) for t in termos)) if termos else 0
     explica(f"{len(visiveis)} de {_plural(len(universo), 'item novo' if so_novos else 'item', 'itens novos' if so_novos else 'itens')} na tela."
             + (f" A busca acha mais {achados_fora} em outras comissões." if achados_fora else "")
-            + " O Word sai com tudo o que está marcado.")
+            + " O Word sai com tudo o que está marcado. " + SALVE_ANTES)
+else:
+    explica(SALVE_ANTES)
 # Item que não estava na tela na rodada anterior recebe o valor de novo NESTA rodada. Valor gravado
 # numa rodada em que a caixa não foi desenhada fica só no servidor: o navegador mostra a caixa vazia
 # e, ao salvar, o formulário manda o vazio, desmarcando o que a equipe tinha salvo (caso de 23/11).
