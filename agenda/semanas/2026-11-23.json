@@ -12374,9 +12374,9 @@
   }
  ],
  "erros": [
-  "Câmara: HTTPSConnectionPool(host='dadosabertos.camara.leg.br', port=443): Max retries exceeded with url: /api/v2/eventos?dataInicio=2026-11-23&dataFim=2026-11-27&itens=100&ordem=ASC&ordenarPor=dataHoraInicio (Caused by ConnectTimeoutError(<HTTPSConnection(host='dadosabertos.camara.leg.br', port=443) at 0x783dc244ae40>, 'Connection to dadosabertos.camara.leg.br timed out. (connect timeout=30)')) (mantida a pauta da coleta de 25/11 07:00)"
+  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/eventos/83409/pauta (mantida a pauta da coleta de 25/11 07:45)"
  ],
- "coletadoEm": "25/11 07:45",
+ "coletadoEm": "25/11 09:00",
  "idsSegunda": [
   "SF-15068-19425",
   "SF-15068-19426",
