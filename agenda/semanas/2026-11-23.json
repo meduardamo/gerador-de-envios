@@ -4032,6 +4032,42 @@
    "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594181",
    "situacao": "",
    "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594181-171599",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "PL 5809/2025",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/171599",
+   "ementa": "Altera a Lei nº 9.605, de 12 de fevereiro de 1998 (Lei dos Crimes Ambientais), para tipificar o crime de tráfico de animais silvestres e aumentar penas de crimes nela previstos.",
+   "autor": "",
+   "parecer": "Pareceres nºs: - 62, de 2026, da Comissão de Constituição, Justiça e Cidadania, Relator: Senador Otto Alencar, favorável ao projeto, com a Emenda nº 1, de redação, que apresenta; e - 17, de 2026, da Comissão de Meio Ambiente, Relator: Senador Fabiano Contarato, favorável ao projeto e à Emenda nº 1, de redação."
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-24",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594181",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594181-176253",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "RQS 750/2026",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176253",
+   "ementa": "Solicita a realização de Sessão Especial destinada à cerimônia de premiação da Oficina Legislativa 2026, iniciativa promovida pelo Senado Federal, por meio do Programa e-Cidadania.",
+   "autor": "Damares Alves",
+   "parecer": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-24",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594181",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
    "id": "SF-PLEN-594181-175950",
    "tipo": "materia",
    "rotulo": "Sessão deliberativa ordinária",
@@ -4040,6 +4076,24 @@
    "ementa": "Institui o Plano Nacional de Cultura (PNC) para o decênio 2026-2036; e altera a Lei nº 14.399, de 8 de julho de 2022.",
    "autor": "Presidência da República",
    "parecer": "Parecer nº 231, de 2026, de Plenário, Relator: Senador Humberto Costa, favorável ao projeto, com as Emendas nº s 19 a 22, de redação, que apresenta, e pela rejeição das Emendas nº s 1 a 18, de Plenário."
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-24",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594181",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594181-176516",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "REQ 417/2026 - CDIR",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176516",
+   "ementa": "Solicita, com fundamento no art. 40 do Regimento Interno, licença dos trabalhos da Casa para participar de missão oficial, nos termos da autorização da Presidência do Senado Federal.",
+   "autor": "Astronauta Marcos Pontes",
+   "parecer": ""
   },
   {
    "casa": "SF",
@@ -4075,7 +4129,7 @@
    "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/175741",
    "ementa": "Dispõe sobre a transformação de cargos vagos no quadro permanente do Tribunal Regional do Trabalho da 18ª Região, sem aumento de despesas.",
    "autor": "Tribunal Superior do Trabalho",
-   "parecer": "Parecer favorável nº 70, de 2026, da Comissão de Constituição, Justiça e Cidadania, Relator: Senador Vanderlan Cardoso. (Pendente de deliberação do Requerimento nº 41, de 2026, da Comissão de Constituição, Justiça e Cidadania, que solicita urgência para a matéria, nos termos dos arts. 336, II, e 338, IV, do Regimento Interno do Senado Federal)."
+   "parecer": "Parecer favorável nº 70, de 2026, da Comissão de Constituição, Justiça e Cidadania, Relator: Senador Vanderlan Cardoso."
   },
   {
    "casa": "CD",
@@ -9611,8 +9665,8 @@
    "ementa": "Altera o Decreto-Lei nº 3.689, de 3 de outubro de 1941 (Código de Processo Penal), para estabelecer hipóteses de denegação de liberdade provisória.",
    "autor": "Câmara dos Deputados",
    "relator": "Marcio Bittar (PL/AC)",
-   "parecer": "Favorável ao Projeto, com duas emendas que apresenta, e contrário à Emenda nº 1 .",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/4af47df9-0bdc-4648-9684-59dd44350eba"
+   "parecer": "Favorável ao Projeto, nos termos da Emenda Substitutiva que apresenta, e contrário à Emenda nº 1.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/0a266880-3b4a-4a67-8890-109414ba7f75"
   },
   {
    "casa": "SF",
@@ -9711,7 +9765,7 @@
    "ementa": "Altera a Lei nº 5.194, de 24 de dezembro de 1966, que regula o exercício das profissões de engenheiro, arquiteto e engenheiro-agrônomo; e revoga a Lei nº 8.195, de 26 de junho de 1991. Regula o exercício das profissões de engenheiro e de engenheiro-agrônomo e dá outras providências.",
    "autor": "Câmara dos Deputados",
    "relator": "Fabiano Contarato (PT/ES)",
-   "parecer": "Favorável ao Projeto com a emenda de redação que apresenta.",
+   "parecer": "Favorável ao Projeto, com a emenda de redação que apresenta, e contrário às Emendas nºs 1 a 25.",
    "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/5fccb253-8e9c-4650-a075-600c86925d31"
   },
   {
@@ -11201,6 +11255,26 @@
    "dia": "2026-11-25",
    "ordem": "11:00",
    "hora": "11h",
+   "colegiado": "SUBCOMISSÃO PERMANENTE DOS POVOS INDÍGENAS YANOMAMI (CDHYANOM)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/2815/reuniao/15095",
+   "situacao": "",
+   "reuniao": "Reunião Reunião de Subcomissão",
+   "id": "SF-15095-113293",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "Relatório Legislativo da diligência",
+   "tituloLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/2815/reuniao/15095",
+   "ementa": "Relatório da diligência da CDHYANOM realizada em São Gabriel/Amazonas",
+   "autor": "Damares Alves (REPUBLICANOS/DF)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "11:00",
+   "hora": "11h",
    "colegiado": "COMISSÃO DE SERVIÇOS DE INFRAESTRUTURA (CI)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/59/reuniao/15101",
    "situacao": "",
@@ -11262,8 +11336,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11282,8 +11356,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11302,8 +11376,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11322,8 +11396,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11342,8 +11416,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11362,8 +11436,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11382,8 +11456,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11402,8 +11476,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11422,8 +11496,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11442,8 +11516,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11462,8 +11536,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11482,8 +11556,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11502,8 +11576,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11522,8 +11596,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11542,8 +11616,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11562,8 +11636,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -11592,8 +11666,8 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "11:00",
-   "hora": "11h",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
    "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
    "situacao": "",
@@ -12300,9 +12374,9 @@
   }
  ],
  "erros": [
-  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/eventos/83206/pauta (mantida a pauta da coleta de 24/11 16:49)"
+  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/eventos/83408/pauta (mantida a pauta da coleta de 24/11 18:55)"
  ],
- "coletadoEm": "24/11 18:55",
+ "coletadoEm": "25/11 07:00",
  "idsSegunda": [
   "SF-15068-19425",
   "SF-15068-19426",
