@@ -11873,7 +11873,43 @@
    "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/169659",
    "ementa": "Institui a Força Nacional do Sistema Único de Saúde (FN-SUS).",
    "autor": "Alexandre Padilha",
-   "parecer": "Pendente de parecer. Designado Relator de Plenário o Senador Confúcio Moura. (Pendente de apresentação de requerimento de urgência)"
+   "parecer": "Parecer nº 234, de 2026, de Plenário, Relator: Senador Confúcio Moura, favorável ao projeto, com a Emenda nº 1, de redação, que apresenta."
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594182",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594182-176600",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "RQS 812/2026",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176600",
+   "ementa": "Solicita calendário especial para a Proposta de Emenda à Constituição nº 1, de 2025.",
+   "autor": "Wellington Fagundes",
+   "parecer": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594182",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594182-176605",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "RQS 814/2026",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176605",
+   "ementa": "Requer urgência para o Projeto de Lei nº 2.896, de 2022, nos termos dos arts. 336, III, e 338, III, do Regimento Interno do Senado Federal.",
+   "autor": "Eliziane Gama",
+   "parecer": ""
   },
   {
    "casa": "SF",
@@ -11910,6 +11946,60 @@
    "ementa": "Altera a Lei nº 10.741, de 1º de outubro de 2003 (Estatuto da Pessoa Idosa), para assegurar o acesso a tecnologias direcionadas à preservação da saúde mental e cognitiva da pessoa idosa.",
    "autor": "Paula Belmonte",
    "parecer": "Pareceres: - nº 55, de 2026, da Comissão de Assuntos Sociais, Relatora: Senadora Dra. Eudócia, favorável ao projeto, com a Emenda nº 1, de redação, que apresenta; e - nº 138, de 2026, da Comissão de Direitos Humanos e Legislação Participativa, Relatora: Senadora Roberta Acioly, favorável ao projeto e à Emenda nº 1, de redação."
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594182",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594182-176581",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "REQ 421/2026 - CDIR",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176581",
+   "ementa": "Solicita licença para desempenhar missão oficial, a fim de participar da Visita Oficial por ocasião do Dia da Amizade Argentino-Brasileira, em Buenos Aires, Argentina; da Visita Oficial à República do Paraguai, em Assunção, Paraguai; da Sessão Plenária do Parlamento do Mercosul – Parlasul, em Montevidéu, Uruguai; e da 5ª Cúpula Parlamentar da Plataforma Internacional da Crimeia, em Londres, Reino Unido.",
+   "autor": "Nelsinho Trad",
+   "parecer": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594182",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594182-176602",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "REQ 422/2026 - CDIR",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176602",
+   "ementa": "Solicita licença para desempenhar missão oficial, a fim de participar do AI Innovation & Immersion Summit, em D.C e Washington, EUA.",
+   "autor": "Eduardo Gomes",
+   "parecer": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:00",
+   "hora": "14h",
+   "colegiado": "PLENÁRIO",
+   "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/594182",
+   "situacao": "",
+   "reuniao": "Sessão deliberativa ordinária",
+   "id": "SF-PLEN-594182-176604",
+   "tipo": "materia",
+   "rotulo": "Sessão deliberativa ordinária",
+   "titulo": "REQ 423/2026 - CDIR",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176604",
+   "ementa": "Solicita licença para desempenhar missão oficial, a fim de participar do Fórum Acordo Mercosul-UE: Oportunidades e Desafios, em Lisboa, Portugal.",
+   "autor": "Fabiano Contarato",
+   "parecer": ""
   },
   {
    "casa": "SF",
@@ -12503,6 +12593,25 @@
    "dia": "2026-11-26",
    "ordem": "15:00",
    "hora": "15h",
+   "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15110",
+   "situacao": "",
+   "reuniao": "V Reunião do Grupo de Trabalho (GT) Duchenne/Doenças Raras",
+   "id": "SF-15110-19471",
+   "tipo": "evento",
+   "rotulo": "V Reunião do Grupo de Trabalho (GT) Duchenne/Doenças Raras",
+   "titulo": "V Reunião do Grupo de Trabalho (GT) Duchenne/Doenças Raras",
+   "tituloLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15110",
+   "ementa": "Ouvir o Ministério da Saúde sobre as ações voltadas à Distrofia Muscular de Duchenne (DMD), detalhando o planejamento assistencial, jurídico e financeiro através de seis eixos principais: Acompanhamento de pacientes; Judicialização; Linha de cuidado; Rede assistencial; Dados e pesquisa; Orçamento.",
+   "convidados": [
+    "Ministério da Saúde"
+   ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-26",
+   "ordem": "15:00",
+   "hora": "15h",
    "colegiado": "PLENÁRIO",
    "reuniaoLink": "https://www25.senado.leg.br/web/atividade/sessao-plenaria/-/pauta/587302",
    "situacao": "",
@@ -12532,9 +12641,9 @@
   }
  ],
  "erros": [
-  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/proposicoes/2632236/autores (mantida a pauta da coleta de 25/11 09:00)"
+  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/proposicoes/2658898/autores (mantida a pauta da coleta de 25/11 15:55)"
  ],
- "coletadoEm": "25/11 15:55",
+ "coletadoEm": "25/11 18:02",
  "idsSegunda": [
   "SF-15068-19425",
   "SF-15068-19426",
