@@ -9564,7 +9564,7 @@
    "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/166999",
    "ementa": "Altera a Constituição Federal para garantir que os recursos transferidos pela União ao Fundo Constitucional do Distrito Federal (FCDF) sejam corrigidos anualmente pela variação da receita corrente líquida (RCL) da União.",
    "autor": "Izalci Lucas (PL/DF)",
-   "relator": "Rogério Carvalho (PT/SE)",
+   "relator": "",
    "parecer": "Favorável à Proposta, com duas emendas que apresenta.",
    "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/8473fb30-8005-4d8a-bd69-0ae6972b370c"
   },
@@ -9766,7 +9766,27 @@
    "autor": "Câmara dos Deputados",
    "relator": "Fabiano Contarato (PT/ES)",
    "parecer": "Favorável ao Projeto, com a emenda de redação que apresenta, e contrário às Emendas nºs 1 a 25.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/5fccb253-8e9c-4650-a075-600c86925d31"
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/a416da53-78b6-4372-a7a8-298ff6506a04"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "09:00",
+   "hora": "9h",
+   "colegiado": "COMISSÃO DE CONSTITUIÇÃO, JUSTIÇA E CIDADANIA (CCJ)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/34/reuniao/15077",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15077-113302",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 1383/2024",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/173510",
+   "ementa": "Altera a Lei nº 11.771, de 17 de setembro de 2008, para incluir os motéis no Cadastro de Prestadores de Serviços Turísticos (Cadastur).",
+   "autor": "Câmara dos Deputados",
+   "relator": "Soraya Thronicke (PSB/MS)",
+   "parecer": "Favorável ao Projeto.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/b0f8e1b2-6aa3-413e-8877-9e790332d3ff"
   },
   {
    "casa": "SF",
@@ -9959,6 +9979,31 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
+   "ordem": "09:00",
+   "hora": "9h",
+   "colegiado": "COMISSÃO DE ASSUNTOS SOCIAIS (CAS)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/40/reuniao/15075",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15075-113297",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "REQ 106/2026 - CAS",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176543",
+   "ementa": "Requer, nos termos do art. 58, § 2º, inciso II, da Constituição Federal e do art. 93, inciso II, do Regimento Interno do Senado Federal, a realização de audiência pública com o objetivo de lançar e apresentar os resultados da Pesquisa sobre Misoginia, realizada pelo Instituto de Pesquisa DataSenado, em parceria com o Observatório da Mulher contra a Violência (OMV), e debater suas contribuições para a apreciação do Projeto de Lei nº 896, de 2023.",
+   "autor": "Ana Paula Lobato (PSB/MA)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": "",
+   "convidados": [
+    "Márcia Lopes, ministra de Estado das Mulheres",
+    "Senadora Jussara Lima, relatora do PL nº 896, de 2023, na Comissão de Direitos Humanos e Legislação Participativa (CDH)",
+    "Senadora Soraya Thronicke, relatora do PL nº 896, de 2023, na Comissão de Constituição, Justiça e Cidadania (CCJ) e em Plenário, onde apresentou o substitutivo aprovado pelo Senado Federal"
+   ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
    "ordem": "10:00",
    "hora": "10h",
    "colegiado": "COMISSÃO DE CIÊNCIA, TECNOLOGIA, INOVAÇÃO E INFORMÁTICA (CCT)",
@@ -9974,7 +10019,7 @@
    "autor": "Randolfe Rodrigues (PT/AP)",
    "relator": "Weverton (PDT/MA)",
    "parecer": "Pela aprovação do projeto com 2 (duas) emendas que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/bced8ca6-46d5-420a-a698-e68bc5a84412"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10014,7 +10059,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Beto Faro (PT/PA)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/aa450673-da3f-4585-a3c2-43cf5e72b0d7"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10034,7 +10079,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Damares Alves (REPUBLICANOS/DF)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/3d51b7d9-6ee6-4cfd-a96d-5338fa424a82"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10054,7 +10099,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/72715bed-22bb-4fff-be0f-146d5ccb7b99"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10074,7 +10119,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/1aca6e8c-db86-4ea6-9a3d-b188c4bdbd22"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10094,7 +10139,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/9f5afa77-b535-46e0-a8ca-155a11cd5968"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10114,7 +10159,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/4d573a12-86f7-46bf-88cc-89892d3aeeac"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10134,7 +10179,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/f13b23e7-268e-41ba-bf2d-11edb78f9393"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10154,7 +10199,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/708b0561-7338-4a0c-9049-a2fb89f16af0"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10174,7 +10219,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Ivete da Silveira (MDB/SC)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/e401a0d2-62bc-4a45-8674-86163e0b9baf"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10194,7 +10239,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Izalci Lucas (PL/DF)",
    "parecer": "Pela apresentação de requerimento de informações dirigido ao ministro de Estado das Comunicações.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/fac19513-27cc-427c-975a-31217f360e26"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10214,7 +10259,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto com 1 (uma) emenda de redação que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/23d14a2b-808c-43ad-aa31-4dc790db5f6f"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10234,7 +10279,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Teresa Leitão (PT/PE)",
    "parecer": "Pela aprovação do projeto com 1 (uma) emenda de redação que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/6514d7c3-fca6-4546-844b-d76e13a05cb0"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10254,7 +10299,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Chico Rodrigues (PSB/RR)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/afd3b3e5-97e3-44c6-bbde-14eccfc26044"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10274,7 +10319,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Chico Rodrigues (PSB/RR)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/384fb33e-88ad-4b2a-b1a9-646be9dbae0c"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10294,7 +10339,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Damares Alves (REPUBLICANOS/DF)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/7081ad9d-9ed4-4287-b566-64bc3a17e5ab"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10314,7 +10359,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Damares Alves (REPUBLICANOS/DF)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/97150261-ace2-4394-b8f7-5ac394cf2c6d"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10334,7 +10379,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Damares Alves (REPUBLICANOS/DF)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/766fbecd-b3a4-40eb-b557-544a24ebd29e"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10354,7 +10399,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/75a6b4f8-9a28-48ed-9d76-9f20eb3053e3"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10374,7 +10419,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/7d189644-5e3e-44b4-bb6e-c06332c97dc9"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10394,7 +10439,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/38aad5b8-69e8-41ee-ab5b-daaf3d59936f"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10414,7 +10459,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/5440c57d-3581-4a75-a46c-507d60e190b6"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10434,7 +10479,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/75ad6a9b-d900-45cd-be36-8ee040b48181"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10454,7 +10499,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/2e6604d1-b7c7-49ab-862b-6af9fbb42716"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10474,7 +10519,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/4b1ca8b9-8247-4483-b3c5-aa5430792b90"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10494,7 +10539,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/231f4ef7-4d8a-41f6-a5ba-cae772abf594"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10514,7 +10559,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/71991599-df29-4591-8799-5819ffa191fa"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10534,7 +10579,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Daniella Ribeiro (PP/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/0d014a51-c944-4688-a9bc-563fb0fa40c9"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10554,7 +10599,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Dra. Eudócia (PL/AL)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/539e5534-7174-4255-8140-ec1711a091cb"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10574,7 +10619,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Dra. Eudócia (PL/AL)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/6518545b-d149-483e-895b-7f1fca1b4bc8"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10594,7 +10639,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/489bbd2e-5726-43d4-9f21-f5e3996cdd43"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10614,7 +10659,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/70331afb-1277-4c19-be3b-d3e477ed83cd"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10634,7 +10679,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/f99f3909-61a7-4aaf-a6c4-f30c5594706a"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10654,7 +10699,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/d081f510-dc04-4989-8c78-1a1c953ffc6d"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10674,7 +10719,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/a9119e72-be70-46e1-8195-a837a106268d"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10694,7 +10739,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/fa24643d-6c39-48d1-a2c2-eab417e9d59a"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10714,7 +10759,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Efraim Filho (UNIÃO/PB)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/7258d15f-aab9-42c7-8c6a-bb93267678c6"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10734,7 +10779,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Esperidião Amin (PP/SC)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/dba8be6d-0a5d-4260-871b-fc96456ef2e0"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10754,7 +10799,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Flávio Arns (PSB/PR)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/8de53214-7174-4bdf-9cbe-22bcbe7dee78"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10774,7 +10819,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Flávio Arns (PSB/PR)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/80f5f9bb-c915-49a2-9e9f-5c13174a8799"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10794,7 +10839,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Ivete da Silveira (MDB/SC)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/8911b40f-f75c-4650-a9b1-5463c59bcf21"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10814,7 +10859,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Izalci Lucas (PL/DF)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/d8879497-f610-46cd-8133-5b8060fab49a"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10834,7 +10879,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Nelsinho Trad (PSD/MS)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/eb9420b6-8c84-40d5-8d3a-66087a1ecb44"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10854,7 +10899,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Nelsinho Trad (PSD/MS)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/3a555aa5-58ae-44cd-a721-a75eb7446b26"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10874,7 +10919,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Paulo Paim (PT/RS)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/857d9027-2b0d-4f2c-a779-4f3f1d8d41b7"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10894,7 +10939,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Rogério Carvalho (PT/SE)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/1fa0e982-d482-46fd-8a3a-87c03abc37ae"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10914,7 +10959,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Rogério Carvalho (PT/SE)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/0dcac9b5-8207-4aea-b7cb-e2f1d85b5c46"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10934,7 +10979,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Teresa Leitão (PT/PE)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/b9980a06-905c-44d1-9bbd-39c045868f6c"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10954,7 +10999,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Teresa Leitão (PT/PE)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/17718460-d7a9-441a-9a34-da3ed0a2543d"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -10974,7 +11019,7 @@
    "autor": "Câmara dos Deputados",
    "relator": "Teresa Leitão (PT/PE)",
    "parecer": "Pela aprovação do projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/cbd14107-7727-4d5c-8150-d82d8aeb1e7a"
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -11005,6 +11050,29 @@
     "o Senhor Paulo Manzato, Cloudflare",
     "representante Exército Brasileiro",
     "representante Agência Brasileira de Inteligência - ABIN"
+   ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "10:00",
+   "hora": "10h",
+   "colegiado": "COMISSÃO DE CIÊNCIA, TECNOLOGIA, INOVAÇÃO E INFORMÁTICA (CCT)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1363/reuniao/15050",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15050-113298",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "REQ 103/2026 - CCT",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176529",
+   "ementa": "Requer, nos termos do art. 58, § 2º, II, da Constituição Federal e do art. 93, II, do Regimento Interno do Senado Federal, que na Audiência Pública objeto do REQ 102/2026 - CCT seja incluído o convidado que especifica.",
+   "autor": "Jorge Seif (PL/SC)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": "",
+   "convidados": [
+    "o Senhor Patrick Aron Rinski, Diretor Geral Unit42 Palo Alto Networks"
    ]
   },
   {
@@ -11061,8 +11129,8 @@
    "ementa": "Aprova o texto do Acordo sobre Medidas do Estado de Porto Destinadas a Prevenir, Impedir e Eliminar a Pesca Ilegal Não Declarada e Não Regulamentada, celebrado na 36ª Sessão da Conferência da Organização das Nações Unidas para a Alimentação e a Agricultura (FAO), em Roma, Itália, em 22 de novembro de 2009.",
    "autor": "Câmara dos Deputados",
    "relator": "Leany Lemos (PSB/DF)",
-   "parecer": "Não apresentado.",
-   "parecerLink": ""
+   "parecer": "Pela aprovação.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/27f6d02f-0979-4e8a-8dac-ae2857310145"
   },
   {
    "casa": "SF",
@@ -11324,7 +11392,7 @@
    "rotulo": "Deliberativa",
    "titulo": "REQ 95/2026 - CI",
    "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176517",
-   "ementa": "Requer inclusão de convidado na audiência pública objeto do REQ 46/2026-CI",
+   "ementa": "Requer a inclusão de um representante do Instituto Brasileiro de Petróleo, Gás e Biocombustíveis - IBP na audiência pública objeto do REQ 46/2026-CI, com o objetivo de promover um debate técnico e institucional acerca do fortalecimento da ética concorrencial e a conformidade no mercado de combustíveis como pilares da segurança econômica.",
    "autor": "Veneziano Vital do Rêgo (MDB/PB)",
    "relator": "",
    "parecer": "",
@@ -11332,6 +11400,50 @@
    "convidados": [
     "representante Instituto Brasileiro de Petróleo, Gás e Biocombustíveis (IBP)"
    ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "11:00",
+   "hora": "11h",
+   "colegiado": "COMISSÃO DE SERVIÇOS DE INFRAESTRUTURA (CI)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/59/reuniao/15101",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15101-113299",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "REQ 97/2026 - CI",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176558",
+   "ementa": "Requer realização de audiência pública no âmbito da Comissão de Serviços de Infraestrutura, para debater os entraves e as perspectivas de regulamentação do § 2º do art. 49 da Lei nº 12.305, de 2 de agosto de 2010, alterado pela Lei nº 15.088, de 6 de janeiro de 2025.",
+   "autor": "Jorge Kajuru (PSB/GO)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": "",
+   "convidados": [
+    "o Senhor Uallace Moreira Lima, Ministério do Desenvolvimento, Indústria, Comércio e Serviços (MDIC)",
+    "o Senhor Adalberto Felício Maluf Filho, Secretário Nacional de Meio Ambiente Urbano, Recursos Hídricos e Qualidade Ambiental do Ministério do Meio Ambiente e Mudança do Clima (MMA/SQA)"
+   ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "11:00",
+   "hora": "11h",
+   "colegiado": "COMISSÃO DE SERVIÇOS DE INFRAESTRUTURA (CI)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/59/reuniao/15101",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15101-113300",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "REQ 96/2026 - CI",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176556",
+   "ementa": "Requer a convocação do Senhor George Santoro, Ministro de Estado dos Transportes, para que compareça a esta Comissão, a fim de prestar informações sobre o Edital de Concessão nº 2/2026 da Rota Agro Central (LoteCN3 – BR-070/174/364/MT/RO) até o dia 2 de dezembro de 2026, com leilão agendado para o dia 17 de dezembro de 2026 na B3.",
+   "autor": "Jaime Bagattoli (PL/RO)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": ""
   },
   {
    "casa": "SF",
@@ -11686,8 +11798,28 @@
   {
    "casa": "SF",
    "dia": "2026-11-25",
-   "ordem": "13:50",
-   "hora": "13h50",
+   "ordem": "11:30",
+   "hora": "logo após a 9ª reunião da CDHYANOM",
+   "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15081",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15081-113301",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "REQ 142/2026 - CDH",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/176550",
+   "ementa": "Requer, nos termos do art. 93, I, do Regimento Interno do Senado Federal, a realização de audiência pública, com o objetivo de instruir o PL 501/2023, que “altera a Lei nº 8.069, de 13 de julho de 1990 (Estatuto da Criança e do Adolescente), para tipificar o crime de submissão de criança ou adolescente a intervenção cirúrgica ou a tratamento de transexualização”.",
+   "autor": "Mara Gabrilli (PSD/SP)",
+   "relator": "",
+   "parecer": "",
+   "parecerLink": ""
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:00",
+   "hora": "14h",
    "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
    "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15094",
    "situacao": "",
@@ -11699,186 +11831,6 @@
    "tituloLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15094",
    "ementa": "OITAVO bloco de apreciação das indicações dos Senadores à Emenda RP8 (LOA 2026) desta Comissão. - Nova indicação e superação de impedimentos técnicos, em indicações aprovadas, apontados pelo Ministério da Agricultura e Pecuária por meio dos Ofícios: 183/2026/AEAPF/MAPA; 203/2026/AEAPF/MAPA; 135/2026/COAPLO/AEAPF/MAPA; 171/2026/COAPLO/AEAPF/MAPA; 186/2026/COAPLO/AEAPF/MAPA; 190/2026/COAPLO/AEAPF/MAPA e 191/2026/COAPLO/AEAPF/MAPA. - Parlamentares solicitantes: Senador Sérgio Petecão, Senador Ângelo Coronel, Senador Carlos Viana e Senador Veneziano Vital do Rêgo. - Coordenação/relatoria: Senador Zequinha Marinho. - Dados da Emenda RP8 da CRA: Número: 60120002. Ação: 20ZV – Fomento ao setor agropecuário nacional. Unidade Orçamentária: Ministério da Agricultura e Pecuária. Valor: R$ 400.000.000,00 (quatrocentos milhões de reais). - Referências normativas: Lei Complementar nº 210/2024; Lei nº 15.346/2025 (LOA 2026); Lei nº 15.321/2025 (LDO 2026); Resolução do Congresso Nacional nº 1/2006.",
    "convidados": []
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113234",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 2143/2025 (Substitutivo-CD)",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/175107",
-   "ementa": "Altera a Lei nº 9.456, de 25 de abril de 1997, para aumentar o prazo de vigência do direito de proteção de novas cultivares, e dá outras providências.",
-   "autor": "Câmara dos Deputados",
-   "relator": "Luis Carlos Heinze (PP/RS)",
-   "parecer": "Pela aprovação parcial do Substitutivo da Câmara dos Deputados ao Projeto de Lei do Senado nº 404, de 2018, acolhendo as alterações promovidas ao inciso III do § 1º do art. 10 e ao art. 11 da Lei nº 9.456, de 25 de abril de 1997, e rejeitando a supressão do § 4º do art. 10 da mesma Lei, de modo a preservar a redação originalmente aprovada pelo Senado Federal.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/5f81fcd9-f0fd-4986-b5a4-39512425dad2"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113224",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 6028/2019",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/154373",
-   "ementa": "Dispõe sobre o uso de cães farejadores nas ações de vigilância e defesa agropecuária realizadas em portos, em aeroportos e em postos de fronteira internacional.",
-   "autor": "Câmara dos Deputados",
-   "relator": "Chico Rodrigues (PSB/RR)",
-   "parecer": "Pela aprovação do Projeto e das 2 (duas) Emendas que apresenta e pela rejeição da Emenda n° 1.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/4bf907a9-503d-4d4d-b7ad-9bd0a8d32b6f"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113225",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 2648/2022",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/154920",
-   "ementa": "Altera a Lei nº 10.438, de 26 de abril de 2002, para criar a Subclasse Rural por Autogestão na classificação de consumidores de energia elétrica.",
-   "autor": "Câmara dos Deputados",
-   "relator": "Beto Faro (PT/PA)",
-   "parecer": "Pela aprovação do Projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/0e17e9b1-3f2a-430f-8e37-62a6e43e5223"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113227",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 1/2024",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/161856",
-   "ementa": "Altera a Lei nº 11.947, de 16 de junho de 2009, que dispõe sobre o atendimento da alimentação escolar, para estimular o cumprimento de percentual mínimo de aquisição de gêneros alimentícios da agricultura familiar para o Programa Nacional de Alimentação Escolar.",
-   "autor": "Laércio Oliveira (PP/SE)",
-   "relator": "Professora Dorinha Seabra (UNIÃO/TO)",
-   "parecer": "Pela aprovação do Projeto na forma do Substitutivo que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/643e9c62-b17a-4755-816f-4434b1f8ed21"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113228",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 1707/2024",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/170231",
-   "ementa": "Altera a Lei nº 4.829, de 5 de novembro de 1965, para autorizar a utilização de recursos do crédito rural por cooperativas de geração compartilhada constituídas por produtores rurais beneficiários do crédito rural do Programa Nacional de Fortalecimento da Agricultura Familiar (Pronaf), a Lei nº 12.087, de 11 de novembro de 2009, para incluir cooperativas de geração compartilhada entre as entidades elegíveis à garantia de risco às operações de crédito do Fundo Garantidor de Operações (FGO), e a Lei nº 14.042, de 19 de agosto de 2020, para reservar valores a serem destinados à concessão de garantias a operações de crédito para cooperativas de geração compartilhada em projetos de construção de usinas de microgeração e de minigeração de energia fotovoltaica; e institui o Programa Nacional de Desenvolvimento de Sistemas Agroflorestais de Base Agroecológica (PROSAFs) e o Programa Nacional de Florestas Produtivas.",
-   "autor": "Câmara dos Deputados",
-   "relator": "Sérgio Petecão (PSD/AC)",
-   "parecer": "Pela aprovação do Projeto na forma do Substitutivo que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/52453b8d-7b8c-4623-8c14-df71f8d61519"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113229",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 4162/2024",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/173856",
-   "ementa": "Altera a Lei nº 11.959, de 29 de junho de 2009, para especificar e diferenciar a aquicultura em bem público da aquicultura em propriedade privada.",
-   "autor": "Câmara dos Deputados",
-   "relator": "Jorge Seif (PL/SC)",
-   "parecer": "Pela aprovação do Projeto e das 2 (duas) Emendas de redação que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/b0816096-2e3a-4f18-ada7-557f35d0ff62"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113230",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 1115/2022",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/152938",
-   "ementa": "Institui a Política Nacional de Controle e Erradicação do Mormo e da Anemia Infecciosa Equina (AIE).",
-   "autor": "Alexandre Silveira (PSD/MG)",
-   "relator": "Eliziane Gama (PSD/MA)",
-   "parecer": "Pela aprovação do Projeto.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/b2c2f0bb-e4f7-4067-b011-c3654b1f924a"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113231",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 1087/2024",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/162902",
-   "ementa": "Estabelece percentual mínimo de aplicações de recursos do Fundo de Amparo ao Trabalhador (FAT), disponibilizados para o Banco Nacional de Desenvolvimento Econômico e Social (BNDES), para projetos e programas específicos de saneamento básico em áreas rurais, almejando o desenvolvimento da agricultura familiar e dos pequenos produtores rurais.",
-   "autor": "Mecias de Jesus (REPUBLICANOS/RR)",
-   "relator": "Sérgio Petecão (PSD/AC)",
-   "parecer": "Pela aprovação do Projeto, na forma do Substitutivo que apresenta, e pela rejeição da Emenda n° 1-CAE.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/ed4f26b8-9c99-4b9a-b8e4-72d5fd070ad9"
-  },
-  {
-   "casa": "SF",
-   "dia": "2026-11-25",
-   "ordem": "14:00",
-   "hora": "14h",
-   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
-   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
-   "situacao": "",
-   "reuniao": "Reunião Extraordinária",
-   "id": "SF-15092-113232",
-   "tipo": "materia",
-   "rotulo": "Deliberativa",
-   "titulo": "PL 1348/2024",
-   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/163141",
-   "ementa": "Altera a Lei nº 8.171, de 17 de janeiro de 1991, e a Lei nº 11.326, de 24 de julho de 2006, para incluir o estímulo à utilização de bioinsumos na atividade agrícola entre os objetivos da política agrícola e da Política Nacional da Agricultura Familiar e Empreendimentos Familiares Rurais.",
-   "autor": "Janaína Farias (PT/CE)",
-   "relator": "Beto Faro (PT/PA)",
-   "parecer": "Pela aprovação do Projeto e das 3 (três) Emendas que apresenta.",
-   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/6e468d6c-90bf-48a2-8cf3-5b076414882c"
   },
   {
    "casa": "SF",
@@ -11898,9 +11850,11 @@
    "convidados": [
     "Ir. Maria Irene Lopes dos Santos, Secretária Executiva da Rede Eclesial Pan-Amazônica (REPAM-Brasil)",
     "Ir. Iraní Rupolo, Diretora-Presidente da Associação Nacional de Educação Católica do Brasil (ANEC)",
-    "Sr. Guinartt Diniz, Secretário Executivo da Associação Nacional de Educação Católica do Brasil (ANEC)",
+    "Pe. Edson Sestari, Diretor da Faculdade Católica de Mato Grosso (UNIFACC)",
     "Dom Jaime Spengler, Presidente da Conferência Nacional dos Bispos do Brasil (CNBB)",
-    "Dom Joaquim Hudson de Souza Ribeiro, Representante da Comissão da Amazônia"
+    "Dom Joaquim Hudson de Souza Ribeiro, Representante da Comissão da Amazônia",
+    "Sra. Roberta Guedes, Gerente da Câmara de Ensino Superior da Associação Nacional de Educação Católica do Brasil (ANEC)",
+    "Sra. Tatiana Nunes, Pesquisadora da União Brasileira de Educação Católica (UBEC)"
    ]
   },
   {
@@ -11956,6 +11910,186 @@
    "ementa": "Altera a Lei nº 10.741, de 1º de outubro de 2003 (Estatuto da Pessoa Idosa), para assegurar o acesso a tecnologias direcionadas à preservação da saúde mental e cognitiva da pessoa idosa.",
    "autor": "Paula Belmonte",
    "parecer": "Pareceres: - nº 55, de 2026, da Comissão de Assuntos Sociais, Relatora: Senadora Dra. Eudócia, favorável ao projeto, com a Emenda nº 1, de redação, que apresenta; e - nº 138, de 2026, da Comissão de Direitos Humanos e Legislação Participativa, Relatora: Senadora Roberta Acioly, favorável ao projeto e à Emenda nº 1, de redação."
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113234",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 2143/2025 (Substitutivo-CD)",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/175107",
+   "ementa": "Altera a Lei nº 9.456, de 25 de abril de 1997, para aumentar o prazo de vigência do direito de proteção de novas cultivares, e dá outras providências.",
+   "autor": "Câmara dos Deputados",
+   "relator": "Luis Carlos Heinze (PP/RS)",
+   "parecer": "Pela aprovação parcial do Substitutivo da Câmara dos Deputados ao Projeto de Lei do Senado nº 404, de 2018, acolhendo as alterações promovidas ao inciso III do § 1º do art. 10 e ao art. 11 da Lei nº 9.456, de 25 de abril de 1997, e rejeitando a supressão do § 4º do art. 10 da mesma Lei, de modo a preservar a redação originalmente aprovada pelo Senado Federal.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/5f81fcd9-f0fd-4986-b5a4-39512425dad2"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113224",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 6028/2019",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/154373",
+   "ementa": "Dispõe sobre o uso de cães farejadores nas ações de vigilância e defesa agropecuária realizadas em portos, em aeroportos e em postos de fronteira internacional.",
+   "autor": "Câmara dos Deputados",
+   "relator": "Chico Rodrigues (PSB/RR)",
+   "parecer": "Pela aprovação do Projeto e das 2 (duas) Emendas que apresenta e pela rejeição da Emenda n° 1.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/4bf907a9-503d-4d4d-b7ad-9bd0a8d32b6f"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113225",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 2648/2022",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/154920",
+   "ementa": "Altera a Lei nº 10.438, de 26 de abril de 2002, para criar a Subclasse Rural por Autogestão na classificação de consumidores de energia elétrica.",
+   "autor": "Câmara dos Deputados",
+   "relator": "Beto Faro (PT/PA)",
+   "parecer": "Pela aprovação do Projeto.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/0e17e9b1-3f2a-430f-8e37-62a6e43e5223"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113227",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 1/2024",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/161856",
+   "ementa": "Altera a Lei nº 11.947, de 16 de junho de 2009, que dispõe sobre o atendimento da alimentação escolar, para estimular o cumprimento de percentual mínimo de aquisição de gêneros alimentícios da agricultura familiar para o Programa Nacional de Alimentação Escolar.",
+   "autor": "Laércio Oliveira (PP/SE)",
+   "relator": "Professora Dorinha Seabra (UNIÃO/TO)",
+   "parecer": "Pela aprovação do Projeto na forma do Substitutivo que apresenta.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/643e9c62-b17a-4755-816f-4434b1f8ed21"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113228",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 1707/2024",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/170231",
+   "ementa": "Altera a Lei nº 4.829, de 5 de novembro de 1965, para autorizar a utilização de recursos do crédito rural por cooperativas de geração compartilhada constituídas por produtores rurais beneficiários do crédito rural do Programa Nacional de Fortalecimento da Agricultura Familiar (Pronaf), a Lei nº 12.087, de 11 de novembro de 2009, para incluir cooperativas de geração compartilhada entre as entidades elegíveis à garantia de risco às operações de crédito do Fundo Garantidor de Operações (FGO), e a Lei nº 14.042, de 19 de agosto de 2020, para reservar valores a serem destinados à concessão de garantias a operações de crédito para cooperativas de geração compartilhada em projetos de construção de usinas de microgeração e de minigeração de energia fotovoltaica; e institui o Programa Nacional de Desenvolvimento de Sistemas Agroflorestais de Base Agroecológica (PROSAFs) e o Programa Nacional de Florestas Produtivas.",
+   "autor": "Câmara dos Deputados",
+   "relator": "Sérgio Petecão (PSD/AC)",
+   "parecer": "Pela aprovação do Projeto na forma do Substitutivo que apresenta.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/52453b8d-7b8c-4623-8c14-df71f8d61519"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113229",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 4162/2024",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/173856",
+   "ementa": "Altera a Lei nº 11.959, de 29 de junho de 2009, para especificar e diferenciar a aquicultura em bem público da aquicultura em propriedade privada.",
+   "autor": "Câmara dos Deputados",
+   "relator": "Jorge Seif (PL/SC)",
+   "parecer": "Pela aprovação do Projeto e das 2 (duas) Emendas de redação que apresenta.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/b0816096-2e3a-4f18-ada7-557f35d0ff62"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113230",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 1115/2022",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/152938",
+   "ementa": "Institui a Política Nacional de Controle e Erradicação do Mormo e da Anemia Infecciosa Equina (AIE).",
+   "autor": "Alexandre Silveira (PSD/MG)",
+   "relator": "Eliziane Gama (PSD/MA)",
+   "parecer": "Pela aprovação do Projeto.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/b2c2f0bb-e4f7-4067-b011-c3654b1f924a"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113231",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 1087/2024",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/162902",
+   "ementa": "Estabelece percentual mínimo de aplicações de recursos do Fundo de Amparo ao Trabalhador (FAT), disponibilizados para o Banco Nacional de Desenvolvimento Econômico e Social (BNDES), para projetos e programas específicos de saneamento básico em áreas rurais, almejando o desenvolvimento da agricultura familiar e dos pequenos produtores rurais.",
+   "autor": "Mecias de Jesus (REPUBLICANOS/RR)",
+   "relator": "Sérgio Petecão (PSD/AC)",
+   "parecer": "Pela aprovação do Projeto, na forma do Substitutivo que apresenta, e pela rejeição da Emenda n° 1-CAE.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/ed4f26b8-9c99-4b9a-b8e4-72d5fd070ad9"
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-25",
+   "ordem": "14:10",
+   "hora": "logo após a 24ª Reunião",
+   "colegiado": "COMISSÃO DE AGRICULTURA E REFORMA AGRÁRIA (CRA)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/1307/reuniao/15092",
+   "situacao": "",
+   "reuniao": "Reunião Extraordinária",
+   "id": "SF-15092-113232",
+   "tipo": "materia",
+   "rotulo": "Deliberativa",
+   "titulo": "PL 1348/2024",
+   "tituloLink": "https://www25.senado.leg.br/web/atividade/materias/-/materia/163141",
+   "ementa": "Altera a Lei nº 8.171, de 17 de janeiro de 1991, e a Lei nº 11.326, de 24 de julho de 2006, para incluir o estímulo à utilização de bioinsumos na atividade agrícola entre os objetivos da política agrícola e da Política Nacional da Agricultura Familiar e Empreendimentos Familiares Rurais.",
+   "autor": "Janaína Farias (PT/CE)",
+   "relator": "Beto Faro (PT/PA)",
+   "parecer": "Pela aprovação do Projeto e das 3 (três) Emendas que apresenta.",
+   "parecerLink": "https://legis.senado.leg.br/sdleg-getter/documento/download/6e468d6c-90bf-48a2-8cf3-5b076414882c"
   },
   {
    "casa": "CD",
@@ -12329,15 +12463,39 @@
    "tituloLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15066",
    "ementa": "\"Debater os desafios e os avanços nas áreas de Acessibilidade, Equidade de Gênero e Raça e Sustentabilidade Ambiental, à luz da Agenda 2030 da Organização das Nações Unidas (ONU) e do trabalho desenvolvido pelas respectivas redes temáticas nacionais, bem como abordar o uso de ferramentas tecnológicas de apoio à gestão e ao monitoramento dessas políticas, com destaque para o SIMPLS – Sistema Integrado de Monitoramento e Planejamento para o Legislativo Sustentável, que passa a disponibilizar portais institucionais gratuitos, com perfis socioambientais das entidades participantes em todas as Unidades da Federação\".",
    "convidados": [
+    "Frederico Julio Goepfert Junior, Secretário-geral adjunto da Secretaria-Geral de Administração do Tribunal de Contas da União - SEGEDAM/TCU",
+    "Carmen Fortes Mesquita, Supervisora do EcoCâmara e Coordenadora da Rede Legislativo Sustentável da Câmara dos Deputados",
     "Ilana Trombka, Diretora-Geral do Senado Federal",
     "Fabiana de Freitas Goulart Lourenço, Coordenadora-Geral da Rede de Acessibilidade do Conselho de Justiça Federal - CJF",
-    "Benjamim Lima Júnior, Auditor Federal de Controle Externo - chefe de serviço de Gestão Socioambiental e de Transparência Administrativa do Tribunal de Contas da União - TCU",
     "Taís Penna de Queiroz, Gestora do Núcleo de Coordenação de Ações de Responsabilidade Social e Coordenadora da Rede Legislativo Sustentável do Senado Federal",
-    "Carmen Fortes Mesquita, Supervisora do EcoCâmara e Coordenadora da Rede Legislativo Sustentável da Câmara dos Deputados",
-    "Maria Terezinha Nunes, Coordenadora da Rede Equidade do Senado Federal",
     "Stella Maria Vaz Valadares Chervenski, Gestora do Núcleo de Coordenação de Ações de Diversidade, Equidade e Inclusão do Senado Federal",
-    "Frederico Julio Goepfert Junior, Secretário-Geral Adjunto de Administração - ADGEDAM/TCU",
-    "Humberto Mendes de Sá Formiga, Assessor Técnico do Núcleo de Políticas Econômicas do Senado Federal"
+    "Humberto Mendes de Sá Formiga, Assessor Técnico do Núcleo de Políticas Econômicas do Senado Federal",
+    "Maria Terezinha Nunes, Coordenadora da Rede Equidade do Senado Federal"
+   ]
+  },
+  {
+   "casa": "SF",
+   "dia": "2026-11-26",
+   "ordem": "10:00",
+   "hora": "10h",
+   "colegiado": "COMISSÃO DE DIREITOS HUMANOS E LEGISLAÇÃO PARTICIPATIVA (CDH)",
+   "reuniaoLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15104",
+   "situacao": "",
+   "reuniao": "II Reunião do Grupo de Trabalho (GT) Ciganismo - Políticas públicas e realidade dos povos ciganos",
+   "id": "SF-15104-19464",
+   "tipo": "evento",
+   "rotulo": "II Reunião do Grupo de Trabalho (GT) Ciganismo - Políticas públicas e realidade dos povos ciganos",
+   "titulo": "II Reunião do Grupo de Trabalho (GT) Ciganismo - Políticas públicas e realidade dos povos ciganos",
+   "tituloLink": "https://legis.senado.leg.br/atividade/comissoes/comissao/834/reuniao/15104",
+   "ementa": "Políticas públicas e realidade dos povos ciganos (moradia; educação; saúde; documentação; segurança pública; acesso à Justiça; desocupações; produção de dados; participação social).",
+   "convidados": [
+    "Carlos Henrique Wencland Reiss, Coordenador-Geral do Museu do Holocausto de Curitiba",
+    "Zuleica Iovanovich, Coletivo de Mulheres Ciganas do Brasil",
+    "Hayanne Giovana Iovanovitchi, Fundadora do Coletivo de Mulheres Ciganas do Brasil (COMCIB)",
+    "Edvalda Bispo dos Santos Viana, Representante do Conselho Nacional de Promoção da Igualdade Racial (CNPIR)",
+    "Matheus Alves do Nascimento, Especialista em Direitos Humanos",
+    "Mário Igor Shimura, Presidente do Instituto PluriBrasil",
+    "Marcos Toyansk Silva Guimarãis, Coordenador do Grupo de Estudos Ciganos no LEER-USP"
    ]
   },
   {
@@ -12374,9 +12532,9 @@
   }
  ],
  "erros": [
-  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/eventos/83409/pauta (mantida a pauta da coleta de 25/11 07:45)"
+  "Câmara: 429 Client Error: Too Many Requests for url: https://dadosabertos.camara.leg.br/api/v2/proposicoes/2632236/autores (mantida a pauta da coleta de 25/11 09:00)"
  ],
- "coletadoEm": "25/11 09:00",
+ "coletadoEm": "25/11 15:55",
  "idsSegunda": [
   "SF-15068-19425",
   "SF-15068-19426",
