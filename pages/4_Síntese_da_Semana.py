@@ -204,7 +204,7 @@ def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
 
 # ─── Rodada compartilhada (planilha da Agenda, abas "Síntese rodada" e "Síntese revisão") ───
 COMP = bool(AGENDA_SHEET_ID)
-WIDGETS = ("sb_", "sc_", "sd_", "sp_", "sm_", "cp_", "nb_")
+WIDGETS = ("sb_", "sc_", "sd_", "sp_", "sm_", "cp_", "nb_", "ap_")
 
 
 @st.cache_resource
@@ -263,6 +263,26 @@ def _mudou(chave: str, semana: dt.date, versao: str | None):
         SS["_assinatura"] = None
     except Exception as e:  # noqa: BLE001
         SS["_rev_erro"] = f"{type(e).__name__}: {e}"
+
+
+def _aplicar_a_todos(c: str, i: int, b: dict, alvos: list[tuple[str, int]]):
+    """Callback do Editar: o título e o texto deste bullet passam para os bullets da mesma notícia nos
+    outros clientes (roda antes do script, então pode trocar o valor de campo já desenhado)."""
+    vals = {"t": SS.get(f"sb_{c}_{i}_t", b["titulo"]), "x": SS.get(f"sb_{c}_{i}_x", b["texto"])}
+    novos = {f"sb_{c2}_{j}_{suf}": v for c2, j in alvos for suf, v in vals.items()}
+    SS.update(novos)
+    SS.pop("sint_arquivos", None)
+    SS.pop("sint_emails", None)
+    versao = SS.get("sint_versao")
+    if COMP and versao:
+        try:
+            quando = comp.registrar_varios(_abas_comp()[1], INI, versao, novos, _quem())
+            SS.setdefault("_rev_aplicado", {}).update({k: quando for k in novos})
+            _revisao.clear()
+            SS["_assinatura"] = None
+        except Exception as e:  # noqa: BLE001
+            SS["_rev_erro"] = f"{type(e).__name__}: {e}"
+    SS["_toast"] = f"Título e texto aplicados em {len(alvos)} {'cliente' if len(alvos) == 1 else 'clientes'}."
 
 
 def _sem_texto(noticias: list[dict]) -> list[dict]:
@@ -325,8 +345,11 @@ def _ultima_mudanca(grupo: str) -> str:
 
 def _campo(tipo, rotulo: str, chave: str, valor: str, **kw):
     """text_input/text_area que grava na revisão ao sair do campo."""
-    ini = {} if chave in SS else {"value": valor}
-    return tipo(rotulo, key=chave, on_change=_mudou, args=(chave, INI, SS.get("sint_versao")), **ini, **kw)
+    # value sempre preenchido: sem ele o Streamlit manda "" como padrão ao navegador, e o campo que
+    # monta depois (popover Editar aberto numa rodada seguinte) devolvia "" no próximo clique, o
+    # on_change gravava o vazio na revisão e o bullet perdia título e texto
+    return tipo(rotulo, key=chave, on_change=_mudou, args=(chave, INI, SS.get("sint_versao")),
+                value=SS.get(chave, valor), **kw)
 
 
 def _item(chave: str, html_corpo: str, valor: bool = True, editar=None, nota: str = ""):
@@ -340,7 +363,7 @@ def _item(chave: str, html_corpo: str, valor: bool = True, editar=None, nota: st
             if editar:
                 with st.popover("Editar", icon=":material/edit:"):
                     editar()
-            ini = {} if chave in SS else {"value": valor}
+            ini = {"value": bool(SS.get(chave, valor))}  # mesmo motivo de _campo
             on = st.toggle("Incluir", key=chave, label_visibility="collapsed", on_change=_mudou,
                            args=(chave, INI, SS.get("sint_versao")),
                            help="Desligado, o item não vai para o Word nem para o email", **ini)
@@ -479,6 +502,8 @@ if COMP:
         SS["_rev"] = rev
         SS["_assinatura"] = (SS.get("sint_versao"), len(rev), max((r["n"] for r in rev.values()), default=-1),
                              tuple(sorted((k, r["em"]) for k, r in remoto.items())))
+if SS.get("_toast"):
+    st.toast(SS.pop("_toast"))
 if SS.get("_rev_erro"):
     st.warning(f"Uma mudança não foi gravada para a equipe: {SS.pop('_rev_erro')}")
 
@@ -904,6 +929,13 @@ for c, tab in zip(abas, tabs):
                 def _editar(c=c, i=i, b=b):
                     _campo(st.text_input, "Título", f"sb_{c}_{i}_t", b["titulo"])
                     _campo(st.text_area, "Texto", f"sb_{c}_{i}_x", b["texto"], height=150)
+                    alvos = [(c2, j) for c2 in CLIS if c2 != c
+                             for j, b2 in enumerate(bullets.get(c2, [])) if b.get("url") and b2.get("url") == b["url"]]
+                    if alvos:
+                        nomes = ", ".join(dict.fromkeys(ss.CLIENTES[c2]["titulo"] for c2, _ in alvos))
+                        st.button(f"Aplicar a todos com esta notícia ({len(alvos)})", key=f"ap_{c}_{i}",
+                                  icon=":material/done_all:", on_click=_aplicar_a_todos, args=(c, i, b, alvos),
+                                  help=f"Troca título e texto do bullet da mesma notícia em: {nomes}.")
                     destinos = [x for x in CLIS if x != c]
                     if destinos:
                         st.divider()

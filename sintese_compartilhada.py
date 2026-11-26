@@ -124,6 +124,14 @@ def registrar(ws, semana: dt.date, versao: str, chave: str, valor, quem: str) ->
     return quando
 
 
+def registrar_varios(ws, semana: dt.date, versao: str, valores: dict, quem: str) -> str:
+    """Várias chaves numa linha cada, numa chamada só (aplicar o mesmo bullet a todos os clientes)."""
+    quando = agora()
+    ws.append_rows([[semana.isoformat(), versao, k, para_json(v), quem, quando] for k, v in valores.items()],
+                   value_input_option="RAW")
+    return quando
+
+
 def ler_revisao(ws, semana: dt.date, versao: str) -> dict:
     """{chave: {"valor", "por", "em", "n"}}: a última linha de cada chave na versão da rodada."""
     s = semana.isoformat()
