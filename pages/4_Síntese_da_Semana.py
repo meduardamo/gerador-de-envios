@@ -204,7 +204,7 @@ def _movs_da_semana(ini: dt.date, fim: dt.date, chave_lista: int):
 
 # ─── Rodada compartilhada (planilha da Agenda, abas "Síntese rodada" e "Síntese revisão") ───
 COMP = bool(AGENDA_SHEET_ID)
-WIDGETS = ("sb_", "sc_", "sd_", "sp_", "sm_")
+WIDGETS = ("sb_", "sc_", "sd_", "sp_", "sm_", "cp_", "nb_")
 
 
 @st.cache_resource
@@ -329,7 +329,7 @@ def _campo(tipo, rotulo: str, chave: str, valor: str, **kw):
     return tipo(rotulo, key=chave, on_change=_mudou, args=(chave, INI, SS.get("sint_versao")), **ini, **kw)
 
 
-def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
+def _item(chave: str, html_corpo: str, valor: bool = True, editar=None, nota: str = ""):
     """Um bloco branco: conteúdo à esquerda; à direita, Editar (quando há) e a chave de incluir.
     A chave e o texto editado vão para a aba de revisão, e a equipe vê o mesmo estado."""
     grupo = chave[:-3] if chave.endswith("_on") else chave
@@ -345,7 +345,7 @@ def _item(chave: str, html_corpo: str, valor: bool = True, editar=None):
                            args=(chave, INI, SS.get("sint_versao")),
                            help="Desligado, o item não vai para o Word nem para o email", **ini)
         with col1:
-            marca = _ultima_mudanca(grupo)
+            marca = _ultima_mudanca(grupo) or nota
             st.markdown(f'<div class="{"" if on else "sx-fora"}">{html_corpo}'
                         + (f'<p class="sx-quem">{esc(marca)}</p>' if marca else "") + "</div>",
                         unsafe_allow_html=True)
@@ -360,7 +360,7 @@ def _limpar_tudo():
               "sint_arquivos", "sint_emails", "sint_acomp_ok", "sint_acomp_n",
               "sint_movs_xls", "sint_erros", "sint_semana", "sint_versao", "sint_meta", "_rev_aplicado", "_rev"):
         SS.pop(k, None)
-    for k in [k for k in list(SS.keys()) if str(k).startswith(("sb_", "sc_", "sd_", "sp_", "sm_", "xls_"))]:
+    for k in [k for k in list(SS.keys()) if str(k).startswith(WIDGETS + ("xls_",))]:
         SS.pop(k, None)
     SS["sint_upload_ver"] = SS.get("sint_upload_ver", 0) + 1
     edu.limpar()
@@ -457,6 +457,11 @@ if COMP:
         v_rem = (remoto.get("versao") or {}).get("valor")
         if v_rem != SS.get("sint_versao") or SS.pop("_forcar_adocao", False):
             _adotar(remoto)
+        elif remoto.get("bullets") and remoto["bullets"]["valor"] != SS.get("sint_bullets"):
+            SS["sint_bullets"] = remoto["bullets"]["valor"]
+            SS.setdefault("sint_meta", {})["bullets"] = (remoto["bullets"]["por"], remoto["bullets"]["em"])
+            SS.pop("sint_arquivos", None)
+            SS.pop("sint_emails", None)
         rev = {}
         if SS.get("sint_versao"):
             try:
@@ -850,6 +855,19 @@ def _dou_padrao(a) -> bool:
     return not (ss.dou_rotina(a) or a.get("duvida"))
 
 
+def _acrescentar_bullet(dest: str, b: dict, aviso: str):
+    """Anexa bullet manual ou copiado no fim da lista do cliente para preservar os índices da revisão."""
+    bullets.setdefault(dest, []).append(b)
+    SS["sint_bullets"] = bullets
+    for k in ("sint_arquivos", "sint_emails"):
+        SS.pop(k, None)
+    if SS.get("sint_versao"):
+        _gravar(INI, {"bullets": bullets})
+    st.toast(aviso)
+    st.rerun()
+
+
+nots_validas = [n for n in noticias if not ss.secao_de_clipping(n.get("secao", ""))]
 tabs = st.tabs([f"{ss.CLIENTES[c]['titulo']} · {len(bullets[c])}" for c in abas])
 for c, tab in zip(abas, tabs):
     with tab:
@@ -886,15 +904,73 @@ for c, tab in zip(abas, tabs):
                 def _editar(c=c, i=i, b=b):
                     _campo(st.text_input, "Título", f"sb_{c}_{i}_t", b["titulo"])
                     _campo(st.text_area, "Texto", f"sb_{c}_{i}_x", b["texto"], height=150)
+                    destinos = [x for x in CLIS if x != c]
+                    if destinos:
+                        st.divider()
+                        dest = st.selectbox("Copiar para outro cliente", destinos,
+                                            format_func=lambda x: ss.CLIENTES[x]["titulo"],
+                                            key=f"cp_{c}_{i}_dst")
+                        sec_dest = st.selectbox("Seção no destino", ss.secoes_do_cliente(dest),
+                                                key=f"cp_{c}_{i}_sec_{dest}")
+                        if st.button("Copiar bullet", key=f"cp_{c}_{i}_go", icon=":material/content_copy:"):
+                            quem = comp.quem_curto(_quem()) or "Alguém"
+                            novo = {
+                                "url": b.get("url", ""),
+                                "secao": sec_dest,
+                                "tema": b.get("tema", ""),
+                                "titulo": SS.get(f"sb_{c}_{i}_t", b["titulo"]).strip(),
+                                "texto": SS.get(f"sb_{c}_{i}_x", b["texto"]).strip(),
+                                "documentos": list(b.get("documentos") or []),
+                                "fonte_titulo": b.get("fonte_titulo", ""),
+                                "adicionado": f"{quem} copiou de {ss.CLIENTES[c]['titulo']} · {comp.hora_curta(comp.agora())}",
+                            }
+                            _acrescentar_bullet(dest, novo, f"Bullet copiado para {ss.CLIENTES[dest]['titulo']}.")
 
                 _item(f"sb_{c}_{i}_on",
                       (f'<div class="sx-top">{chip(b.get("tema"))}</div>' if b.get("tema") else "")
                       + f'<p class="sx-h">{_a(b["url"], tit.rstrip(".") + ".")}</p>'
                       f'<p class="sx-txt">{esc(txt)}</p>'
-                      + (f'<p class="sx-meta">Documentos citados: {docs}</p>' if docs else ""), editar=_editar)
+                      + (f'<p class="sx-meta">Documentos citados: {docs}</p>' if docs else ""),
+                      editar=_editar, nota=b.get("adicionado", ""))
         if not bullets[c] and not clipping.get(c):
             secao("Destaques", "", COR["dest"], menor=True)
             vazio("Nenhuma notícia da semana tem relação direta com os temas do cliente.")
+        with st.popover("Adicionar bullet", icon=":material/add:", key=f"nb_{c}_pop"):
+            escolhida = st.selectbox(
+                "Notícia da Divisão (opcional)", [None] + nots_validas,
+                format_func=lambda n: "Colar outro link manualmente" if n is None
+                else f"[{n.get('secao', '')}] {(n.get('titulo') or n['url'])[:75]}",
+                key=f"nb_{c}_not",
+            )
+            if escolhida and escolhida.get("titulo"):
+                st.caption(escolhida["titulo"])
+            url_manual = "" if escolhida else st.text_input(
+                "Link da notícia (opcional)", key=f"nb_{c}_url", placeholder="https://..."
+            )
+            sec_nb = st.selectbox("Seção", ss.secoes_do_cliente(c), key=f"nb_{c}_sec")
+            tema_nb = st.text_input(
+                "Tema (opcional)", key=f"nb_{c}_tema",
+                placeholder="Se vazio, usa a seção da notícia escolhida",
+            )
+            tit_nb = st.text_input("Título", key=f"nb_{c}_tit", placeholder="Frase no presente resumindo o fato.")
+            txt_nb = st.text_area("Texto", key=f"nb_{c}_txt", height=130,
+                                  placeholder="1 a 3 frases objetivas com fatos e desdobramentos.")
+            if st.button("Adicionar à síntese", type="primary", key=f"nb_{c}_go",
+                         disabled=not (tit_nb.strip() and txt_nb.strip())):
+                quem = comp.quem_curto(_quem()) or "Alguém"
+                novo = {
+                    "url": (escolhida["url"] if escolhida else url_manual).strip(),
+                    "secao": sec_nb,
+                    "tema": tema_nb.strip() or (escolhida.get("secao", "") if escolhida else ""),
+                    "titulo": tit_nb.strip(),
+                    "texto": txt_nb.strip(),
+                    "documentos": [],
+                    "fonte_titulo": escolhida.get("titulo", "") if escolhida else "",
+                    "adicionado": f"{quem} adicionou · {comp.hora_curta(comp.agora())}",
+                }
+                for kf in (f"nb_{c}_not", f"nb_{c}_url", f"nb_{c}_tema", f"nb_{c}_tit", f"nb_{c}_txt"):
+                    SS.pop(kf, None)
+                _acrescentar_bullet(c, novo, f"Bullet adicionado em {ss.CLIENTES[c]['titulo']}.")
 
         secao("Novas proposições", plural(len(novas), "proposição", "proposições") if novas else "", COR["novas"],
               "Da tabela NOVAS PROPOSIÇÕES da Divisão. As marcadas com ? entram desligadas. "
